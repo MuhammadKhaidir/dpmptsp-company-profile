@@ -496,44 +496,59 @@
             cat.classList.remove('is-attacking');
         }
 
-        function enterCat() {
-            if (state === 'idle' || state === 'entering') return;
-            state = 'entering';
-            stopAttack();
-            idleAnimator.stop();
-            cat.classList.remove('is-hidden', 'is-running-out', 'is-idle-pose');
-            cat.classList.add('is-running-in');
-            runAnimator.start();
+ function enterCat() {
+    if (state === 'idle' || state === 'entering') return;
+    state = 'entering';
+    stopAttack();
+    idleAnimator.stop();
+    cat.classList.remove('is-hidden', 'is-running-out', 'is-idle-pose');
+    cat.classList.add('is-running-in');
+    runAnimator.start();
 
-            cat.addEventListener('animationend', function onEnd() {
-                cat.removeEventListener('animationend', onEnd);
-                if (state !== 'entering') return;
-                state = 'idle';
-                cat.classList.remove('is-running-in');
-                cat.classList.add('is-idle-pose');
-                runAnimator.stop();
-                idleAnimator.start();
-            }, { once: true });
-        }
+    var settled = false;
+    function settle() {
+        if (settled) return;
+        settled = true;
+        cat.removeEventListener('animationend', onEnd);
+        if (state !== 'entering') return;
+        state = 'idle';
+        cat.classList.remove('is-running-in');
+        cat.classList.add('is-idle-pose');
+        runAnimator.stop();
+        idleAnimator.start();
+    }
+    function onEnd() { settle(); }
+    cat.addEventListener('animationend', onEnd, { once: true });
+    // Fallback kalau animationend gak nembak (ke-interupsi transisi lain,
+    // reduced-motion aktif, atau main thread lagi sibuk) -- state tetap
+    // dipaksa lanjut biar gak nyangkut permanen.
+    setTimeout(settle, 500);
+}
 
-        function exitCat() {
-            if (state === 'hidden' || state === 'exiting') return;
-            state = 'exiting';
-            stopAttack();
-            idleAnimator.stop();
-            cat.classList.remove('is-idle-pose', 'is-running-in');
-            cat.classList.add('is-running-out');
-            runAnimator.start();
+function exitCat() {
+    if (state === 'hidden' || state === 'exiting') return;
+    state = 'exiting';
+    stopAttack();
+    idleAnimator.stop();
+    cat.classList.remove('is-idle-pose', 'is-running-in');
+    cat.classList.add('is-running-out');
+    runAnimator.start();
 
-            cat.addEventListener('animationend', function onEnd() {
-                cat.removeEventListener('animationend', onEnd);
-                if (state !== 'exiting') return;
-                state = 'hidden';
-                cat.classList.remove('is-running-out');
-                cat.classList.add('is-hidden');
-                runAnimator.stop();
-            }, { once: true });
-        }
+    var settled = false;
+    function settle() {
+        if (settled) return;
+        settled = true;
+        cat.removeEventListener('animationend', onEnd);
+        if (state !== 'exiting') return;
+        state = 'hidden';
+        cat.classList.remove('is-running-out');
+        cat.classList.add('is-hidden');
+        runAnimator.stop();
+    }
+    function onEnd() { settle(); }
+    cat.addEventListener('animationend', onEnd, { once: true });
+    setTimeout(settle, 500);
+}
 
         function hideCatInstant() {
             if (state === 'hidden') return;
