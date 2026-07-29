@@ -3,7 +3,7 @@ const multer = require('multer');
 const crypto = require('crypto');
 
 const store = require('../data/qrImageStore');
-const { redis, getJSON, setJSON } = require('../lib/redisClient');
+const { getJSON, setJSON, delKey } = require('../lib/redisClient');
 
 const router = express.Router();
 
@@ -71,7 +71,7 @@ async function registerFailedAttempt(req) {
 }
 
 async function clearFailedAttempts(req) {
-    await redis.del(lockoutKey(req));
+    await delKey(lockoutKey(req));
 }
 
 function verifyPassword(inputPassword) {
