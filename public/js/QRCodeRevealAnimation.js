@@ -435,28 +435,41 @@
         });
     }
 
-    function createFrameAnimator(imgEl, frames, fps) {
-        var interval = null;
-        var idx = 0;
-        var delay = 1000 / fps;
+function createFrameAnimator(imgEl, frames, fps) {
+    var frameDuration = 1000 / fps;
+    var rafId = null;
+    var idx = 0;
+    var lastFrameTime = 0;
 
-        function start() {
-            stop();
-            idx = 0;
+    function tick(now) {
+        if (!lastFrameTime) lastFrameTime = now;
+        var elapsed = now - lastFrameTime;
+        if (elapsed >= frameDuration) {
+            // Kalau telat (main thread sempat sibuk), lompat ke frame yang
+            // SEHARUSNYA saat ini -- bukan numpuk kayak setInterval.
+            var framesToAdvance = Math.floor(elapsed / frameDuration);
+            idx = (idx + framesToAdvance) % frames.length;
             imgEl.src = frames[idx];
-            interval = setInterval(function () {
-                idx = (idx + 1) % frames.length;
-                imgEl.src = frames[idx];
-            }, delay);
+            lastFrameTime = now - (elapsed % frameDuration);
         }
-        function stop() {
-            if (interval) {
-                clearInterval(interval);
-                interval = null;
-            }
-        }
-        return { start: start, stop: stop };
+        rafId = requestAnimationFrame(tick);
     }
+
+    function start() {
+        stop();
+        idx = 0;
+        lastFrameTime = 0;
+        imgEl.src = frames[idx];
+        rafId = requestAnimationFrame(tick);
+    }
+    function stop() {
+        if (rafId) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+        }
+    }
+    return { start: start, stop: stop };
+}
 
     function setupCat(panel) {
         var cat = document.getElementById('qr-cat');
