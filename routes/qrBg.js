@@ -1,45 +1,24 @@
 // routes/qrBg.js
 //
 // Router Express untuk fitur "ganti gambar LATAR BELAKANG di belakang
-// kotak QR" (elemen .qr-hover-bg-left/center/right yang muncul redup saat
-// kotak QR di-hover). TERPISAH dari routes/qrImages.js (yang mengurus
-// gambar kode QR itu sendiri) -- keduanya independen.
-//
-// Endpoint:
-//   GET  /api/qr-bg/meta        -> info slot mana yang memiliki gambar
-//                                   latar khusus + kapan terakhir diperbarui
-//   GET  /api/qr-bg/file/:slot  -> mengalirkan BYTES gambar latar slot itu
-//   POST /api/qr-bg/:slot       -> mengunggah/mengganti gambar latar
-//                                   (WAJIB kata sandi)
-//
-// CARA PASANG ke server.js (2 baris, taruh dekat route qr-images):
-//   const qrBgRouter = require('./routes/qrBg');
-//   app.use('/api/qr-bg', qrBgRouter);
-//
-// WAJIB: multer (sudah terpasang dari fitur ganti gambar QR sebelumnya,
-// tidak perlu instal ulang).
-//
-// KATA SANDI: memakai variabel .env yang SAMA dengan fitur pengelolaan
-// konten lain (QR_EDIT_PASSWORD), supaya hanya satu kata sandi yang perlu
-// diingat untuk semua fitur kelola konten.
-//
-// CATATAN PATH: baris require di bawah mengasumsikan folder data/ berada
-// di root proyek (sejajar dengan routes/, server.js), sama seperti
-// routes/qrImages.js. Kalau folder data/ ada di dalam public/data/, ganti
-// baris require menjadi: require('../public/data/qrBgStore')
+// kotak QR". Endpoint & URL SENGAJA dipertahankan bentuknya sama persis
+// kayak sebelumnya (/api/qr-bg/meta, /api/qr-bg/file/:slot,
+// POST /api/qr-bg/:slot) -- biar frontend (QRCodeRevealAnimation.js) gak
+// perlu diubah sama sekali.
 
 const express = require('express');
 const multer = require('multer');
-const path = require('path');
 const crypto = require('crypto');
-const fs = require('fs');
 
 const store = require('../data/qrBgStore');
+const { getJSON, setJSON, delKey } = require('../lib/redisClient');
 
 const router = express.Router();
 
 const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+// Diturunin dari 5MB -> 4MB, sama alasannya kayak di routes/qrImages.js:
+// Vercel Functions punya limit ukuran body request sekitar 4.5MB.
+const MAX_FILE_SIZE = 4 * 1024 * 1024;
 
 const upload = multer({
     storage: multer.memoryStorage(),
@@ -54,21 +33,21 @@ const upload = multer({
 });
 
 /* ------------------------------------------------------------------ */
-/* Proteksi kata sandi + penjagaan dasar (pola identik dengan          */
-/* routes/qrImages.js)                                                 */
+/* Rate limit -- sekarang lewat Redis (bukan Map di memory), pola sama  */
+/* persis dengan routes/qrImages.js                                    */
 /* ------------------------------------------------------------------ */
-
-const failedAttempts = new Map();
 const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS = 5 * 60 * 1000;
+const LOCKOUT_SECONDS = 5 * 60;
 
 function getClientIp(req) {
     return req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
 }
+function lockoutKey(req) {
+    return `qr-bg-lockout:${getClientIp(req)}`;
+}
 
-function checkLockout(req, res) {
-    const ip = getClientIp(req);
-    const rec = failedAttempts.get(ip);
+async function checkLockout(req, res) {
+    const rec = await getJSON(lockoutKey(req));
     if (rec && rec.lockedUntil && Date.now() < rec.lockedUntil) {
         const waitSec = Math.ceil((rec.lockedUntil - Date.now()) / 1000);
         res.status(429).json({
@@ -80,19 +59,19 @@ function checkLockout(req, res) {
     return true;
 }
 
-function registerFailedAttempt(req) {
-    const ip = getClientIp(req);
-    const rec = failedAttempts.get(ip) || { count: 0, lockedUntil: 0 };
+async function registerFailedAttempt(req) {
+    const key = lockoutKey(req);
+    const rec = (await getJSON(key)) || { count: 0, lockedUntil: 0 };
     rec.count += 1;
     if (rec.count >= MAX_ATTEMPTS) {
-        rec.lockedUntil = Date.now() + LOCKOUT_MS;
+        rec.lockedUntil = Date.now() + LOCKOUT_SECONDS * 1000;
         rec.count = 0;
     }
-    failedAttempts.set(ip, rec);
+    await setJSON(key, rec, { ex: LOCKOUT_SECONDS * 2 });
 }
 
-function clearFailedAttempts(req) {
-    failedAttempts.delete(getClientIp(req));
+async function clearFailedAttempts(req) {
+    await delKey(lockoutKey(req));
 }
 
 function verifyPassword(inputPassword) {
@@ -107,88 +86,87 @@ function verifyPassword(inputPassword) {
     return { ok: match, reason: match ? null : 'wrong' };
 }
 
-/* ------------------------------------------------------------------ */
-/* GET /api/qr-bg/meta                                                 */
-/* ------------------------------------------------------------------ */
-router.get('/meta', (req, res) => {
-    res.json({ success: true, meta: store.getMeta() });
+router.get('/meta', async (req, res) => {
+    try {
+        const meta = await store.getMeta();
+        res.json({ success: true, meta });
+    } catch (err) {
+        console.error('[qrBg] Gagal ambil meta:', err);
+        res.status(500).json({ success: false, message: 'Gagal mengambil data dari server.' });
+    }
 });
 
-/* ------------------------------------------------------------------ */
-/* GET /api/qr-bg/file/:slot                                           */
-/* ------------------------------------------------------------------ */
-router.get('/file/:slot', (req, res) => {
+// Redirect ke URL Blob yang sedang aktif -- CSS background-image & <img>
+// otomatis ikutin redirect ini, gak ada yang perlu diubah di frontend.
+router.get('/file/:slot', async (req, res) => {
     const { slot } = req.params;
     if (!store.isValidSlot(slot)) {
         return res.status(404).json({ success: false, message: 'Slot tidak dikenali.' });
     }
-    const entry = store.getSlotImage(slot);
-    if (!entry) {
-        return res.status(404).json({ success: false, message: 'Belum terdapat gambar latar khusus untuk slot ini.' });
+    try {
+        const entry = await store.getSlotImage(slot);
+        if (!entry || !entry.url) {
+            return res.status(404).json({ success: false, message: 'Belum terdapat gambar latar khusus untuk slot ini.' });
+        }
+        res.redirect(302, entry.url);
+    } catch (err) {
+        console.error('[qrBg] Gagal ambil file:', err);
+        res.status(500).json({ success: false, message: 'Gagal mengambil berkas dari server.' });
     }
-    const filePath = path.join(store.UPLOAD_DIR, entry.filename);
-    if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ success: false, message: 'Berkas gambar tidak ditemukan pada server.' });
-    }
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Content-Type', entry.mimeType || 'application/octet-stream');
-    res.sendFile(filePath);
 });
 
-/* ------------------------------------------------------------------ */
-/* POST /api/qr-bg/:slot  (multipart: password, image)                 */
-/* ------------------------------------------------------------------ */
 router.post('/:slot', (req, res) => {
     const { slot } = req.params;
     if (!store.isValidSlot(slot)) {
         return res.status(404).json({ success: false, message: 'Slot tidak dikenali.' });
     }
 
-    if (!checkLockout(req, res)) return;
-
-    upload.single('image')(req, res, (err) => {
-        if (err) {
-            return res.status(400).json({ success: false, message: err.message || 'Proses pengunggahan gagal.' });
-        }
-
-        const { password } = req.body;
-        const verdict = verifyPassword(password);
-
-        if (!verdict.ok) {
-            registerFailedAttempt(req);
-            if (verdict.reason === 'not-configured') {
-                return res.status(500).json({
-                    success: false,
-                    message: 'Fitur pengelolaan gambar latar belum dikonfigurasi. Silakan atur QR_EDIT_PASSWORD pada berkas .env server terlebih dahulu.'
-                });
-            }
-            return res.status(401).json({ success: false, message: 'Kata sandi yang Anda masukkan salah.' });
-        }
-
-        clearFailedAttempts(req);
-
-        if (!req.file) {
-            return res.status(400).json({ success: false, message: 'Tidak ada berkas gambar yang dikirim.' });
-        }
-
-        const ext = (req.file.mimetype.split('/')[1] || 'png').replace('jpeg', 'jpg');
-        const filename = `${slot}-bg-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
-        const destPath = path.join(store.UPLOAD_DIR, filename);
-
-        fs.writeFile(destPath, req.file.buffer, (writeErr) => {
-            if (writeErr) {
-                console.error('[qrBg] Gagal menyimpan berkas:', writeErr);
-                return res.status(500).json({ success: false, message: 'Gagal menyimpan berkas pada server.' });
+    upload.single('image')(req, res, async (uploadErr) => {
+        // Seluruh isi callback dibungkus try/catch -- apa pun yang meleset
+        // (Blob/Redis gagal diakses, dll) SELALU kirim response JSON,
+        // bukan bikin function mati diam-diam (itu penyebab ERR_EMPTY_RESPONSE
+        // yang kejadian kemarin).
+        try {
+            if (uploadErr) {
+                return res.status(400).json({ success: false, message: uploadErr.message || 'Proses pengunggahan gagal.' });
             }
 
-            const entry = store.setSlotImage(slot, {
-                filename,
+            if (!(await checkLockout(req, res))) return;
+
+            const { password } = req.body;
+            const verdict = verifyPassword(password);
+
+            if (!verdict.ok) {
+                await registerFailedAttempt(req);
+                if (verdict.reason === 'not-configured') {
+                    return res.status(500).json({
+                        success: false,
+                        message: 'Fitur pengelolaan gambar latar belum dikonfigurasi. Silakan atur QR_EDIT_PASSWORD pada Environment Variables server terlebih dahulu.'
+                    });
+                }
+                return res.status(401).json({ success: false, message: 'Kata sandi yang Anda masukkan salah.' });
+            }
+
+            await clearFailedAttempts(req);
+
+            if (!req.file) {
+                return res.status(400).json({ success: false, message: 'Tidak ada berkas gambar yang dikirim.' });
+            }
+
+            const ext = (req.file.mimetype.split('/')[1] || 'png').replace('jpeg', 'jpg');
+            const entry = await store.setSlotImage(slot, {
+                buffer: req.file.buffer,
                 mimeType: req.file.mimetype,
-                updatedAt: Date.now()
+                ext
             });
 
             res.json({ success: true, message: 'Gambar latar berhasil diperbarui.', entry });
-        });
+        } catch (fatalErr) {
+            console.error('[qrBg] Error tak terduga:', fatalErr);
+            if (!res.headersSent) {
+                res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server saat menyimpan perubahan.' });
+            }
+        }
     });
 });
 

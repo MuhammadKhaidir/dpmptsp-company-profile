@@ -1,48 +1,28 @@
 // data/mapStore.js
 //
-// Penyimpanan sederhana (file JSON, BUKAN MySQL) untuk titik-titik lokasi
-// investasi yang ditampilkan di peta interaktif.
+// Penyimpanan titik-titik lokasi investasi untuk lingkungan SERVERLESS.
+// Beda dari QR/musik: gak ada berkas yang diupload, cuma data teks/angka
+// (judul, deskripsi, lat, lng) -- jadi CUKUP Upstash Redis, gak perlu
+// Vercel Blob. Seluruh daftar disimpan sebagai satu array JSON di bawah
+// satu key Redis.
 
-const fs = require('fs');
-const path = require('path');
 const crypto = require('crypto');
+const { getJSON, setJSON } = require('../lib/redisClient');
 
-// Lihat komentar di data/qrImageStore.js -- pola yang sama persis.
-const DATA_DIR = process.env.DATA_DIR || __dirname;
-const STORE_FILE = path.join(DATA_DIR, 'map-locations.json');
+const LIST_KEY = 'map:locations';
 
-function ensureReady() {
-    if (!fs.existsSync(STORE_FILE)) {
-        fs.writeFileSync(STORE_FILE, JSON.stringify([], null, 2));
-    }
+async function getAll() {
+    const list = await getJSON(LIST_KEY);
+    return Array.isArray(list) ? list : [];
 }
 
-function readStore() {
-    ensureReady();
-    try {
-        const raw = fs.readFileSync(STORE_FILE, 'utf8');
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? parsed : [];
-    } catch (err) {
-        console.error('[mapStore] Gagal membaca store, reset ke kosong:', err);
-        return [];
-    }
+async function getById(id) {
+    const list = await getAll();
+    return list.find((loc) => loc.id === id) || null;
 }
 
-function writeStore(list) {
-    fs.writeFileSync(STORE_FILE, JSON.stringify(list, null, 2));
-}
-
-function getAll() {
-    return readStore();
-}
-
-function getById(id) {
-    return readStore().find((loc) => loc.id === id) || null;
-}
-
-function addLocation(data) {
-    const list = readStore();
+async function addLocation(data) {
+    const list = await getAll();
     const entry = {
         id: Date.now().toString(36) + '-' + crypto.randomBytes(4).toString('hex'),
         lat: data.lat,
@@ -53,12 +33,12 @@ function addLocation(data) {
         updatedAt: Date.now()
     };
     list.push(entry);
-    writeStore(list);
+    await setJSON(LIST_KEY, list);
     return entry;
 }
 
-function updateLocation(id, patch) {
-    const list = readStore();
+async function updateLocation(id, patch) {
+    const list = await getAll();
     const idx = list.findIndex((loc) => loc.id === id);
     if (idx === -1) return null;
 
@@ -72,15 +52,15 @@ function updateLocation(id, patch) {
         updatedAt: Date.now()
     };
     list[idx] = updated;
-    writeStore(list);
+    await setJSON(LIST_KEY, list);
     return updated;
 }
 
-function deleteLocation(id) {
-    const list = readStore();
+async function deleteLocation(id) {
+    const list = await getAll();
     const next = list.filter((loc) => loc.id !== id);
     const changed = next.length !== list.length;
-    if (changed) writeStore(next);
+    if (changed) await setJSON(LIST_KEY, next);
     return changed;
 }
 

@@ -1,95 +1,87 @@
 // data/musicStore.js
 //
-// Penyimpanan sederhana (file JSON, BUKAN MySQL) untuk fitur musik latar.
-// Menyimpan hingga 3 slot lagu (slot1, slot2, slot3), masing-masing berisi
-// judul + berkas audio.
+// Penyimpanan lagu untuk lingkungan SERVERLESS (Vercel), pola sama persis
+// dengan data/qrImageStore.js:
+// - Berkas audio -> Vercel Blob
+// - Metadata (judul, url, waktu update) -> Upstash Redis
 
-const fs = require('fs');
-const path = require('path');
-
-// Lihat komentar di data/qrImageStore.js -- pola yang sama persis.
-const DATA_DIR = process.env.DATA_DIR || __dirname;
-const STORE_FILE = path.join(DATA_DIR, 'music-store.json');
-const UPLOAD_DIR = path.join(DATA_DIR, 'music-uploads');
+const { put, del } = require('@vercel/blob');
+const { getJSON, setJSON, delKey } = require('../lib/redisClient');
 
 const SLOTS = ['slot1', 'slot2', 'slot3'];
-
-function ensureReady() {
-    if (!fs.existsSync(UPLOAD_DIR)) {
-        fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-    }
-    if (!fs.existsSync(STORE_FILE)) {
-        const empty = { slot1: null, slot2: null, slot3: null };
-        fs.writeFileSync(STORE_FILE, JSON.stringify(empty, null, 2));
-    }
-}
-
-function readStore() {
-    ensureReady();
-    try {
-        const raw = fs.readFileSync(STORE_FILE, 'utf8');
-        return JSON.parse(raw);
-    } catch (err) {
-        console.error('[musicStore] Gagal membaca store, reset ke kosong:', err);
-        return { slot1: null, slot2: null, slot3: null };
-    }
-}
-
-function writeStore(store) {
-    fs.writeFileSync(STORE_FILE, JSON.stringify(store, null, 2));
-}
 
 function isValidSlot(slot) {
     return SLOTS.includes(slot);
 }
 
-function setSlotTrack(slot, entry) {
-    if (!isValidSlot(slot)) throw new Error('Slot tidak valid: ' + slot);
-    const store = readStore();
-
-    const prev = store[slot];
-    if (prev && prev.filename) {
-        fs.unlink(path.join(UPLOAD_DIR, prev.filename), () => {});
-    }
-
-    store[slot] = entry;
-    writeStore(store);
-    return store[slot];
+function keyFor(slot) {
+    return `music:${slot}`;
 }
 
-function clearSlotTrack(slot) {
-    if (!isValidSlot(slot)) throw new Error('Slot tidak valid: ' + slot);
-    const store = readStore();
-    const prev = store[slot];
-    if (prev && prev.filename) {
-        fs.unlink(path.join(UPLOAD_DIR, prev.filename), () => {});
-    }
-    store[slot] = null;
-    writeStore(store);
-}
-
-function getSlotTrack(slot) {
+// entry: { url, pathname, mimeType, title, updatedAt }
+async function getSlotTrack(slot) {
     if (!isValidSlot(slot)) return null;
-    return readStore()[slot] || null;
+    return getJSON(keyFor(slot));
 }
 
-function getPublicList() {
-    const store = readStore();
-    return SLOTS
-        .map((slot) => {
-            const entry = store[slot];
-            if (!entry) return null;
-            return { slot, title: entry.title || 'Tanpa Judul', updatedAt: entry.updatedAt };
-        })
-        .filter(Boolean);
+// params: { buffer, mimeType, ext, title }
+async function setSlotTrack(slot, { buffer, mimeType, ext, title }) {
+    if (!isValidSlot(slot)) throw new Error('Slot tidak valid: ' + slot);
+
+    const prev = await getSlotTrack(slot);
+
+    const blob = await put(`music/${slot}-${Date.now()}.${ext}`, buffer, {
+        access: 'public',
+        contentType: mimeType,
+        addRandomSuffix: true
+    });
+
+    const entry = {
+        url: blob.url,
+        pathname: blob.pathname,
+        mimeType,
+        title,
+        updatedAt: Date.now()
+    };
+
+    await setJSON(keyFor(slot), entry);
+
+    if (prev && prev.pathname && prev.pathname !== blob.pathname) {
+        del(prev.pathname).catch((err) => {
+            console.error('[musicStore] Gagal hapus blob lama:', err);
+        });
+    }
+
+    return entry;
+}
+
+async function clearSlotTrack(slot) {
+    if (!isValidSlot(slot)) throw new Error('Slot tidak valid: ' + slot);
+    const prev = await getSlotTrack(slot);
+    if (prev && prev.pathname) {
+        await del(prev.pathname).catch((err) => {
+            console.error('[musicStore] Gagal hapus blob:', err);
+        });
+    }
+    await delKey(keyFor(slot));
+}
+
+async function getPublicList() {
+    const list = [];
+    for (const slot of SLOTS) {
+        const entry = await getSlotTrack(slot);
+        if (entry) {
+            list.push({ slot, title: entry.title || 'Tanpa Judul', updatedAt: entry.updatedAt });
+        }
+    }
+    return list;
 }
 
 module.exports = {
     SLOTS,
-    UPLOAD_DIR,
     isValidSlot,
+    getSlotTrack,
     setSlotTrack,
     clearSlotTrack,
-    getSlotTrack,
     getPublicList
 };

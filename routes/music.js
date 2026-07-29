@@ -1,44 +1,21 @@
 // routes/music.js
 //
-// Router Express untuk fitur pemutar musik latar. Mendukung hingga 3 slot
-// lagu (slot1, slot2, slot3). Endpoint:
-//   GET    /api/music/list         -> daftar lagu yang tersedia (publik,
-//                                      tidak perlu kata sandi -- hanya untuk
-//                                      melihat & memutar)
-//   GET    /api/music/file/:slot   -> streaming berkas audio (mendukung
-//                                      Range header untuk seek/scrubbing)
-//   POST   /api/music/:slot        -> unggah/ganti lagu (WAJIB kata sandi)
-//   DELETE /api/music/:slot        -> hapus lagu dari slot (WAJIB kata sandi)
+// Endpoint & URL SENGAJA dipertahankan sama persis (/api/music/list,
+// /api/music/file/:slot, POST & DELETE /api/music/:slot) -- frontend
+// (js/MusicPlayer.js) gak perlu diubah.
 //
-// CARA PASANG ke server.js (2 baris, taruh dekat route qr-images):
-//   const musicRouter = require('./routes/music');
-//   app.use('/api/music', musicRouter);
-//
-// WAJIB: multer (kalau sebelumnya sudah diinstal untuk fitur ganti gambar
-// QR, tidak perlu instal ulang -- npm install multer).
-//
-// KATA SANDI: fitur ini SENGAJA memakai variabel .env yang SAMA dengan
-// fitur ganti gambar QR (QR_EDIT_PASSWORD), supaya hanya ada satu kata
-// sandi pengelolaan konten yang perlu diingat. Kalau ke depannya ingin
-// kata sandi terpisah, tinggal ganti baris process.env.QR_EDIT_PASSWORD
-// di bawah menjadi variabel .env baru, misalnya MUSIC_EDIT_PASSWORD.
-//
-// CATATAN PATH: baris require di bawah mengasumsikan folder data/ berada
-// di root proyek (sejajar dengan routes/, server.js), sama seperti
-// routes/qrImages.js. Kalau folder data/ ada di dalam public/data/, ganti
-// baris require menjadi: require('../public/data/musicStore')
-//
-// PENTING: endpoint DELETE di bawah membaca req.body sebagai JSON --
-// mengasumsikan express.json() sudah dipasang secara global di server.js
-// (seperti yang sudah dipakai oleh /api/chat & /api/auth).
+// CATATAN soal /file/:slot: dulu route ini streaming byte manual pakai
+// Range header (buat fitur seek/scrubbing). Sekarang cukup REDIRECT ke
+// URL Vercel Blob -- elemen <audio> otomatis ikutin redirect, dan Range
+// request buat seek tetap jalan normal langsung ke Blob-nya (Vercel Blob
+// mendukung Range request secara native), jadi gak ada fungsi yang hilang.
 
 const express = require('express');
 const multer = require('multer');
-const path = require('path');
 const crypto = require('crypto');
-const fs = require('fs');
 
 const store = require('../data/musicStore');
+const { getJSON, setJSON, delKey } = require('../lib/redisClient');
 
 const router = express.Router();
 
@@ -46,7 +23,10 @@ const ALLOWED_MIME = new Set([
     'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav',
     'audio/ogg', 'audio/mp4', 'audio/x-m4a', 'audio/webm'
 ]);
-const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB -- ubah di sini kalau perlu ukuran berbeda
+// PENTING: diturunin dari 15MB -> 4MB karena limit body request Vercel
+// Functions (~4.5MB). Lagu yang lumayan besar bisa ketolak -- lihat catatan
+// di atas soal solusi "client upload" kalau ini kerasa kekecilan.
+const MAX_FILE_SIZE = 4 * 1024 * 1024;
 const MAX_TITLE_LENGTH = 80;
 
 const upload = multer({
@@ -61,22 +41,18 @@ const upload = multer({
     }
 });
 
-/* ------------------------------------------------------------------ */
-/* Proteksi kata sandi + penjagaan dasar terhadap percobaan brute-force */
-/* (pola identik dengan routes/qrImages.js)                            */
-/* ------------------------------------------------------------------ */
-
-const failedAttempts = new Map();
 const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS = 5 * 60 * 1000;
+const LOCKOUT_SECONDS = 5 * 60;
 
 function getClientIp(req) {
     return req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
 }
+function lockoutKey(req) {
+    return `music-lockout:${getClientIp(req)}`;
+}
 
-function checkLockout(req, res) {
-    const ip = getClientIp(req);
-    const rec = failedAttempts.get(ip);
+async function checkLockout(req, res) {
+    const rec = await getJSON(lockoutKey(req));
     if (rec && rec.lockedUntil && Date.now() < rec.lockedUntil) {
         const waitSec = Math.ceil((rec.lockedUntil - Date.now()) / 1000);
         res.status(429).json({
@@ -88,19 +64,19 @@ function checkLockout(req, res) {
     return true;
 }
 
-function registerFailedAttempt(req) {
-    const ip = getClientIp(req);
-    const rec = failedAttempts.get(ip) || { count: 0, lockedUntil: 0 };
+async function registerFailedAttempt(req) {
+    const key = lockoutKey(req);
+    const rec = (await getJSON(key)) || { count: 0, lockedUntil: 0 };
     rec.count += 1;
     if (rec.count >= MAX_ATTEMPTS) {
-        rec.lockedUntil = Date.now() + LOCKOUT_MS;
+        rec.lockedUntil = Date.now() + LOCKOUT_SECONDS * 1000;
         rec.count = 0;
     }
-    failedAttempts.set(ip, rec);
+    await setJSON(key, rec, { ex: LOCKOUT_SECONDS * 2 });
 }
 
-function clearFailedAttempts(req) {
-    failedAttempts.delete(getClientIp(req));
+async function clearFailedAttempts(req) {
+    await delKey(lockoutKey(req));
 }
 
 function verifyPassword(inputPassword) {
@@ -115,156 +91,126 @@ function verifyPassword(inputPassword) {
     return { ok: match, reason: match ? null : 'wrong' };
 }
 
-/* ------------------------------------------------------------------ */
-/* GET /api/music/list                                                 */
-/* ------------------------------------------------------------------ */
-router.get('/list', (req, res) => {
-    res.json({ success: true, tracks: store.getPublicList() });
+router.get('/list', async (req, res) => {
+    try {
+        const tracks = await store.getPublicList();
+        res.json({ success: true, tracks });
+    } catch (err) {
+        console.error('[music] Gagal ambil list:', err);
+        res.status(500).json({ success: false, message: 'Gagal mengambil data dari server.' });
+    }
 });
 
-/* ------------------------------------------------------------------ */
-/* GET /api/music/file/:slot  (mendukung Range header untuk seek)      */
-/* ------------------------------------------------------------------ */
-router.get('/file/:slot', (req, res) => {
+router.get('/file/:slot', async (req, res) => {
     const { slot } = req.params;
     if (!store.isValidSlot(slot)) {
         return res.status(404).json({ success: false, message: 'Slot tidak dikenali.' });
     }
-    const entry = store.getSlotTrack(slot);
-    if (!entry) {
-        return res.status(404).json({ success: false, message: 'Slot ini belum memiliki lagu.' });
-    }
-    const filePath = path.join(store.UPLOAD_DIR, entry.filename);
-    if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ success: false, message: 'Berkas lagu tidak ditemukan pada server.' });
-    }
-
-    const mimeType = entry.mimeType || 'application/octet-stream';
-    const stat = fs.statSync(filePath);
-    const fileSize = stat.size;
-    const range = req.headers.range;
-
-    if (range) {
-        const match = /bytes=(\d*)-(\d*)/.exec(range);
-        const start = match && match[1] ? parseInt(match[1], 10) : 0;
-        const end = match && match[2] ? parseInt(match[2], 10) : fileSize - 1;
-
-        if (isNaN(start) || isNaN(end) || start > end || end >= fileSize) {
-            res.status(416).setHeader('Content-Range', `bytes */${fileSize}`);
-            return res.end();
+    try {
+        const entry = await store.getSlotTrack(slot);
+        if (!entry || !entry.url) {
+            return res.status(404).json({ success: false, message: 'Slot ini belum memiliki lagu.' });
         }
-
-        res.writeHead(206, {
-            'Content-Range': `bytes ${start}-${end}/${fileSize}`,
-            'Accept-Ranges': 'bytes',
-            'Content-Length': (end - start) + 1,
-            'Content-Type': mimeType,
-            'Cache-Control': 'no-cache'
-        });
-        fs.createReadStream(filePath, { start, end }).pipe(res);
-    } else {
-        res.writeHead(200, {
-            'Content-Length': fileSize,
-            'Content-Type': mimeType,
-            'Accept-Ranges': 'bytes',
-            'Cache-Control': 'no-cache'
-        });
-        fs.createReadStream(filePath).pipe(res);
+        res.redirect(302, entry.url);
+    } catch (err) {
+        console.error('[music] Gagal ambil file:', err);
+        res.status(500).json({ success: false, message: 'Gagal mengambil berkas dari server.' });
     }
 });
 
-/* ------------------------------------------------------------------ */
-/* POST /api/music/:slot  (multipart: password, title, audio)          */
-/* ------------------------------------------------------------------ */
 router.post('/:slot', (req, res) => {
     const { slot } = req.params;
     if (!store.isValidSlot(slot)) {
         return res.status(404).json({ success: false, message: 'Slot tidak dikenali.' });
     }
 
-    if (!checkLockout(req, res)) return;
-
-    upload.single('audio')(req, res, (err) => {
-        if (err) {
-            return res.status(400).json({ success: false, message: err.message || 'Proses pengunggahan gagal.' });
-        }
-
-        const { password, title } = req.body;
-        const verdict = verifyPassword(password);
-
-        if (!verdict.ok) {
-            registerFailedAttempt(req);
-            if (verdict.reason === 'not-configured') {
-                return res.status(500).json({
-                    success: false,
-                    message: 'Fitur pengelolaan musik belum dikonfigurasi. Silakan atur QR_EDIT_PASSWORD pada berkas .env server terlebih dahulu.'
-                });
-            }
-            return res.status(401).json({ success: false, message: 'Kata sandi yang Anda masukkan salah.' });
-        }
-
-        clearFailedAttempts(req);
-
-        if (!req.file) {
-            return res.status(400).json({ success: false, message: 'Tidak ada berkas lagu yang dikirim.' });
-        }
-
-        const cleanTitle = String(title || '').trim().slice(0, MAX_TITLE_LENGTH) ||
-            req.file.originalname.replace(/\.[^/.]+$/, '');
-
-        const ext = (req.file.mimetype.split('/')[1] || 'mp3')
-            .replace('mpeg', 'mp3')
-            .replace('x-m4a', 'm4a')
-            .replace('x-wav', 'wav');
-        const filename = `${slot}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
-        const destPath = path.join(store.UPLOAD_DIR, filename);
-
-        fs.writeFile(destPath, req.file.buffer, (writeErr) => {
-            if (writeErr) {
-                console.error('[music] Gagal menyimpan berkas:', writeErr);
-                return res.status(500).json({ success: false, message: 'Gagal menyimpan berkas pada server.' });
+    upload.single('audio')(req, res, async (uploadErr) => {
+        try {
+            if (uploadErr) {
+                return res.status(400).json({ success: false, message: uploadErr.message || 'Proses pengunggahan gagal.' });
             }
 
-            const entry = store.setSlotTrack(slot, {
-                filename,
+            if (!(await checkLockout(req, res))) return;
+
+            const { password, title } = req.body;
+            const verdict = verifyPassword(password);
+
+            if (!verdict.ok) {
+                await registerFailedAttempt(req);
+                if (verdict.reason === 'not-configured') {
+                    return res.status(500).json({
+                        success: false,
+                        message: 'Fitur pengelolaan musik belum dikonfigurasi. Silakan atur QR_EDIT_PASSWORD pada Environment Variables server terlebih dahulu.'
+                    });
+                }
+                return res.status(401).json({ success: false, message: 'Kata sandi yang Anda masukkan salah.' });
+            }
+
+            await clearFailedAttempts(req);
+
+            if (!req.file) {
+                return res.status(400).json({ success: false, message: 'Tidak ada berkas lagu yang dikirim.' });
+            }
+
+            const cleanTitle = String(title || '').trim().slice(0, MAX_TITLE_LENGTH) ||
+                req.file.originalname.replace(/\.[^/.]+$/, '');
+
+            const ext = (req.file.mimetype.split('/')[1] || 'mp3')
+                .replace('mpeg', 'mp3')
+                .replace('x-m4a', 'm4a')
+                .replace('x-wav', 'wav');
+
+            const entry = await store.setSlotTrack(slot, {
+                buffer: req.file.buffer,
                 mimeType: req.file.mimetype,
-                title: cleanTitle,
-                updatedAt: Date.now()
+                ext,
+                title: cleanTitle
             });
 
             res.json({ success: true, message: 'Lagu berhasil disimpan.', entry });
-        });
+        } catch (fatalErr) {
+            console.error('[music] Error tak terduga:', fatalErr);
+            if (!res.headersSent) {
+                res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server saat menyimpan perubahan.' });
+            }
+        }
     });
 });
 
-/* ------------------------------------------------------------------ */
-/* DELETE /api/music/:slot  (JSON body: { password })                  */
-/* ------------------------------------------------------------------ */
 router.delete('/:slot', (req, res) => {
     const { slot } = req.params;
     if (!store.isValidSlot(slot)) {
         return res.status(404).json({ success: false, message: 'Slot tidak dikenali.' });
     }
 
-    if (!checkLockout(req, res)) return;
+    (async () => {
+        try {
+            if (!(await checkLockout(req, res))) return;
 
-    const password = req.body && req.body.password;
-    const verdict = verifyPassword(password);
+            const password = req.body && req.body.password;
+            const verdict = verifyPassword(password);
 
-    if (!verdict.ok) {
-        registerFailedAttempt(req);
-        if (verdict.reason === 'not-configured') {
-            return res.status(500).json({
-                success: false,
-                message: 'Fitur pengelolaan musik belum dikonfigurasi. Silakan atur QR_EDIT_PASSWORD pada berkas .env server terlebih dahulu.'
-            });
+            if (!verdict.ok) {
+                await registerFailedAttempt(req);
+                if (verdict.reason === 'not-configured') {
+                    return res.status(500).json({
+                        success: false,
+                        message: 'Fitur pengelolaan musik belum dikonfigurasi. Silakan atur QR_EDIT_PASSWORD pada Environment Variables server terlebih dahulu.'
+                    });
+                }
+                return res.status(401).json({ success: false, message: 'Kata sandi yang Anda masukkan salah.' });
+            }
+
+            await clearFailedAttempts(req);
+            await store.clearSlotTrack(slot);
+            res.json({ success: true, message: 'Lagu berhasil dihapus.' });
+        } catch (fatalErr) {
+            console.error('[music] Error tak terduga saat hapus:', fatalErr);
+            if (!res.headersSent) {
+                res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server saat menghapus lagu.' });
+            }
         }
-        return res.status(401).json({ success: false, message: 'Kata sandi yang Anda masukkan salah.' });
-    }
-
-    clearFailedAttempts(req);
-    store.clearSlotTrack(slot);
-    res.json({ success: true, message: 'Lagu berhasil dihapus.' });
+    })();
 });
 
 module.exports = router;
