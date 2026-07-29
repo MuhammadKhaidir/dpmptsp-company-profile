@@ -2,14 +2,13 @@
 //
 // Penyimpanan sederhana (file JSON, BUKAN MySQL) untuk fitur musik latar.
 // Menyimpan hingga 3 slot lagu (slot1, slot2, slot3), masing-masing berisi
-// judul + berkas audio. Mengikuti pola yang sama persis dengan
-// data/qrImageStore.js -- taruh file ini di data/ level root proyek
-// (sejajar dengan routes/, server.js, dll), BUKAN di dalam public/.
+// judul + berkas audio.
 
 const fs = require('fs');
 const path = require('path');
 
-const DATA_DIR = __dirname;
+// Lihat komentar di data/qrImageStore.js -- pola yang sama persis.
+const DATA_DIR = process.env.DATA_DIR || __dirname;
 const STORE_FILE = path.join(DATA_DIR, 'music-store.json');
 const UPLOAD_DIR = path.join(DATA_DIR, 'music-uploads');
 
@@ -44,16 +43,13 @@ function isValidSlot(slot) {
     return SLOTS.includes(slot);
 }
 
-// entry: { filename, mimeType, title, updatedAt }
 function setSlotTrack(slot, entry) {
     if (!isValidSlot(slot)) throw new Error('Slot tidak valid: ' + slot);
     const store = readStore();
 
-    // Hapus berkas lama milik slot ini (kalau ada) supaya folder upload
-    // tidak menumpuk berkas yang sudah tidak terpakai setiap kali diganti.
     const prev = store[slot];
     if (prev && prev.filename) {
-        fs.unlink(path.join(UPLOAD_DIR, prev.filename), () => {}); // best-effort
+        fs.unlink(path.join(UPLOAD_DIR, prev.filename), () => {});
     }
 
     store[slot] = entry;
@@ -77,8 +73,6 @@ function getSlotTrack(slot) {
     return readStore()[slot] || null;
 }
 
-// Daftar publik -- hanya slot yang terisi yang ditampilkan, dan hanya
-// informasi yang aman ditampilkan ke pengguna umum (judul, waktu update).
 function getPublicList() {
     const store = readStore();
     return SLOTS

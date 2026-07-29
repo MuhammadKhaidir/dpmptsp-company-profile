@@ -22,7 +22,7 @@
         return Number.isNaN(n) ? fallback : n;
     };
 
-    class ArcCarousel {
+    class Arccarousel {
         constructor(root) {
             this.root = root;
             this.track = root.querySelector('[data-arc-track]');
@@ -243,7 +243,7 @@
     const init = () => {
         document.querySelectorAll('[data-arc-carousel]').forEach((el) => {
             if (!el.__arcCarouselInstance) {
-                el.__arcCarouselInstance = new ArcCarousel(el);
+                el.__arcCarouselInstance = new Arccarousel(el);
             }
         });
     };
@@ -254,5 +254,5 @@
         init();
     }
 
-    window.ArcCarousel = ArcCarousel;
+    window.Arccarousel = Arccarousel;
 })();

@@ -1,20 +1,14 @@
 // data/mapStore.js
 //
 // Penyimpanan sederhana (file JSON, BUKAN MySQL) untuk titik-titik lokasi
-// investasi yang ditampilkan di peta interaktif (section #map-section).
-// Setiap lokasi punya: id, lat, lng, title, description, createdAt,
-// updatedAt. TIDAK dibatasi jumlah slot (beda dari QR/musik yang cuma 3
-// slot) -- peta secara alami mendukung banyak titik sekaligus.
-//
-// Taruh file ini di data/ level root proyek (sejajar dengan routes/,
-// server.js, dll), BUKAN di dalam public/, mengikuti pola yang sama
-// dengan data/qrImageStore.js, data/qrBgStore.js, dan data/musicStore.js.
+// investasi yang ditampilkan di peta interaktif.
 
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const DATA_DIR = __dirname;
+// Lihat komentar di data/qrImageStore.js -- pola yang sama persis.
+const DATA_DIR = process.env.DATA_DIR || __dirname;
 const STORE_FILE = path.join(DATA_DIR, 'map-locations.json');
 
 function ensureReady() {
@@ -47,7 +41,6 @@ function getById(id) {
     return readStore().find((loc) => loc.id === id) || null;
 }
 
-// data: { lat, lng, title, description }
 function addLocation(data) {
     const list = readStore();
     const entry = {
@@ -64,8 +57,6 @@ function addLocation(data) {
     return entry;
 }
 
-// patch: bagian mana pun dari { lat, lng, title, description } -- yang
-// tidak disertakan (undefined) tidak akan diubah dari nilai sebelumnya.
 function updateLocation(id, patch) {
     const list = readStore();
     const idx = list.findIndex((loc) => loc.id === id);

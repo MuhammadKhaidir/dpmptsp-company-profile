@@ -1,0 +1,31 @@
+# Konfigurasi deploy ke Fly.io. Ganti "app" di bawah ke nama unik pilihan
+# kamu (huruf kecil, boleh strip, harus unik se-Fly.io).
+
+app = "dpmptsp-app"        # GANTI ke nama unik pilihan kamu
+primary_region = "sin"      # Singapura -- region terdekat ke Indonesia
+
+[build]
+
+[env]
+  PORT = "8080"
+  # Ini yang bikin data/qr-images-store.json, data/music-store.json, dll
+  # (lihat 4 file *Store.js yang direvisi di bawah) nulis ke VOLUME
+  # PERSISTEN, bukan ke folder di dalam image yang hilang tiap kali
+  # deploy ulang/restart.
+  DATA_DIR = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false   # server gak "tidur" -- penting karena kamu
+                                 # punya rate-limit password yang disimpan
+                                 # di memori (failedAttempts Map), yang
+                                 # bakal ke-reset kalau machine sempet mati
+  auto_start_machines = true
+  min_machines_running = 1
+
+# WAJIB dibuat dulu manual sebelum deploy pertama (lihat langkah 4 di
+# bawah), baru mount-nya kebaca dari sini.
+[mounts]
+  source = "data_volume"
+  destination = "/data"

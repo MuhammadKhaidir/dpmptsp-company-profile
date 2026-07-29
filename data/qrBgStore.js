@@ -3,18 +3,13 @@
 // Penyimpanan sederhana (file JSON, BUKAN MySQL) untuk gambar LATAR
 // BELAKANG yang muncul di belakang kotak QR saat kotak tersebut di-hover
 // (elemen .qr-hover-bg-left/center/right). Ini TERPISAH dari gambar kode
-// QR itu sendiri (yang disimpan lewat data/qrImageStore.js) -- keduanya
-// sengaja dibuat independen supaya masing-masing bisa diganti tanpa
-// saling mempengaruhi atau berisiko merusak fitur yang sudah berjalan.
-//
-// Mengikuti pola yang sama persis dengan data/qrImageStore.js. Taruh file
-// ini di data/ level root proyek (sejajar dengan routes/, server.js, dll),
-// BUKAN di dalam public/.
+// QR itu sendiri (yang disimpan lewat data/qrImageStore.js).
 
 const fs = require('fs');
 const path = require('path');
 
-const DATA_DIR = __dirname;
+// Lihat komentar di data/qrImageStore.js -- pola yang sama persis.
+const DATA_DIR = process.env.DATA_DIR || __dirname;
 const STORE_FILE = path.join(DATA_DIR, 'qr-bg-store.json');
 const UPLOAD_DIR = path.join(DATA_DIR, 'qr-bg-uploads');
 
@@ -49,16 +44,13 @@ function isValidSlot(slot) {
     return SLOTS.includes(slot);
 }
 
-// entry: { filename, mimeType, updatedAt }
 function setSlotImage(slot, entry) {
     if (!isValidSlot(slot)) throw new Error('Slot tidak valid: ' + slot);
     const store = readStore();
 
-    // Hapus berkas lama milik slot ini (kalau ada) supaya folder upload
-    // tidak menumpuk berkas yang sudah tidak terpakai setiap kali diganti.
     const prev = store[slot];
     if (prev && prev.filename) {
-        fs.unlink(path.join(UPLOAD_DIR, prev.filename), () => {}); // best-effort
+        fs.unlink(path.join(UPLOAD_DIR, prev.filename), () => {});
     }
 
     store[slot] = entry;

@@ -1,0 +1,20 @@
+node_modules
+npm-debug.log
+.git
+.gitignore
+.env
+.env.example
+start.bat
+
+# Berkas hasil-generate otomatis (JSON store + folder upload) -- gak perlu
+# ikut ke-bundle ke image, karena nanti ditulis ulang ke volume persisten
+# (/data) di server, bukan ke sini. Baris di bawah nyakup kedua kemungkinan
+# lokasi (data/ di root ATAU public/data/), biar aman dua-duanya.
+data/qr-uploads
+data/qr-bg-uploads
+data/music-uploads
+data/*.json
+public/data/qr-uploads
+public/data/qr-bg-uploads
+public/data/music-uploads
+public/data/*.json
