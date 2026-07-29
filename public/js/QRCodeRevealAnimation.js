@@ -347,10 +347,12 @@
                         throw new Error(result.data.message || 'Gagal memperbarui kode QR.');
                     }
 
+                    // SESUDAH — entry sekarang punya `url`, bukan `filename`
                     var entry = result.data.entry || {};
-                    if (entry.filename) {
+                    if (entry.url) {
                         applyCustomImage(slot, entry);
                     }
+
                     if (entry.title) {
                         applyCustomTitle(slot, entry.title);
                         label = entry.title;

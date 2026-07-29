@@ -1,101 +1,108 @@
 // data/qrImageStore.js
 //
-// Penyimpanan sederhana ("database" ringan berbasis file JSON) buat nyimpen
-// info gambar QR yang di-upload lewat panel ganti-gambar. Sengaja PAKAI file
-// JSON biasa, BUKAN MySQL/XAMPP -- karena datanya simpel banget (cuma path
-// file + waktu update per slot), jadi gak butuh setup database server yang
-// berat. File ini otomatis dibuat sendiri kalau belum ada.
+// Penyimpanan gambar QR untuk lingkungan SERVERLESS (Vercel).
 //
-// Lokasi file gambar yang di-upload disimpan di data/qr-uploads/, TIDAK di
-// folder Assets/Video/ -- biar gambar asli/default kamu di Assets/Video/
-// gak pernah ketimpa/ke-overwrite. Kalau slot belum pernah di-upload gambar
-// custom, front-end otomatis tetap pakai gambar default dari HTML.
+// Kenapa diubah dari versi sebelumnya (yang nulis ke disk lokal via `fs`):
+// Vercel Functions punya filesystem READ-ONLY (kecuali /tmp, dan /tmp pun
+// ephemeral -- gak permanen, bisa ilang kapan aja). Versi lama didesain
+// buat Fly.io (volume persisten di /data), jadi begitu di-deploy ke Vercel,
+// setiap kali route ini nyoba fs.mkdirSync/fs.writeFileSync bakal throw
+// EROFS -- dan karena throw-nya kejadian di dalam callback async, Express
+// gak sempat nangkep, function-nya crash sebelum sempat kirim response
+// (persis gejala net::ERR_EMPTY_RESPONSE di browser).
+//
+// Solusinya:
+// - Berkas gambar   -> disimpan di Vercel Blob (object storage, bukan disk).
+// - Metadata (judul, url gambar saat ini, waktu update) -> Upstash Redis.
+//
+// Env vars yang WAJIB ada (otomatis ke-set kalau kamu connect lewat tab
+// Storage di dashboard Vercel -- lihat instruksi di chat):
+//   BLOB_READ_WRITE_TOKEN
+//   UPSTASH_REDIS_REST_URL
+//   UPSTASH_REDIS_REST_TOKEN
 
-const fs = require('fs');
-const path = require('path');
-
-// BARU: DATA_DIR sekarang bisa di-override lewat environment variable
-// DATA_DIR (di-set ke "/data" lewat fly.toml pas deploy ke Fly.io, biar
-// nulis ke VOLUME PERSISTEN, bukan ke folder di dalam image yang hilang
-// tiap kali di-deploy ulang/restart). Kalau env var itu gak di-set (misal
-// pas dijalanin lokal di laptop lewat "node server.js" / start.bat),
-// otomatis balik ke __dirname kayak semula -- jadi perilaku development
-// lokal SAMA SEKALI GAK BERUBAH.
-const DATA_DIR = process.env.DATA_DIR || __dirname;
-const STORE_FILE = path.join(DATA_DIR, 'qr-images-store.json');
-const UPLOAD_DIR = path.join(DATA_DIR, 'qr-uploads');
+const { put, del } = require('@vercel/blob');
+const { getJSON, setJSON } = require('../lib/redisClient');
 
 const SLOTS = ['left', 'center', 'right'];
-
-function ensureReady() {
-    if (!fs.existsSync(UPLOAD_DIR)) {
-        fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-    }
-    if (!fs.existsSync(STORE_FILE)) {
-        const empty = { left: null, center: null, right: null };
-        fs.writeFileSync(STORE_FILE, JSON.stringify(empty, null, 2));
-    }
-}
-
-function readStore() {
-    ensureReady();
-    try {
-        const raw = fs.readFileSync(STORE_FILE, 'utf8');
-        return JSON.parse(raw);
-    } catch (err) {
-        console.error('[qrImageStore] Gagal baca store, reset ke kosong:', err);
-        return { left: null, center: null, right: null };
-    }
-}
-
-function writeStore(store) {
-    fs.writeFileSync(STORE_FILE, JSON.stringify(store, null, 2));
-}
 
 function isValidSlot(slot) {
     return SLOTS.includes(slot);
 }
 
-// entry: { filename, mimeType, title, updatedAt }
-function setSlotImage(slot, entry) {
-    if (!isValidSlot(slot)) throw new Error('Slot tidak valid: ' + slot);
-    const store = readStore();
+function keyFor(slot) {
+    return `qr-image:${slot}`;
+}
 
-    const prev = store[slot];
-    if (prev && prev.filename && entry.filename && prev.filename !== entry.filename) {
-        const prevPath = path.join(UPLOAD_DIR, prev.filename);
-        fs.unlink(prevPath, () => {});
+// entry yang disimpan per slot: { url, pathname, mimeType, title, updatedAt }
+async function getSlotImage(slot) {
+    if (!isValidSlot(slot)) return null;
+    return getJSON(keyFor(slot));
+}
+
+// params: { buffer, mimeType, ext, title? }
+// title cuma diubah kalau dikirim (undefined = judul lama dipertahankan).
+async function setSlotImage(slot, { buffer, mimeType, ext, title }) {
+    if (!isValidSlot(slot)) throw new Error('Slot tidak valid: ' + slot);
+
+    const prev = await getSlotImage(slot);
+
+    const blob = await put(`qr-images/${slot}-${Date.now()}.${ext}`, buffer, {
+        access: 'public',
+        contentType: mimeType,
+        addRandomSuffix: true
+    });
+
+    const entry = {
+        url: blob.url,
+        pathname: blob.pathname,
+        mimeType,
+        title: (title !== undefined ? title : (prev ? prev.title : null)) || null,
+        updatedAt: Date.now()
+    };
+
+    await setJSON(keyFor(slot), entry);
+
+    // Hapus blob LAMA setelah yang baru berhasil disimpan -- biar kalau ada
+    // yang gagal di tengah proses, gambar lama gak ilang percuma. Ini juga
+    // gak di-await biar gak bikin response nunggu, cukup dicatat kalau gagal.
+    if (prev && prev.pathname && prev.pathname !== blob.pathname) {
+        del(prev.pathname).catch((err) => {
+            console.error('[qrImageStore] Gagal hapus blob lama:', err);
+        });
     }
 
-    const merged = Object.assign({}, prev, entry);
-    store[slot] = merged;
-    writeStore(store);
-    return store[slot];
+    return entry;
 }
 
-function getSlotImage(slot) {
-    if (!isValidSlot(slot)) return null;
-    const store = readStore();
-    return store[slot] || null;
+async function setSlotTitle(slot, title) {
+    if (!isValidSlot(slot)) throw new Error('Slot tidak valid: ' + slot);
+    const prev = await getSlotImage(slot);
+    const entry = Object.assign(
+        { url: null, pathname: null, mimeType: null },
+        prev,
+        { title, updatedAt: Date.now() }
+    );
+    await setJSON(keyFor(slot), entry);
+    return entry;
 }
 
-function getMeta() {
-    const store = readStore();
+async function getMeta() {
     const meta = {};
-    SLOTS.forEach((slot) => {
-        const entry = store[slot];
+    await Promise.all(SLOTS.map(async (slot) => {
+        const entry = await getSlotImage(slot);
         meta[slot] = entry
-            ? { hasCustom: !!entry.filename, updatedAt: entry.updatedAt, title: entry.title }
-            : { hasCustom: false, updatedAt: null, title: null };
-    });
+            ? { hasCustom: !!entry.url, url: entry.url, updatedAt: entry.updatedAt, title: entry.title || null }
+            : { hasCustom: false, url: null, updatedAt: null, title: null };
+    }));
     return meta;
 }
 
 module.exports = {
     SLOTS,
-    UPLOAD_DIR,
     isValidSlot,
-    setSlotImage,
     getSlotImage,
+    setSlotImage,
+    setSlotTitle,
     getMeta
 };

@@ -1,15 +1,19 @@
 const express = require('express');
 const multer = require('multer');
-const path = require('path');
 const crypto = require('crypto');
-const fs = require('fs');
 
 const store = require('../data/qrImageStore');
+const { redis, getJSON, setJSON } = require('../lib/redisClient');
 
 const router = express.Router();
 
 const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB -- ubah di sini kalau perlu ukuran berbeda
+// Diturunin dari 5MB -> 4MB. Upload di sini masih lewat pola "server upload"
+// (file singgah dulu di body request Express sebelum dikirim ke Vercel Blob),
+// dan Vercel Functions punya limit ukuran body request sekitar 4.5MB. Kalau
+// nanti butuh file lebih besar, ganti ke pola "client upload" langsung ke
+// Blob (lihat docs @vercel/blob) yang gak lewat body server sama sekali.
+const MAX_FILE_SIZE = 4 * 1024 * 1024;
 const MAX_TITLE_LENGTH = 80; // ubah di sini kalau perlu batas karakter judul berbeda
 
 const upload = multer({
@@ -24,17 +28,25 @@ const upload = multer({
     }
 });
 
-const failedAttempts = new Map(); // ip -> { count, lockedUntil }
+// ------------------------------------------------------------------
+// Rate limit percobaan password gagal -- sekarang disimpan di Redis
+// (bukan Map di memory) karena tiap invocation Vercel Function bisa jatuh
+// di instance yang berbeda-beda; Map di memory bakal ke-reset kapan aja
+// dan gak bakal konsisten ngunci IP yang sama.
+// ------------------------------------------------------------------
 const MAX_ATTEMPTS = 5;
-const LOCKOUT_MS = 5 * 60 * 1000; // 5 menit
+const LOCKOUT_SECONDS = 5 * 60; // 5 menit
 
 function getClientIp(req) {
     return req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
 }
 
-function checkLockout(req, res) {
-    const ip = getClientIp(req);
-    const rec = failedAttempts.get(ip);
+function lockoutKey(req) {
+    return `qr-lockout:${getClientIp(req)}`;
+}
+
+async function checkLockout(req, res) {
+    const rec = await getJSON(lockoutKey(req));
     if (rec && rec.lockedUntil && Date.now() < rec.lockedUntil) {
         const waitSec = Math.ceil((rec.lockedUntil - Date.now()) / 1000);
         res.status(429).json({
@@ -46,19 +58,20 @@ function checkLockout(req, res) {
     return true;
 }
 
-function registerFailedAttempt(req) {
-    const ip = getClientIp(req);
-    const rec = failedAttempts.get(ip) || { count: 0, lockedUntil: 0 };
+async function registerFailedAttempt(req) {
+    const key = lockoutKey(req);
+    const rec = (await getJSON(key)) || { count: 0, lockedUntil: 0 };
     rec.count += 1;
     if (rec.count >= MAX_ATTEMPTS) {
-        rec.lockedUntil = Date.now() + LOCKOUT_MS;
+        rec.lockedUntil = Date.now() + LOCKOUT_SECONDS * 1000;
         rec.count = 0;
     }
-    failedAttempts.set(ip, rec);
+    // TTL 2x lockout window biar key otomatis kebersihin sendiri di Redis.
+    await setJSON(key, rec, { ex: LOCKOUT_SECONDS * 2 });
 }
 
-function clearFailedAttempts(req) {
-    failedAttempts.delete(getClientIp(req));
+async function clearFailedAttempts(req) {
+    await redis.del(lockoutKey(req));
 }
 
 function verifyPassword(inputPassword) {
@@ -73,67 +86,34 @@ function verifyPassword(inputPassword) {
     return { ok: match, reason: match ? null : 'wrong' };
 }
 
-// ------------------------------------------------------------------
-// Penyimpanan judul kotak QR (mis. "Katalog Investasi").
-// Disimpan terpisah dari qrImageStore (yang cuma ngurus gambar) lewat
-// satu berkas JSON kecil di dalam folder upload yang sama, supaya
-// gak perlu ubah-ubah qrImageStore.js. Formatnya: { left: "...",
-// center: "...", right: "..." }.
-// ------------------------------------------------------------------
-const TITLES_FILE = path.join(store.UPLOAD_DIR, '_titles.json');
-
-function loadTitles() {
+router.get('/meta', async (req, res) => {
     try {
-        const raw = fs.readFileSync(TITLES_FILE, 'utf8');
-        const parsed = JSON.parse(raw);
-        return (parsed && typeof parsed === 'object') ? parsed : {};
+        const meta = await store.getMeta();
+        res.json({ success: true, meta });
     } catch (err) {
-        return {};
+        console.error('[qrImages] Gagal ambil meta:', err);
+        res.status(500).json({ success: false, message: 'Gagal mengambil data dari server.' });
     }
-}
-
-function saveTitles(titles) {
-    fs.writeFileSync(TITLES_FILE, JSON.stringify(titles, null, 2), 'utf8');
-}
-
-function getSlotTitle(slot) {
-    const titles = loadTitles();
-    return titles[slot] || null;
-}
-
-function setSlotTitle(slot, title) {
-    const titles = loadTitles();
-    titles[slot] = title;
-    saveTitles(titles);
-    return titles[slot];
-}
-
-router.get('/meta', (req, res) => {
-    const meta = store.getMeta();
-    const titles = loadTitles();
-    const mergedMeta = {};
-    Object.keys(meta).forEach((slot) => {
-        mergedMeta[slot] = Object.assign({}, meta[slot], { title: titles[slot] || null });
-    });
-    res.json({ success: true, meta: mergedMeta });
 });
 
-router.get('/file/:slot', (req, res) => {
+// Endpoint ini SENGAJA dipertahankan bentuknya (/file/:slot) biar frontend
+// (QRCodeRevealAnimation.js) gak perlu diubah -- sekarang isinya redirect ke
+// URL Vercel Blob yang sedang aktif untuk slot itu, bukan res.sendFile lokal.
+router.get('/file/:slot', async (req, res) => {
     const { slot } = req.params;
     if (!store.isValidSlot(slot)) {
         return res.status(404).json({ success: false, message: 'Slot tidak dikenali.' });
     }
-    const entry = store.getSlotImage(slot);
-    if (!entry) {
-        return res.status(404).json({ success: false, message: 'Belum terdapat gambar khusus untuk slot ini.' });
+    try {
+        const entry = await store.getSlotImage(slot);
+        if (!entry || !entry.url) {
+            return res.status(404).json({ success: false, message: 'Belum terdapat gambar khusus untuk slot ini.' });
+        }
+        res.redirect(302, entry.url);
+    } catch (err) {
+        console.error('[qrImages] Gagal ambil file:', err);
+        res.status(500).json({ success: false, message: 'Gagal mengambil berkas dari server.' });
     }
-    const filePath = path.join(store.UPLOAD_DIR, entry.filename);
-    if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ success: false, message: 'Berkas gambar tidak ditemukan pada server.' });
-    }
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Content-Type', entry.mimeType || 'application/octet-stream');
-    res.sendFile(filePath);
 });
 
 router.post('/:slot', (req, res) => {
@@ -142,79 +122,72 @@ router.post('/:slot', (req, res) => {
         return res.status(404).json({ success: false, message: 'Slot tidak dikenali.' });
     }
 
-    if (!checkLockout(req, res)) return;
+    upload.single('image')(req, res, async (uploadErr) => {
+        // KUNCI PERBAIKANNYA ADA DI SINI: seluruh isi callback ini dibungkus
+        // try/catch. Apa pun yang meleset di dalamnya (Blob gagal diakses,
+        // Redis gagal diakses, dll) sekarang PASTI ketangkep dan tetap kirim
+        // response JSON -- bukan bikin function mati diam-diam kayak
+        // sebelumnya (itu penyebab persis net::ERR_EMPTY_RESPONSE).
+        try {
+            if (uploadErr) {
+                return res.status(400).json({ success: false, message: uploadErr.message || 'Proses pengunggahan gagal.' });
+            }
 
-    upload.single('image')(req, res, (err) => {
-        if (err) {
-            return res.status(400).json({ success: false, message: err.message || 'Proses pengunggahan gagal.' });
-        }
+            if (!(await checkLockout(req, res))) return;
 
-        const { password, title } = req.body;
-        const verdict = verifyPassword(password);
+            const { password, title } = req.body;
+            const verdict = verifyPassword(password);
 
-        if (!verdict.ok) {
-            registerFailedAttempt(req);
-            if (verdict.reason === 'not-configured') {
-                return res.status(500).json({
+            if (!verdict.ok) {
+                await registerFailedAttempt(req);
+                if (verdict.reason === 'not-configured') {
+                    return res.status(500).json({
+                        success: false,
+                        message: 'Fitur pembaruan gambar belum dikonfigurasi. Silakan atur QR_EDIT_PASSWORD pada Environment Variables server terlebih dahulu.'
+                    });
+                }
+                return res.status(401).json({ success: false, message: 'Kata sandi yang Anda masukkan salah.' });
+            }
+
+            await clearFailedAttempts(req);
+
+            const trimmedTitle = typeof title === 'string' ? title.trim() : '';
+
+            if (trimmedTitle.length > MAX_TITLE_LENGTH) {
+                return res.status(400).json({
                     success: false,
-                    message: 'Fitur pembaruan gambar belum dikonfigurasi. Silakan atur QR_EDIT_PASSWORD pada berkas .env server terlebih dahulu.'
+                    message: `Judul terlalu panjang (maksimal ${MAX_TITLE_LENGTH} karakter).`
                 });
             }
-            return res.status(401).json({ success: false, message: 'Kata sandi yang Anda masukkan salah.' });
-        }
 
-        clearFailedAttempts(req);
-
-        const trimmedTitle = typeof title === 'string' ? title.trim() : '';
-
-        if (trimmedTitle.length > MAX_TITLE_LENGTH) {
-            return res.status(400).json({
-                success: false,
-                message: `Judul terlalu panjang (maksimal ${MAX_TITLE_LENGTH} karakter).`
-            });
-        }
-
-        if (!req.file && !trimmedTitle) {
-            return res.status(400).json({ success: false, message: 'Tidak ada berkas gambar atau judul baru yang dikirim.' });
-        }
-
-        function respondWith(imageEntry) {
-            let titleEntry = getSlotTitle(slot);
-            if (trimmedTitle) {
-                titleEntry = setSlotTitle(slot, trimmedTitle);
+            if (!req.file && !trimmedTitle) {
+                return res.status(400).json({ success: false, message: 'Tidak ada berkas gambar atau judul baru yang dikirim.' });
             }
-            const baseEntry = imageEntry || store.getSlotImage(slot) || {};
+
+            let entry;
+            if (req.file) {
+                const ext = (req.file.mimetype.split('/')[1] || 'png').replace('jpeg', 'jpg');
+                entry = await store.setSlotImage(slot, {
+                    buffer: req.file.buffer,
+                    mimeType: req.file.mimetype,
+                    ext,
+                    title: trimmedTitle || undefined
+                });
+            } else {
+                entry = await store.setSlotTitle(slot, trimmedTitle);
+            }
+
             res.json({
                 success: true,
                 message: 'Perubahan berhasil disimpan.',
-                entry: Object.assign({}, baseEntry, { title: titleEntry })
+                entry
             });
-        }
-
-        if (!req.file) {
-            // Cuma judul yang diganti, gambar tetap yang lama.
-            respondWith(null);
-            return;
-        }
-
-        const ext = (req.file.mimetype.split('/')[1] || 'png').replace('jpeg', 'jpg');
-        const filename = `${slot}-${Date.now()}-${crypto.randomBytes(4).toString('hex')}.${ext}`;
-        const destPath = path.join(store.UPLOAD_DIR, filename);
-
-        fs.writeFile(destPath, req.file.buffer, (writeErr) => {
-            if (writeErr) {
-                console.error('[qrImages] Gagal menyimpan berkas:', writeErr);
-                return res.status(500).json({ success: false, message: 'Gagal menyimpan berkas pada server.' });
+        } catch (fatalErr) {
+            console.error('[qrImages] Error tak terduga:', fatalErr);
+            if (!res.headersSent) {
+                res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server saat menyimpan perubahan.' });
             }
-
-            const entry = store.setSlotImage(slot, {
-                filename,
-                mimeType: req.file.mimetype,
-                updatedAt: Date.now()
-            });
-
-            respondWith(entry);
-        });
+        }
     });
 });
 
