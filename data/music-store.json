@@ -1,0 +1,20 @@
+{
+  "slot1": {
+    "filename": "slot1-1785227982371-b700fe5a.mp3",
+    "mimeType": "audio/mpeg",
+    "title": "Civic Glow",
+    "updatedAt": 1785227982380
+  },
+  "slot2": {
+    "filename": "slot2-1785210957376-e9a6b0b4.wav",
+    "mimeType": "audio/wav",
+    "title": "Amber Road",
+    "updatedAt": 1785210957382
+  },
+  "slot3": {
+    "filename": "slot3-1785210976010-2c3841ad.mp3",
+    "mimeType": "audio/mpeg",
+    "title": "No Enemies",
+    "updatedAt": 1785210976017
+  }
+}

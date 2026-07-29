@@ -1,0 +1,848 @@
+/* ==========================================================================
+   MAP SECTION -- peta interaktif lokasi investasi (Leaflet.js + tile
+   OpenStreetMap/CARTO, gratis, tanpa API key)
+   Dipakai bareng: js/MapSection.js
+   Leaflet CSS/JS dimuat lewat CDN di index.html (lihat <head>).
+   ========================================================================== */
+
+.map-scene {
+    position: relative;
+    max-width: 1080px;
+    margin: 0 auto;
+}
+
+.investment-map {
+    width: 100%;
+    height: clamp(360px, 62vh, 600px);
+    border-radius: 24px;
+    overflow: hidden;
+    border: 1px solid rgba(17, 17, 17, 0.1);
+    box-shadow:
+        0 24px 60px -8px rgba(20, 16, 10, 0.28),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.4);
+    background: #e6ded0; /* fallback warna sebelum tile Leaflet termuat */
+}
+
+/* Leaflet butuh font sendiri buat kontrol zoom/atribusi -- diselaraskan
+   ke Inter biar konsisten sama tipografi situs. */
+.investment-map,
+.leaflet-container {
+    font-family: 'Inter', sans-serif;
+}
+
+/* Kontrol zoom (+/-) Leaflet direstyle biar senada gaya "kaca" nav-pill */
+.leaflet-control-zoom {
+    border: none !important;
+    box-shadow: 0 8px 20px rgba(20, 16, 10, 0.18) !important;
+}
+.leaflet-control-zoom a {
+    background: rgba(255, 255, 255, 0.75) !important;
+    backdrop-filter: blur(10px);
+    color: rgba(17, 17, 17, 0.78) !important;
+    border-color: rgba(17, 17, 17, 0.08) !important;
+}
+.leaflet-control-zoom a:hover {
+    background: rgba(255, 255, 255, 0.95) !important;
+}
+
+.leaflet-popup-content-wrapper {
+    background: #faf9f5;
+    border-radius: 14px;
+    box-shadow: 0 16px 34px rgba(20, 16, 10, 0.28);
+}
+.leaflet-popup-content {
+    margin: 14px 16px;
+    font-family: 'Inter', sans-serif;
+}
+.leaflet-popup-tip {
+    background: #faf9f5;
+}
+
+.map-popup-title {
+    font-family: 'Fraunces', serif;
+    font-size: 15px;
+    font-weight: 800;
+    color: rgba(17, 17, 17, .92);
+    margin-bottom: 4px;
+}
+.map-popup-desc {
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: rgba(17, 17, 17, .62);
+}
+
+/* Tombol "Tambahkan ke Lokasi Investasi" -- muncul di popup marker
+   sementara hasil pencarian (lokasi mana pun / koordinat), belum
+   tersimpan ke database sampai form diisi & kata sandi dikonfirmasi. */
+.map-popup-add-btn {
+    margin-top: 8px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(203, 164, 84, 0.45);
+    background: rgba(203, 164, 84, 0.12);
+    color: #8a6a22;
+    font-family: 'Inter', sans-serif;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .2s ease;
+}
+.map-popup-add-btn:hover { background: rgba(203, 164, 84, 0.22); }
+
+/* Tombol "Rute ke Sini" -- muncul di popup SETIAP marker (lokasi
+   investasi yang sudah tersimpan MAUPUN marker sementara hasil
+   pencarian), memicu fitur rute perjalanan dari lokasi pengguna.
+   Warna biru disamakan dengan marker sementara/pencarian, supaya
+   perannya kebedakan dari tombol emas "Tambahkan ke Lokasi Investasi"
+   di atas. */
+.map-popup-route-btn {
+    margin-top: 8px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 7px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(31, 78, 140, 0.35);
+    background: rgba(31, 78, 140, 0.08);
+    color: #1f4e8c;
+    font-family: 'Inter', sans-serif;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .2s ease;
+}
+.map-popup-route-btn:hover { background: rgba(31, 78, 140, 0.16); }
+
+/* Marker pin custom -- bentuk teardrop dari border-radius + rotate,
+   diisi ikon FontAwesome yang di-counter-rotate biar tetap tegak. */
+.map-pin-icon { background: transparent; border: none; }
+.map-pin-dot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    background: linear-gradient(135deg, #cba454, #8a6a22);
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    box-shadow: 0 6px 14px rgba(20, 16, 10, .4), inset 0 1px 1px rgba(255,255,255,.45);
+    border: 2px solid #fff6d8;
+}
+.map-pin-dot i {
+    transform: rotate(45deg);
+    color: #241a06;
+    font-size: 14px;
+}
+
+/* Marker sementara (hasil pencarian yang belum ditandai permanen) --
+   warna biru biar gampang dibedakan dari pin emas lokasi investasi
+   yang sudah tersimpan. */
+.map-pin-dot-temp {
+    background: linear-gradient(135deg, #4a7fc9, #1f4e8c);
+    border-color: #dce9ff;
+}
+
+/* Marker lokasi pengguna saat ini -- dipakai fitur rute perjalanan.
+   Titik biru solid + cincin animasi ("pulse") biar gampang dikenali,
+   beda bentuk dari pin lokasi investasi/pencarian di atas. */
+.map-user-location-icon {
+    background: transparent;
+    border: none;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.map-user-location-dot {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #1f4e8c;
+    border: 2.5px solid #ffffff;
+    box-shadow: 0 2px 8px rgba(20, 16, 10, .4);
+    z-index: 2;
+}
+.map-user-location-pulse {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 14px;
+    height: 14px;
+    margin: -7px 0 0 -7px;
+    border-radius: 50%;
+    background: rgba(31, 78, 140, 0.35);
+    animation: mapUserPulse 1.8s ease-out infinite;
+    z-index: 1;
+}
+@keyframes mapUserPulse {
+    0%   { transform: scale(1); opacity: .8; }
+    100% { transform: scale(2.6); opacity: 0; }
+}
+
+/* Tombol "Kelola Lokasi" -- mengambang di pojok kanan-atas peta */
+.map-manage-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    z-index: 500; /* di atas layer peta Leaflet */
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    box-shadow: 0 8px 20px rgba(20, 16, 10, 0.18);
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: rgba(17, 17, 17, .8);
+    cursor: pointer;
+    transition: transform .25s ease, box-shadow .25s ease, background .25s ease;
+}
+.map-manage-btn:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.88);
+    box-shadow: 0 12px 26px rgba(20, 16, 10, 0.24);
+}
+
+/* Banner instruksi saat mode "menandai lokasi" aktif */
+.map-pick-banner {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 500;
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px 10px 18px;
+    border-radius: 999px;
+    background: rgba(20, 16, 10, 0.88);
+    backdrop-filter: blur(6px);
+    color: #fdf6e3;
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    box-shadow: 0 12px 28px rgba(20, 16, 10, 0.36);
+    max-width: calc(100% - 32px);
+}
+.map-pick-banner.is-active { display: flex; }
+.map-pick-banner i { color: #cba454; }
+.map-pick-banner button {
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.14);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    color: #fdf6e3;
+    border-radius: 999px;
+    padding: 5px 12px;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .2s ease;
+}
+.map-pick-banner button:hover { background: rgba(255, 255, 255, 0.26); }
+
+/* Kursor crosshair di seluruh peta selagi mode menandai lokasi aktif */
+.investment-map.is-picking .leaflet-container {
+    cursor: crosshair !important;
+}
+
+/* ============================================================
+   KOTAK PENCARIAN -- cari lokasi yang sudah ditandai, lokasi mana
+   pun di dunia (lewat Nominatim/OpenStreetMap, gratis tanpa API
+   key, sama seperti tile peta), atau langsung lewat koordinat
+   latitude/longitude. Mengambang di pojok kiri-atas peta.
+   ============================================================ */
+.map-search-box {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 500;
+    width: min(340px, calc(100% - 32px));
+    transition: opacity .25s ease;
+}
+.map-search-box.is-disabled {
+    opacity: .45;
+    pointer-events: none;
+}
+
+.map-search-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    box-shadow: 0 8px 20px rgba(20, 16, 10, 0.18);
+    transition: box-shadow .25s ease, background .25s ease;
+}
+.map-search-input-wrap:focus-within {
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 12px 26px rgba(20, 16, 10, 0.24);
+}
+.map-search-input-wrap > i {
+    color: rgba(17, 17, 17, .4);
+    font-size: 13px;
+    flex-shrink: 0;
+}
+.map-search-input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    background: none;
+    outline: none;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    color: rgba(17, 17, 17, .86);
+}
+.map-search-input::placeholder {
+    color: rgba(17, 17, 17, .38);
+}
+.map-search-clear {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(17, 17, 17, 0.08);
+    color: rgba(17, 17, 17, .5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    cursor: pointer;
+    transition: background .2s ease;
+}
+.map-search-clear:hover { background: rgba(17, 17, 17, 0.16); }
+
+.map-search-results {
+    display: none;
+    margin-top: 8px;
+    max-height: min(360px, 50vh);
+    overflow-y: auto;
+    border-radius: 16px;
+    background: rgba(250, 249, 245, 0.98);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 16px 34px rgba(20, 16, 10, 0.24);
+    border: 1px solid rgba(17, 17, 17, 0.08);
+    padding: 6px;
+}
+.map-search-results.is-active { display: block; }
+
+.map-search-section + .map-search-section {
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(17, 17, 17, 0.06);
+}
+.map-search-section-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: rgba(17, 17, 17, .38);
+    padding: 6px 10px 4px;
+}
+
+.map-search-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: none;
+    background: none;
+    border-radius: 10px;
+    cursor: pointer;
+    text-align: left;
+    transition: background .18s ease;
+}
+.map-search-item:hover { background: rgba(203, 164, 84, 0.14); }
+.map-search-item > i {
+    flex-shrink: 0;
+    width: 16px;
+    text-align: center;
+    color: #8a6a22;
+    font-size: 12.5px;
+}
+.map-search-item-text {
+    min-width: 0;
+}
+.map-search-item-title {
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: rgba(17, 17, 17, .84);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.map-search-item-sub {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    color: rgba(17, 17, 17, .44);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.map-search-loading, .map-search-empty {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    color: rgba(17, 17, 17, .46);
+    padding: 10px 12px;
+    text-align: center;
+}
+.map-search-loading i { margin-right: 6px; color: #8a6a22; }
+
+/* ============================================================
+   PANEL RUTE PERJALANAN -- mengambang di pojok kiri-bawah peta,
+   muncul saat tombol "Rute ke Sini" di salah satu popup marker
+   diklik. Dipakai bareng js/MapSection.js (fitur rute: geolocation
+   browser buat lokasi pengguna + OSRM buat hitung rute, jarak, dan
+   estimasi waktu tempuh -- gratis, tanpa API key).
+   ============================================================ */
+.map-route-panel {
+    position: absolute;
+    left: 16px;
+    bottom: 16px;
+    z-index: 500;
+    width: min(300px, calc(100% - 32px));
+    display: none;
+    border-radius: 16px;
+    background: rgba(250, 249, 245, 0.96);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    box-shadow: 0 16px 34px rgba(20, 16, 10, 0.26);
+    border: 1px solid rgba(17, 17, 17, 0.08);
+    overflow: hidden;
+    animation: mapRoutePanelIn .25s ease;
+}
+.map-route-panel.is-active { display: block; }
+
+@keyframes mapRoutePanelIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.map-route-panel-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 12px 10px 14px;
+    border-bottom: 1px solid rgba(17, 17, 17, 0.06);
+}
+.map-route-panel-head > i {
+    color: #1f4e8c;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+.map-route-panel-title {
+    flex: 1;
+    min-width: 0;
+    font-family: 'Fraunces', serif;
+    font-size: 14px;
+    font-weight: 800;
+    color: rgba(17, 17, 17, .88);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.map-route-panel-close {
+    flex-shrink: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(17, 17, 17, 0.08);
+    color: rgba(17, 17, 17, .5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    cursor: pointer;
+    transition: background .2s ease;
+}
+.map-route-panel-close:hover { background: rgba(17, 17, 17, 0.16); }
+
+.map-route-panel-body {
+    padding: 14px;
+}
+
+.map-route-panel-loading {
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    color: rgba(17, 17, 17, .5);
+    text-align: center;
+    padding: 6px 0;
+}
+.map-route-panel-loading i { margin-right: 6px; color: #1f4e8c; }
+
+.map-route-panel-error {
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #b3261e;
+    background: rgba(179, 38, 30, 0.08);
+    border: 1px solid rgba(179, 38, 30, 0.22);
+    border-radius: 10px;
+    padding: 9px 12px;
+    margin: 0 0 10px;
+    line-height: 1.5;
+}
+
+.map-route-stats {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.map-route-stat {
+    flex: 1;
+    text-align: center;
+    padding: 10px 8px;
+    border-radius: 10px;
+    background: rgba(31, 78, 140, 0.07);
+}
+.map-route-stat-value {
+    font-family: 'Fraunces', serif;
+    font-size: 17px;
+    font-weight: 800;
+    color: #1f4e8c;
+}
+.map-route-stat-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: rgba(17, 17, 17, .42);
+    margin-top: 2px;
+}
+
+.map-route-panel-note {
+    font-family: 'Inter', sans-serif;
+    font-size: 10.5px;
+    line-height: 1.5;
+    color: rgba(17, 17, 17, .4);
+    margin: 0 0 10px;
+}
+
+.map-route-retry-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(31, 78, 140, 0.3);
+    background: rgba(31, 78, 140, 0.08);
+    color: #1f4e8c;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-bottom: 8px;
+    transition: background .2s ease;
+}
+.map-route-retry-btn:hover { background: rgba(31, 78, 140, 0.16); }
+
+.map-route-cancel-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(179, 38, 30, 0.24);
+    background: rgba(179, 38, 30, 0.08);
+    color: #b3261e;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .2s ease;
+}
+.map-route-cancel-btn:hover { background: rgba(179, 38, 30, 0.16); }
+
+/* ============================================================
+   MODAL -- bahasa visual sama dengan modal QR & Musik (kertas krem
+   + pita emas di tepi atas), disimpan sendiri di file ini mengikuti
+   konvensi "CSS dipecah per komponen/fungsi".
+   ============================================================ */
+.map-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 600;
+    background: rgba(20, 16, 10, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: mapModalFadeIn .25s ease;
+}
+@keyframes mapModalFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.map-modal-box {
+    position: relative;
+    width: 100%;
+    max-width: 380px;
+    max-height: 84vh;
+    overflow-y: auto;
+    background: #faf9f5;
+    border-radius: 20px;
+    padding: 32px 28px 28px;
+    box-shadow:
+        0 24px 60px -6px rgba(20, 16, 10, 0.32),
+        inset 0 0 0 1px rgba(0, 0, 0, 0.05),
+        4px 4px 0 -2px rgba(232, 226, 210, 1),
+        8px 8px 0 -4px rgba(216, 209, 191, 1);
+    animation: mapModalPopIn .3s cubic-bezier(.34,1.1,.64,1);
+}
+.map-modal-box-wide { max-width: 430px; }
+
+@keyframes mapModalPopIn {
+    from { opacity: 0; transform: translateY(14px) scale(.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.map-modal-box::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #8a6a22, #cba454 45%, #fff6d8 55%, #cba454 70%, #6b4f18);
+    box-shadow: 0 0 14px rgba(203, 164, 84, 0.45);
+}
+
+.map-modal-title {
+    font-family: 'Fraunces', serif;
+    font-size: 21px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: rgba(17, 17, 17, .92);
+    margin-bottom: 6px;
+}
+.map-modal-sub {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: rgba(17, 17, 17, .58);
+    line-height: 1.6;
+    margin-bottom: 18px;
+}
+
+.map-loading, .map-empty {
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    color: rgba(17, 17, 17, .46);
+    text-align: center;
+    padding: 16px 4px;
+}
+
+.map-location-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 16px 0;
+}
+
+.map-location-row {
+    padding: 12px 14px;
+    background: rgba(17, 17, 17, 0.03);
+    border: 1px solid rgba(17, 17, 17, 0.09);
+    border-radius: 12px;
+}
+.map-location-row-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+.map-location-title {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: rgba(17, 17, 17, .84);
+    line-height: 1.4;
+}
+.map-location-coords {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    color: rgba(17, 17, 17, .4);
+    margin-top: 4px;
+}
+.map-location-row-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+}
+.map-location-edit, .map-location-delete {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    border: 1px solid rgba(17, 17, 17, 0.12);
+    background: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: rgba(17, 17, 17, .6);
+    transition: background .2s ease;
+}
+.map-location-edit:hover { background: rgba(203, 164, 84, 0.2); color: #8a6a22; }
+.map-location-delete {
+    border-color: rgba(179, 38, 30, 0.24);
+    background: rgba(179, 38, 30, 0.08);
+    color: #b3261e;
+}
+.map-location-delete:hover { background: rgba(179, 38, 30, 0.16); }
+
+.map-modal-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 12px 16px;
+    border-radius: 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: transform .25s ease, box-shadow .25s ease, background .25s ease;
+    margin-bottom: 4px;
+}
+.map-modal-btn:hover { transform: translateY(-2px); }
+.map-modal-btn-primary {
+    background: linear-gradient(135deg, #2b2b2b, #000000);
+    color: #fbf8f1;
+    box-shadow: 0 10px 24px rgba(20,16,10,0.26);
+}
+.map-modal-btn-ghost {
+    background: rgba(203, 164, 84, 0.12);
+    border: 1px solid rgba(203, 164, 84, 0.42);
+    color: #8a6a22;
+}
+.map-modal-btn-ghost:hover { background: rgba(203, 164, 84, 0.2); }
+
+.map-modal-cancel {
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 12px 8px 0;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(17, 17, 17, .34);
+    cursor: pointer;
+    text-align: center;
+    transition: color .25s ease;
+}
+.map-modal-cancel:hover { color: rgba(17, 17, 17, .68); }
+
+.map-edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.map-edit-label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(17, 17, 17, .48);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+}
+.map-edit-input, .map-edit-textarea {
+    font-family: 'Inter', sans-serif;
+    font-size: 13.5px;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: normal;
+    color: rgba(17, 17, 17, .88);
+    background: rgba(17, 17, 17, 0.04);
+    border: 1px solid rgba(17, 17, 17, 0.14);
+    border-radius: 10px;
+    padding: 10px 12px;
+    transition: border-color .25s ease, background .25s ease;
+    resize: vertical;
+}
+.map-edit-input:focus, .map-edit-textarea:focus {
+    outline: none;
+    border-color: rgba(203, 164, 84, 0.65);
+    background: rgba(203, 164, 84, 0.06);
+}
+
+.map-edit-error {
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #b3261e;
+    background: rgba(179, 38, 30, 0.08);
+    border: 1px solid rgba(179, 38, 30, 0.22);
+    border-radius: 10px;
+    padding: 9px 12px;
+    margin: 0;
+}
+
+.map-edit-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 2px;
+}
+
+@media (max-width: 480px) {
+    .map-manage-btn span { display: none; } /* di layar sempit cuma ikon */
+
+    .map-search-box {
+        top: 12px;
+        left: 8px;
+        width: calc(100% - 76px); /* sisakan ruang buat tombol Kelola Lokasi di kanan */
+    }
+    .map-manage-btn {
+        top: 12px;
+        right: 8px;
+        padding: 10px 12px;
+    }
+
+    .map-route-panel {
+        left: 8px;
+        right: 8px;
+        bottom: 10px;
+        width: auto; /* full-width di layar sempit, gak nabrak tepi */
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .map-modal-overlay, .map-modal-box { animation: none; }
+    .map-route-panel { animation: none; }
+    .map-user-location-pulse { animation: none; opacity: .35; }
+}

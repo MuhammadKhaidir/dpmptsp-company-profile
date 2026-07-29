@@ -1,0 +1,459 @@
+/* ==========================================================================
+   HERO — "Terminal Layanan Swalayan" landing scene
+   Bright yellow / brush-stroke / gold emblem / glass nav / retro device
+   Dipakai bareng: js/VideoRevealEffect.js, js/HeroTiltEffect.js
+   ========================================================================== */
+
+:root {
+    --hero-yellow: #f4c518;
+    --hero-yellow-deep: #e0b400;
+    --hero-yellow-soft: #f7d24a;
+    --hero-ink: #151310;
+    --hero-gold-1: #fdf3c9;
+    --hero-gold-2: #d9b34e;
+    --hero-gold-3: #7a5a1e;
+    --hero-glass-bg: rgba(255,255,255,0.16);
+    --hero-glass-border: rgba(255,255,255,0.5);
+    --hero-glass-ink: #1c1a15;
+    --hero-ease: cubic-bezier(.16,.84,.32,1);
+}
+
+/* ==========================================================================
+   GLOBAL BACKGROUND — satu background dipakai bareng di SEMUA section
+   ==========================================================================
+   Sebelumnya .hero-grain & #canvas-3d-holder nempel di dalam .hero doang,
+   jadi begitu di-scroll lewat 100svh pertama, background itu (grain +
+   partikel 3D + warna dasar) keputus/ilang — section-section di bawahnya
+   (Profil/Visi/Misi, QR, Flipbook) jadi keliatan "kepisah" dari hero,
+   nyambungnya gak mulus.
+
+   Fix-nya: dua layer itu sekarang ditaruh di dalam #site-bg — wrapper
+   position:fixed yang nutupin seluruh viewport, ditaruh sebagai child
+   PALING PERTAMA di <body> (lihat index.html), jadi dia nempel di
+   belakang SEMUA section sepanjang halaman di-scroll, bukan cuma di
+   belakang .hero doang.
+
+   .hero-grain & #canvas-3d-holder di bawah ini GAK perlu diubah CSS-nya
+   (masih position:absolute; inset:0 kayak biasa), soalnya sekarang
+   containing block-nya adalah #site-bg (position:fixed), gantiin .hero.
+   js/VideoRevealEffect.js juga gak perlu diutak-atik karena dia nyari
+   kedua elemen itu lewat getElementById — lokasinya di DOM gak ngaruh.
+
+   .hero-bg-parallax (glow "brush" pojok kiri-atas) SENGAJA dibiarkan
+   tetap di dalam .hero, karena dia ikut koreografi load-in
+   `[data-hero-in="brush"]` yang selector-nya `.hero.is-loaded
+   [data-hero-in]` — kalau dipindah keluar dari .hero, animasi fade-in-nya
+   berhenti jalan.
+   ========================================================================== */
+#site-bg {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+
+    /* Background premium warna krem/gold — base gradient + vignette atas-bawah
+       + grid halus + spotlight gold ambient + grain + vignette bulat, DITAMBAH
+       beberapa "kilau" gold kecil yang disebar + glow lembut di 2 pojok biar
+       gak polos/kosong di area yang jauh dari spotlight tengah.
+       Dipakai dulu di .flipbook-scroll-sticky (css/FlipBookScroll.css);
+       sekarang dijadiin background bareng buat SELURUH halaman biar satu,
+       gak kuning kayak sebelumnya. .flipbook-scroll-sticky sendiri sekarang
+       transparent (lihat css/FlipBookScroll.css) biar gak dobel. */
+    background-color: #e2d9c8;
+    background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat, repeat, no-repeat, no-repeat;
+    background-size: 3px 3px, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 140% 140%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+    background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 50% 42%, 0 0, 0 0, top, bottom, 0 0, 0 0, center, center;
+    background-image:
+        radial-gradient(rgba(20, 16, 10, 0.06) 1px, transparent 1.4px),
+        radial-gradient(3px circle at 14% 20%, rgba(255, 246, 216, 0.9), transparent 70%),
+        radial-gradient(2.5px circle at 88% 16%, rgba(255, 246, 216, 0.85), transparent 70%),
+        radial-gradient(3px circle at 22% 82%, rgba(255, 246, 216, 0.85), transparent 70%),
+        radial-gradient(2.5px circle at 80% 86%, rgba(255, 246, 216, 0.8), transparent 70%),
+        radial-gradient(620px circle at 50% 42%, rgba(203, 164, 84, 0.22), transparent 65%),
+        radial-gradient(46% 46% at 10% 8%, rgba(203, 164, 84, 0.16), transparent 70%),
+        radial-gradient(46% 46% at 92% 94%, rgba(203, 164, 84, 0.16), transparent 70%),
+        linear-gradient(to bottom, rgba(20, 16, 10, 0.14), transparent 18%),
+        linear-gradient(to top, rgba(20, 16, 10, 0.14), transparent 18%),
+        repeating-linear-gradient(0deg, rgba(20, 16, 10, 0.045) 0 1px, transparent 1px 64px),
+        repeating-linear-gradient(90deg, rgba(20, 16, 10, 0.045) 0 1px, transparent 1px 64px),
+        radial-gradient(ellipse at 50% 50%, transparent 42%, rgba(20, 16, 10, 0.18) 100%),
+        linear-gradient(155deg, #efe9dc 0%, #e6ded0 38%, #d9cfbd 70%, #cfc3ac 100%);
+    animation: siteBgAmbientDrift 26s ease-in-out infinite;
+}
+
+@keyframes siteBgAmbientDrift {
+    0%, 100% { background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 46% 40%, 0 0, 0 0, top, bottom, 0 0, 0 0, center, center; }
+    50%      { background-position: 0 0, 0 0, 0 0, 0 0, 0 0, 54% 46%, 0 0, 0 0, top, bottom, 0 0, 0 0, center, center; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    #site-bg { animation: none; }
+}
+
+.hero {
+    position: relative;
+    min-height: 100svh;
+    width: 100%;
+    overflow: hidden;
+    isolation: isolate;
+    background: transparent; /* biar #site-bg di belakangnya nembus, gak ketutup */
+}
+
+.hero-grain {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    opacity: .05;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 180px 180px;
+}
+
+#canvas-3d-holder {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+}
+#canvas-3d-holder canvas { display: block; }
+
+/* ---- soft background parallax layer ---- */
+.hero-bg-parallax {
+    position: absolute;
+    z-index: 2;
+    top: -18%;
+    left: -18%;
+    width: 36%;
+    height: 36%;
+    pointer-events: none;
+    transition: transform .1s linear;
+    will-change: transform;
+    background:
+        radial-gradient(38% 46% at 22% 30%, rgba(255,255,255,0.55), rgba(255,255,255,0) 70%),
+        radial-gradient(30% 38% at 78% 22%, rgba(253,243,201,0.6), rgba(253,243,201,0) 72%),
+        radial-gradient(34% 42% at 62% 78%, rgba(224,180,0,0.28), rgba(224,180,0,0) 72%);
+    filter: blur(2px);
+}
+
+/* ---- header / glass capsule nav ---- */
+.hero-nav {
+    position: relative;
+    top: clamp(20px, 4vw, 44px);
+    right: clamp(20px, 4vw, 54px);
+    z-index: 20;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+.nav-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 11px 22px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: .01em;
+    color: var(--hero-glass-ink);
+    text-decoration: none;
+    background: var(--hero-glass-bg);
+    border: 1px solid var(--hero-glass-border);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    box-shadow:
+        inset 0 1px 1px rgba(255,255,255,0.65),
+        inset 0 -6px 10px rgba(0,0,0,0.05),
+        0 6px 16px rgba(20,16,0,0.10);
+    transition: transform .35s var(--hero-ease), background .35s ease, box-shadow .35s ease;
+    cursor: pointer;
+}
+.nav-pill:hover {
+    transform: translateY(-2px);
+    background: rgba(255,255,255,0.3);
+    box-shadow:
+        inset 0 1px 1px rgba(255,255,255,0.75),
+        inset 0 -6px 10px rgba(0,0,0,0.06),
+        0 10px 22px rgba(20,16,0,0.16);
+}
+
+/* ---- gold emblem logo ---- */
+.hero-logo-parallax { position: absolute; z-index: 15; top: clamp(60px, 9vw, 96px); left: clamp(24px, 8vw, 130px); transition: transform .1s linear; will-change: transform; }
+.hero-logo-float { animation: heroFloatLogo 6.5s ease-in-out infinite; }
+.hero-logo-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    will-change: transform;
+}
+.hero-logo-badge {
+    width: clamp(272px, 8vw, 308px);
+    height: clamp(272px, 8vw, 308px);
+    filter: drop-shadow(0 10px 18px rgba(60,44,0,0.35)) drop-shadow(0 2px 4px rgba(60,44,0,0.25));
+    object-fit: contain;
+    display: block;
+    margin-top: -40px;
+}
+.hero-logo-wordmark {
+    font-family: 'Inter', sans-serif;
+    font-weight: 800;
+    font-size: 10.5px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--hero-gold-3);
+    text-align: center;
+    line-height: 1.5;
+    text-shadow: 0 1px 0 rgba(255,255,255,0.4);
+}
+.hero-logo-wordmark span { display: block; font-weight: 600; font-size: 9px; letter-spacing: .1em; opacity: .8; }
+
+@keyframes heroFloatLogo {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-10px) rotate(-1.2deg); }
+}
+
+/* ---- title block ---- */
+.hero-title-parallax {
+    position: absolute;
+    z-index: 10;
+    left: clamp(24px, 8vw, 130px);
+    top: 46%;
+    transform: translateY(-42%);
+    transition: transform .1s linear;
+    will-change: transform;
+    max-width: 60vw;
+}
+.hero-title {
+    font-family: 'Fraunces', ;
+    font-weight: 900;
+    font-size: clamp(58px, 10.4vw, 168px);
+    line-height: .92;
+    letter-spacing: -0.03em;
+    color: var(--hero-ink);
+    text-shadow:
+        1px 1px 0 rgba(255,255,255,0.28),
+        -1px -1px 0 rgba(0,0,0,0.12),
+        2px 3px 0 rgba(0,0,0,0.12),
+        4px 6px 0 rgba(0,0,0,0.10),
+        6px 10px 14px rgba(0,0,0,0.22),
+        10px 18px 30px rgba(0,0,0,0.30);
+    margin: 0;
+}
+.hero-subtitle {
+    margin-top: clamp(10px, 2vw, 22px);
+    font-family: 'Inter', sans-serif;
+    font-weight: 900;
+    font-size: clamp(40px, 1.5vw, 22px);
+    letter-spacing: .28em;
+    text-transform: uppercase;
+    color: var(--hero-ink);
+    opacity: .70;
+    margin-left: 13px;
+}
+
+.hero-section {
+    position: relative;
+    overflow: hidden;
+    background-color: #05050a; /* Warna gelap default bagian depan */
+}
+
+.reveal-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 18;
+    mix-blend-mode: difference;
+}
+
+/* Pastikan konten utama posisinya di atas efek reveal */
+.hero-section .content {
+    position: relative;
+    z-index: 2;
+}
+
+/* ---- retro device ---- */
+.hero-device-parallax {
+    position: absolute;
+    z-index: 12;
+    right: clamp(-40px, 2vw, 40px);
+    bottom: clamp(-10px, 4vw, 40px);
+    transition: transform .1s linear;
+    will-change: transform;
+}
+.hero-device-float { animation: heroFloatDevice 7.5s ease-in-out infinite; }
+.hero-device {
+    position: relative;
+    width: min(360px, 30vw);
+    min-width: 320px;
+    aspect-ratio: 3 / 4.55;
+    /* NOTE: transform (termasuk base rotate -6deg) sekarang di-drive penuh
+       oleh js/HeroTiltEffect.js, biar gak rebutan sama tilt-follow-cursor.
+       Jangan taruh transform statis di sini lagi. */
+    filter: drop-shadow(0 34px 40px rgba(30,22,0,0.35)) drop-shadow(0 6px 10px rgba(30,22,0,0.25));
+}
+.device-shell {
+    position: absolute;
+    inset: 0;
+    border-radius: 34px;
+    background: linear-gradient(155deg, rgba(255, 255, 255, 0.422), rgba(255,255,255,0.08) 40%, rgba(255,255,255,0.22) 100%);
+    border: 1px solid rgba(153, 230, 10, 0.65);
+    backdrop-filter: blur(2px);
+    box-shadow:
+        inset 0 2px 2px rgba(255,255,255,0.8),
+        inset 0 -18px 30px rgba(0,0,0,0.06),
+        inset 10px 0 30px rgba(255,255,255,0.25);
+    overflow: hidden;
+}
+.device-shell::before {
+    content: "";
+    position: absolute;
+    top: -20%; left: -40%;
+    width: 65%; height: 160%;
+    background: linear-gradient(120deg, rgba(255,255,255,0.55), rgba(255,255,255,0) 60%);
+    transform: rotate(10deg);
+}
+.device-screen {
+    position: absolute;
+    left: 10%; right: 10%; top: 8%;
+    height: 40%;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #050506;
+    box-shadow: inset 0 0 0 3px rgba(0,0,0,0.55), 0 2px 8px rgba(0,0,0,0.3);
+}
+.device-screen canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.device-scanlines {
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(180deg, rgba(0,0,0,0.35) 0px, rgba(0,0,0,0.35) 1px, transparent 1px, transparent 3px);
+    mix-blend-mode: multiply;
+    pointer-events: none;
+}
+.device-screen-glow {
+    position: absolute; inset: 0;
+    box-shadow: inset 0 0 24px rgba(120,220,255,0.35);
+    pointer-events: none;
+}
+.device-label {
+    position: absolute;
+    left: 10%; right: 10%; top: 50.5%;
+    font-family: 'Inter', sans-serif;
+    font-size: 9.5px;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-align: center;
+    color: rgba(30,26,10,0.55);
+    text-transform: uppercase;
+}
+.device-controls {
+    position: absolute;
+    left: 8%; right: 8%; bottom: 6%; top: 58%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.device-dpad {
+    position: relative;
+    width: 76px; height: 76px;
+}
+.device-dpad span {
+    position: absolute;
+    background: linear-gradient(160deg, #3a3a3a, #101010);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.25), 0 2px 4px rgba(0,0,0,0.4);
+    border-radius: 4px;
+}
+.device-dpad .v { left: 50%; top: 0; width: 26px; height: 100%; margin-left: -13px; }
+.device-dpad .h { top: 50%; left: 0; height: 26px; width: 100%; margin-top: -13px; }
+.device-buttons {
+    position: relative;
+    width: 84px; height: 84px;
+}
+.device-buttons b {
+    position: absolute;
+    width: 32px; height: 32px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #4a4a4a, #0c0c0c 75%);
+    box-shadow: inset 0 1px 2px rgba(255,255,255,0.35), 0 3px 6px rgba(0,0,0,0.4);
+}
+.device-buttons b.b1 { right: 0; top: 22px; }
+.device-buttons b.b2 { right: 22px; top: 0; }
+.device-buttons b.b3 { right: 22px; top: 44px; }
+.device-buttons b.b4 { right: 44px; top: 22px; }
+.device-vents {
+    position: absolute;
+    left: 10%; right: 10%; bottom: 4%;
+    height: 10px;
+    display: flex;
+    gap: 4px;
+}
+.device-vents i {
+    flex: 1;
+    height: 100%;
+    border-radius: 2px;
+    background: rgba(20,16,0,0.18);
+}
+.device-badge {
+    position: absolute;
+    left: 12px; bottom: 34%;
+    width: 22px; height: 22px;
+    opacity: .9;
+}
+
+@keyframes heroFloatDevice {
+    0%, 100% { transform: translateY(0) rotate(-6deg); }
+    50% { transform: translateY(-16px) rotate(-3deg); }
+}
+
+/* ---- load-in choreography ---- */
+.hero [data-hero-in] {
+    opacity: 0;
+    transform: translateY(26px) scale(.97);
+    filter: blur(6px);
+    transition: opacity .9s var(--hero-ease), transform .9s var(--hero-ease), filter .9s var(--hero-ease);
+}
+.hero.is-loaded [data-hero-in] {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+}
+.hero.is-loaded [data-hero-in="nav"]    { transition-delay: .05s; }
+.hero.is-loaded [data-hero-in="logo"]   { transition-delay: .2s; }
+.hero.is-loaded [data-hero-in="brush"]  { transition-delay: 0s; }
+.hero.is-loaded [data-hero-in="title"]  { transition-delay: .35s; }
+.hero.is-loaded [data-hero-in="device"] { transition-delay: .5s; }
+
+/* BARU: dipakai js/VideoRevealEffect.js pas #hero KELUAR viewport --
+   matiin transition SEMENTARA biar semua elemen [data-hero-in] langsung
+   "snap" balik ke kondisi awal (hidden/opacity:0/translateY/blur) TANPA
+   animasi fade-out yang keliatan pelan pas lagi ninggalin section ini.
+   Class ini cuma nempel sebentar (dilepas lagi sama JS di frame
+   berikutnya), jadi pas #hero balik masuk viewport lagi, transition
+   normal udah aktif lagi dan animasi bisa "replay" dari awal mulus. */
+.hero.is-resetting [data-hero-in] {
+    transition: none !important;
+}
+
+@media (max-width: 980px) {
+    .hero { min-height: 100svh; padding-bottom: 40px; }
+    .hero-title-parallax { max-width: 90vw; top: 40%; }
+    .hero-device-parallax { right: 50%; transform: translateX(50%); bottom: 4%; }
+    .hero-device { width: min(220px, 52vw); }
+    .hero-logo-parallax { top: 118px; left: 50%; transform: translateX(-50%); }
+    .hero-logo-parallax, .hero-device-parallax { transition: none; }
+}
+
+@media (max-width: 640px) {
+    .hero-nav { top: 16px; right: 16px; left: 16px; justify-content: center; }
+    .nav-pill { padding: 9px 16px; font-size: 11.5px; }
+    .hero-title-parallax { left: 50%; transform: translateX(-50%); text-align: center; top: auto; bottom: 232px; }
+    .hero-title { font-size: clamp(46px, 15vw, 80px); }
+    .hero-subtitle { letter-spacing: .18em; }
+    .hero-logo-parallax { top: 96px; }
+    .hero-device-parallax { bottom: -6%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hero-logo-float, .hero-device-float { animation: none; }
+    .hero [data-hero-in] { transition: opacity .3s ease; transform: none !important; filter: none !important; }
+}

@@ -1,0 +1,118 @@
+/* ==========================================================================
+   SCRUB REVEAL — sticky scroll section (Profil/Visi/Misi) dengan teks besar
+   dan background 3D yang berubah sesuai posisi scroll
+   Dipakai bareng: js/ScrubRevealAnimation.js
+   ========================================================================== */
+
+.scrub-wrap {
+    position: relative;
+    z-index: 1;
+    height: 420vh;
+    background: transparent; /* biar #site-bg (lihat Hero.css) nembus, satu background sama section lain */
+}
+
+.scrub-sticky {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    height: 100svh; /* progressive enhancement, browser lama fallback ke 100vh di atas */
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 54px;
+    background: transparent;
+}
+
+.scrub-bg-3d {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: min(900px, 74vw);
+    height: 100%;
+    transform: translateX(-50%);
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0;
+    will-change: opacity;
+}
+
+.scrub-text-stage {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 1;
+}
+
+.scrub-word {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin-right: 10px;
+
+    font-family: "Fraunces",;
+    font-weight: 600;
+
+    font-size: clamp(56px, 10vw, 170px);
+    line-height: 0.92;
+
+    letter-spacing: -0.045em;
+    text-transform: uppercase;
+
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+
+    color: rgba(10, 10, 10, 0.95);
+
+    text-shadow:
+        0 1px 0 rgba(246, 243, 243, 0.08),
+        0 8px 18px rgba(0, 0, 0, 0.768),
+        0 20px 45px rgba(250, 248, 248, 0.89);
+
+    white-space: nowrap;
+    opacity: 0;
+
+    will-change: transform, opacity, filter;
+    pointer-events: none;
+}
+
+.scrub-content {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 1100px;
+    max-height: 100%;
+    opacity: 0;
+    will-change: transform, opacity, filter;
+
+    /* FIX: susun heading + carousel jadi flex column dengan gap kecil yang
+       ikut ngecil di layar pendek (clamp vh), gantiin margin-bottom bawaan
+       si heading yang ukurannya gak tau nyesuain layar atau enggak. Ini
+       yang bikin total tinggi konten (judul + carousel) selalu muat di
+       dalam satu layar (.scrub-sticky), gak keluar/kepotong lagi. */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: clamp(10px, 2.2vh, 26px);
+}
+
+/* Matiin margin bawaan si heading (dari Dashboard.css/sejenisnya) supaya
+   jaraknya cuma diatur satu tempat lewat `gap` di atas — gak dobel-dobel
+   makan tinggi layar. Selector ini sengaja pakai child combinator biar
+   spesifisitasnya menang lawan `.info-section-head` polos di file lain. */
+.scrub-content > .info-section-head {
+    margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .scrub-wrap { height: auto; }
+    .scrub-sticky { position: relative; height: auto; padding: 110px 54px; }
+    .scrub-text-stage { display: none; }
+    .scrub-content { opacity: 1 !important; transform: none !important; filter: none !important; }
+}

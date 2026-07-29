@@ -1,0 +1,29 @@
+[
+  {
+    "id": "ms573c0h-795c6088",
+    "lat": -3.0213570841309254,
+    "lng": 104.78343486785889,
+    "title": "Jakabaring",
+    "description": "Jakabaring Sport City",
+    "createdAt": 1785275759249,
+    "updatedAt": 1785275795404
+  },
+  {
+    "id": "ms5e12rn-ae9dc177",
+    "lat": -3.033783019314121,
+    "lng": 104.66224193573,
+    "title": "Pulo Kerto",
+    "description": "Kawasan Pulokerto dikembangkan sebagai destinasi wisata alam dan ekowisata berbasis konservasi, \npertanian, dan petualangan berkelanjutan yang menghadirkan pengalaman wisata hijau, pendidikan \nlingkungan, dan rekreasi keluarga.",
+    "createdAt": 1785287411267,
+    "updatedAt": 1785287411267
+  },
+  {
+    "id": "ms5eh9em-0f796a52",
+    "lat": -3.0114199174646137,
+    "lng": 104.70398783683778,
+    "title": "Museum Bayt Al-Qur'an Al-akbar",
+    "description": "Aula tinggi dan bersepuh emas yang menampilkan Quran di papan bertulisan besar, dengan toko suvenir.",
+    "createdAt": 1785288166366,
+    "updatedAt": 1785288166366
+  }
+]

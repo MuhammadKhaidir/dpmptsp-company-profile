@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistem Pengaduan Masyarakat - DPMPTSP</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,800;9..144,900&display=swap" rel="stylesheet">
+
+    <!-- CSS dipecah per komponen/fungsi -->
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/Hero.css">
+    <link rel="stylesheet" href="css/AiChat.css">
+    <link rel="stylesheet" href="css/Dashboard.css">
+    <link rel="stylesheet" href="css/SectionRevealAnimation.css">
+    <link rel="stylesheet" href="css/ArcCarousel.css">
+    <link rel="stylesheet" href="css/ScrubRevealAnimation.css">
+    <link rel="stylesheet" href="css/QRCodeRevealAnimation.css">
+    <link rel="stylesheet" href="css/MusicPlayer.css">
+    <link rel="stylesheet" href="css/MapSection.css">
+    <link rel="stylesheet" href="css/FlipBookProfile.css">
+    <link rel="stylesheet" href="css/FlipBookScroll.css">
+    <link rel="stylesheet" href="css/Particles.css">
+</head>
+
+<body x-data="appData()">
+
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+        <filter id="waterDistort" x="-40%" y="-40%" width="180%" height="180%">
+            <feTurbulence type="fractalNoise" baseFrequency="0.012 0.045" numOctaves="2" seed="4" result="noise">
+                <animate attributeName="baseFrequency" dur="7s" values="0.010 0.045;0.018 0.06;0.010 0.045" repeatCount="indefinite" />
+            </feTurbulence>
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale="16" xChannelSelector="R" yChannelSelector="G" />
+        </filter>
+    </defs>
+</svg>
+
+<div x-show="toast" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-y-2" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-200" x-transition:leave-end="opacity-0 translate-y-2" x-cloak class="toast">
+    <i class="fa-solid fa-circle-check" style="color:#4ade80;"></i>
+    <span x-text="toastMsg"></span>
+</div>
+
+<div x-show="v==='landing'" x-cloak>
+
+    <section class="hero" id="hero">
+        <div id="hero-particles" class="particles-container" aria-hidden="true"></div>
+
+        <canvas class="reveal-layer" id="revealCanvas"></canvas>
+
+        <div class="hero-bg-parallax" id="heroBgParallax" data-hero-in="brush" aria-hidden="true"></div>
+
+        <header class="hero-nav" data-hero-in="nav">
+            <a href="#layanan-section" class="nav-pill water-hover">Dashboard</a>
+            <a href="#qr-section" class="nav-pill water-hover">QR Kode</a>
+            <a href="#flipbook-section" class="nav-pill water-hover">Dokumen</a>
+            <a href="#map-section" class="nav-pill water-hover">Maps</a>
+        </header>
+
+        <div class="hero-logo-parallax" id="heroLogoParallax" data-hero-in="logo">
+            <div class="hero-logo-float">
+                <div class="hero-logo-wrap" id="heroLogoWobble">
+                    <img class="hero-logo-badge" src="Assets/Video/LogoPTSPKotPal.png" alt="Logo DPMPTSP Kota Palembang">
+                    
+                </div>
+            </div>
+        </div>
+
+        <div class="hero-title-parallax" id="heroTitleParallax" data-hero-in="title">
+            <h1 class="hero-title">DPMPTSP</h1>
+            <p class="hero-subtitle">KOTA PALEMBANG</p>
+        </div>
+
+        <div class="hero-device-parallax" id="heroDeviceParallax" data-hero-in="device">
+            <div class="hero-device-float">
+                <div class="hero-device">
+                    <div class="device-shell">
+                        <div class="device-screen">
+                            <video id="deviceScreenVideo" src="/assets/Video/AmperaDrone.mp4" autoplay muted loop playsinline></video>
+                            <div class="device-scanlines"></div>
+                            <div class="device-screen-glow"></div>
+                        </div>
+                        <p class="device-label">Terminal Layanan Swalayan</p>
+                        <div class="device-controls">
+                            <div class="device-dpad"><span class="v"></span><span class="h"></span></div>
+                            <div class="device-buttons"><b class="b1"></b><b class="b2"></b><b class="b3"></b><b class="b4"></b></div>
+                        </div>
+                        <div class="device-vents"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+                        <svg class="device-badge" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+                            <defs>
+                                <linearGradient id="goldGradMini" x1="0%" y1="0%" x2="100%" y2="100%">
+                                    <stop offset="0%" stop-color="#fff6d8"/>
+                                    <stop offset="60%" stop-color="#cba454"/>
+                                    <stop offset="100%" stop-color="#8a6a22"/>
+                                </linearGradient>
+                            </defs>
+                            <circle cx="20" cy="20" r="18" fill="url(#goldGradMini)" stroke="#7a5a1e" stroke-width="1"></circle>
+                            <text x="20" y="26" text-anchor="middle" font-family="Fraunces, serif" font-size="13" font-weight="700" fill="#3c2c0c">DP</text>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </section>
+
+    <button class="chat-fab interactive" id="chatFabBtn" x-show="!chatOpen" @click="openChat()" aria-label="Buka asisten DPMPTSP">
+        <i class="fa-solid fa-comments"></i>
+    </button>
+
+    <div id="ai-chat-panel" x-show="chatOpen" x-cloak>
+        <div class="chat-window">
+            <div class="chat-header">
+                <div class="chat-avatar"><i class="fa-solid fa-robot"></i></div>
+                <div class="chat-header-info">
+                    <div class="chat-header-name">Asisten DPMPTSP</div>
+                    <div class="chat-header-status">
+                        <span class="chat-status-dot"></span> Online — Siap membantu
+                    </div>
+                </div>
+                <button class="chat-close-btn" @click="closeChat()">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="chat-messages" id="chat-messages-box"></div>
+        </div>
+
+        <div class="chat-chips-area" id="chat-chips-area"></div>
+
+        <div class="chat-input-area">
+            <div class="chat-attach-preview" id="chat-attach-preview">
+                <i class="fa-solid fa-image"></i>
+                <span id="chat-attach-preview-name"></span>
+                <button type="button" id="chat-attach-remove" aria-label="Hapus lampiran">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="chat-input-row">
+                <button type="button" class="chat-attach-btn" id="chat-attach-btn" title="Lampirkan gambar untuk ganti QR">
+                    <i class="fa-solid fa-paperclip"></i>
+                </button>
+                <input
+                    class="chat-input"
+                    id="chat-text-input"
+                    type="text"
+                    placeholder="Ketik pesan atau pilih opsi di atas..."
+                    autocomplete="off"
+                    onkeydown="if(event.key==='Enter') sendChatMessage()"
+                >
+                <button class="chat-send-btn" id="chat-send-btn" onclick="sendChatMessage()">
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+            <input type="file" id="chat-attach-input" accept="image/png,image/jpeg,image/webp,image/gif" style="display:none;">
+        </div>
+    </div>
+
+<section class="scrub-wrap" id="profil-section">
+<div class="scrub-sticky">
+        <canvas class="scrub-bg-3d" id="scrubBg3D"></canvas>
+
+        <div class="scrub-text-stage">
+            <span class="scrub-word">PROFIL</span>
+            <span class="scrub-word">VISI</span>
+            <span class="scrub-word">&amp;</span>
+            <span class="scrub-word">MISI</span>
+            <span class="scrub-word">KAMI</span>
+        </div>
+
+        <div class="scrub-content" id="profilVisiMisiContent">
+            <div class="info-section-head">
+                <p class="info-eyebrow">Tentang Kami</p>
+                <h2 class="info-title">Profil, Visi &amp; Misi</h2>
+            </div>
+            <div class="arc-carousel" data-arc-carousel aria-roledescription="carousel" aria-label="Profil, Visi, dan Misi DPMPTSP">
+                <div class="arc-track" data-arc-track>
+                    <div class="arc-card water-hover" data-arc-card>
+                        <div class="info-card-icon"><i class="fa-solid fa-building-shield"></i></div>
+                        <h3 class="info-card-title">Pelayanan Terpadu</h3>
+                        <p class="info-card-text">Seluruh proses perizinan dan non-perizinan dilayani dalam satu pintu, tanpa perlu berpindah-pindah instansi.</p>
+                    </div>
+                    <div class="arc-card water-hover" data-arc-card>
+                        <div class="info-card-icon"><i class="fa-solid fa-scale-balanced"></i></div>
+                        <h3 class="info-card-title">Transparan &amp; Akuntabel</h3>
+                        <p class="info-card-text">Setiap laporan dan proses perizinan dapat dipantau langsung oleh masyarakat secara real-time.</p>
+                    </div>
+                    <div class="arc-card water-hover" data-arc-card>
+                        <div class="info-card-icon"><i class="fa-solid fa-headset"></i></div>
+                        <h3 class="info-card-title">Responsif</h3>
+                        <p class="info-card-text">Tim petugas siap menindaklanjuti pengaduan dan pertanyaan masyarakat secara cepat dan tepat.</p>
+                    </div>
+                    <div class="arc-card water-hover" data-arc-card>
+                        <div class="info-card-icon"><i class="fa-solid fa-flag"></i></div>
+                        <h3 class="info-card-title">Visi</h3>
+                        <p class="info-card-text">Mewujudkan pelayanan perizinan dan penanaman modal yang cepat, transparan, dan berorientasi pada kepuasan masyarakat.</p>
+                    </div>
+                    <div class="arc-card water-hover" data-arc-card>
+                        <div class="info-card-icon"><i class="fa-solid fa-list-check"></i></div>
+                        <h3 class="info-card-title">Misi</h3>
+                        <p class="info-card-text">Meningkatkan kualitas pelayanan publik, mempercepat proses perizinan berbasis digital, serta membuka ruang partisipasi dan pengaduan masyarakat seluas-luasnya.</p>
+                    </div>
+                </div>
+                <div class="arc-nav">
+                    <button type="button" class="arc-nav-btn arc-prev" aria-label="Kartu sebelumnya"><i class="fa-solid fa-chevron-left"></i></button>
+                    <div class="arc-dots" data-arc-dots></div>
+                    <button type="button" class="arc-nav-btn arc-next" aria-label="Kartu berikutnya"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="info-section" id="qr-section">
+    <div class="info-section-head" data-reveal>
+        <p class="info-eyebrow">TRY NOW</p>
+        <h2 class="info-title">SCAN ME!</h2>
+    </div>
+
+    <div class="qr-scene" id="qr-scene">
+        <div class="qr-panel" id="qr-panel">
+            <div class="qr-panel-inner qr-panel-left">
+                <div class="qr-visual">
+                    <img class="qr-img" src="Assets/Video/Peluang Bisnis Investasi.png" alt="QR Code Pelaung Bisnis Investasi">
+                    <div class="qr-scan-line"></div>
+                </div>
+                <p class="qr-caption">Peluang Bisnis Investasi</p>
+            </div>
+
+            <div class="qr-hover-text qr-hover-text-left" aria-hidden="true">
+                <div class="qr-hover-text-inner">
+                    <h4>Profil Bisnis Investasi</h4>
+                    <p>Informasi singkat mengenai peluang usaha dan potensi investasi yang tersedia bagi calon investor.</p>
+                </div>
+            </div>
+
+            <div class="qr-hover-text qr-hover-text-center" aria-hidden="true">
+                <div class="qr-hover-text-inner">
+                    <h4>Katalog Investasi</h4>
+                    <p>Katalog Investasi Palembang</p>
+                </div>
+            </div>
+
+            <div class="qr-hover-text qr-hover-text-right" aria-hidden="true">
+                <div class="qr-hover-text-inner">
+                    <h4>Profil Investasi Kota Palembang</h4>
+                    <p>Informasi mengenai potensi, sektor unggulan, dan peluang investasi yang ada di Kota Palembang.</p>
+                </div>
+            </div>
+
+            <div class="qr-panel-inner qr-panel-center">
+                <div class="qr-visual">
+                    <img class="qr-img" src="Assets/Video/Katalog.png" alt="QR Code Katalog">
+                    <div class="qr-scan-line"></div>
+                </div>
+                <p class="qr-caption">Katalog Investasi</p>
+            </div>
+
+            <div class="qr-panel-inner qr-panel-right">
+                <div class="qr-visual">
+                    <img class="qr-img" src="Assets/Video/Profil Investasi Kota Palembang.png" alt="QR Code Investasi">
+                    <div class="qr-scan-line"></div>
+                </div>
+                <p class="qr-caption">Profil Investasi Kota Palembang</p>
+            </div>
+        </div>
+
+        <div class="qr-hover-bg" aria-hidden="true">
+            <div class="qr-hover-bg-img qr-hover-bg-left"></div>
+            <div class="qr-hover-bg-img qr-hover-bg-center"></div>
+            <div class="qr-hover-bg-img qr-hover-bg-right"></div>
+        </div>
+
+        <div class="qr-cat is-hidden" id="qr-cat" aria-hidden="true">
+            <img class="qr-cat-frame" src="Assets/Video/IdleCat1.png" alt="">
+        </div>
+    </div>
+</section>
+
+<section class="info-section" id="flipbook-section">
+    <div class="info-wipe-layer">
+        <div class="info-wipe-box"></div>
+        <div class="info-wipe-box"></div>
+        <div class="info-wipe-box"></div>
+        <div class="info-wipe-box"></div>
+        <div class="info-wipe-box"></div>
+        <div class="info-wipe-box"></div>
+        <div class="info-wipe-box"></div>
+        <div class="info-wipe-box"></div>
+        <div class="info-wipe-box"></div>
+        <div class="info-wipe-box"></div>
+    </div>
+
+    <div class="info-section-head" data-reveal>
+        <p class="info-eyebrow">Profil Interaktif</p>
+        <h2 class="info-title">Company Profile</h2>
+    </div>
+    <div class="fb-reveal" id="fbReveal">
+        <div id="flipbookContainer"></div>
+    </div>
+</section>
+
+<section class="info-section" id="map-section">
+    <div class="info-section-head" data-reveal>
+        <p class="info-eyebrow">Peta Investasi</p>
+        <h2 class="info-title">Lokasi Peluang Investasi</h2>
+    </div>
+
+    <div class="map-scene" id="map-scene">
+        <div id="investment-map" class="investment-map"></div>
+
+        <button type="button" class="map-manage-btn" id="map-manage-btn">
+            <i class="fa-solid fa-map-pin"></i> <span>Kelola Lokasi</span>
+        </button>
+
+        <div class="map-pick-banner" id="map-pick-banner">
+            <span><i class="fa-solid fa-crosshairs"></i> Klik pada peta untuk menandai lokasi</span>
+            <button type="button" id="map-pick-cancel">Batal</button>
+        </div>
+    </div>
+</section>
+
+</div>
+
+<div x-show="v==='login'" x-cloak class="inner" style="display:flex;align-items:center;justify-content:center;padding:40px 16px;">
+    <div class="auth-card">
+        <div style="text-align:center;margin-bottom:26px;">
+            <div style="width:50px;height:50px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.26);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:20px;">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            <h2 style="font-size:22px;font-weight:800;letter-spacing:-.03em;">Selamat Datang Kembali</h2>
+            <p style="font-size:13px;color:rgba(255,255,255,.46);margin-top:5px;">Masuk untuk mengakses dashboard sistem</p>
+        </div>
+
+        <div x-data="{ email:'', password:'', errMsg:'', loading:false }">
+        <form @submit.prevent="
+            errMsg = '';
+            loading = true;
+            fetch('/api/auth/login', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ email: email, password: password })
+            })
+            .then(r => r.json())
+            .then(data => {
+                loading = false;
+                if (data.success) {
+                    sessionStorage.setItem('nama_lengkap', data.nama_lengkap);
+                    sessionStorage.setItem('role', data.role);
+                    v = 'dashboard-' + data.role;
+                    fire('Login berhasil sebagai ' + data.role + '!');
+                } else {
+                    errMsg = data.message;
+                }
+            })
+            .catch(() => { loading = false; errMsg = 'Gagal terhubung ke server'; })
+        " style="display:flex;flex-direction:column;gap:15px;">
+            <div><label class="a-label">Email / NIK</label><input type="text" x-model="email" required placeholder="name@domain.com" class="a-input"></div>
+            <div><label class="a-label">Kata Sandi</label><input type="password" x-model="password" required placeholder="••••••••" class="a-input"></div>
+            <p x-show="errMsg" x-text="errMsg" style="color:#fca5a5;font-size:12.5px;font-weight:600;margin-top:-4px;"></p>
+            <button type="submit" class="a-btn" :disabled="loading" style="margin-top:5px;" x-text="loading ? 'Memproses...' : 'Masuk ke Sistem'"></button>
+        </form>
+        </div>
+
+        <p style="margin-top:18px;text-align:center;font-size:13px;color:rgba(255,255,255,.42);">
+            Belum terdaftar? <span @click="v='register'" style="color:#c4b5fd;font-weight:700;cursor:pointer;">Registrasi NIK Baru</span>
+        </p>
+    </div>
+</div>
+
+<div x-show="v==='register'" x-cloak class="inner" style="display:flex;align-items:center;justify-content:center;padding:40px 16px;">
+    <div class="auth-card" style="max-width:510px;">
+        <h2 style="font-size:21px;font-weight:800;letter-spacing:-.03em;margin-bottom:5px;">Pendaftaran Akun Masyarakat</h2>
+        <p style="font-size:13px;color:rgba(255,255,255,.42);margin-bottom:22px;">Pastikan data NIK valid sesuai KTP asli</p>
+
+        <div x-data="{ nama_lengkap:'', nik:'', no_hp:'', email:'', password:'', errMsg:'', loading:false }">
+        <form @submit.prevent="
+            errMsg = '';
+            loading = true;
+            fetch('/api/auth/register', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ nama_lengkap, nik, no_hp, email, password })
+            })
+            .then(r => r.json())
+            .then(data => {
+                loading = false;
+                if (data.success) {
+                    v = 'login';
+                    fire('Registrasi sukses! Silakan login');
+                } else {
+                    errMsg = data.message;
+                }
+            })
+            .catch(() => { loading = false; errMsg = 'Gagal terhubung ke server'; })
+        " style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div style="grid-column:1/-1;"><label class="a-label">Nama Lengkap Sesuai KTP</label><input type="text" x-model="nama_lengkap" required placeholder="Nama Lengkap" class="a-input"></div>
+            <div><label class="a-label">NIK (16 Digit)</label><input type="text" x-model="nik" maxlength="16" required placeholder="16 Digit NIK" class="a-input"></div>
+            <div><label class="a-label">No HP (WhatsApp)</label><input type="tel" x-model="no_hp" required placeholder="08xxxxxxxxxx" class="a-input"></div>
+            <div style="grid-column:1/-1;"><label class="a-label">Email Aktif</label><input type="email" x-model="email" required placeholder="email@contoh.com" class="a-input"></div>
+            <div style="grid-column:1/-1;"><label class="a-label">Buat Kata Sandi</label><input type="password" x-model="password" required placeholder="Minimal 8 karakter" class="a-input"></div>
+            <p x-show="errMsg" x-text="errMsg" style="grid-column:1/-1;color:#fca5a5;font-size:12.5px;font-weight:600;margin-top:-6px;"></p>
+            <div style="grid-column:1/-1;margin-top:4px;"><button type="submit" class="a-btn" :disabled="loading" x-text="loading ? 'Memproses...' : 'Selesaikan Pendaftaran'"></button></div>
+        </form>
+        </div>
+    </div>
+</div>
+
+<div x-show="v==='dashboard-masyarakat'" x-cloak class="inner" style="display:flex;min-height:100vh;">
+    <aside class="d-aside">
+        <div class="d-aside-head">
+            <div class="d-icon" style="background:rgba(167,139,250,.2);color:#c4b5fd;"><i class="fa-solid fa-id-card"></i></div>
+            <span style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(196,181,253,.8);">Panel Masyarakat</span>
+        </div>
+        <div class="d-nav">
+            <button class="d-btn on water-hover"><i class="fa-solid fa-house"></i> Dashboard</button>
+            <button @click="modal=true" class="d-btn water-hover"><i class="fa-solid fa-paper-plane"></i> Buat Pengaduan</button>
+            <div style="flex:1;"></div>
+            <button @click="fetch('/api/auth/logout', {method:'POST'}).then(()=>{ sessionStorage.clear(); v='landing'; })" class="d-btn out water-hover"><i class="fa-solid fa-right-from-bracket"></i> Keluar</button>
+        </div>
+    </aside>
+    <main class="d-main" style="flex:1;padding:25px;display:flex;flex-direction:column;gap:19px;">
+        <header style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+                <h1 style="font-size:21px;font-weight:800;letter-spacing:-.03em;">Sistem Layanan Publik</h1>
+                <p style="font-size:13px;color:rgba(255,255,255,.42);margin-top:2px;">Pantau status pengaduan Anda secara real-time</p>
+            </div>
+            <span style="font-size:11px;font-weight:700;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.13);padding:6px 13px;border-radius:999px;color:rgba(255,255,255,.65);">NIK: 1671020304050001</span>
+        </header>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:12px;">
+            <div class="s-card"><div><p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.38);">Total</p><p style="font-size:28px;font-weight:900;margin-top:3px;">4</p></div><div class="s-card-icon" style="color:#c4b5fd;"><i class="fa-solid fa-folder-open"></i></div></div>
+            <div class="s-card"><div><p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.38);">Diproses</p><p style="font-size:28px;font-weight:900;margin-top:3px;color:#fcd34d;">1</p></div><div class="s-card-icon" style="color:#fcd34d;"><i class="fa-solid fa-spinner"></i></div></div>
+            <div class="s-card"><div><p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.38);">Selesai</p><p style="font-size:28px;font-weight:900;margin-top:3px;color:#6ee7b7;">2</p></div><div class="s-card-icon" style="color:#6ee7b7;"><i class="fa-solid fa-circle-check"></i></div></div>
+            <div class="s-card"><div><p style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,.38);">Ditolak</p><p style="font-size:28px;font-weight:900;margin-top:3px;color:#fca5a5;">1</p></div><div class="s-card-icon" style="color:#fca5a5;"><i class="fa-solid fa-circle-xmark"></i></div></div>
+        </div>
+        <div class="panel">
+            <div class="p-head">
+                <h3 style="font-size:14px;font-weight:700;">Riwayat Pengaduan</h3>
+                <button @click="modal=true" class="btn-sm btn-g"><i class="fa-solid fa-plus" style="margin-right:5px;"></i>Baru</button>
+            </div>
+            <table class="dtable">
+                <thead><tr><th>ID</th><th>Judul Pengaduan</th><th>Kategori</th><th>Status</th><th>Aksi</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td style="color:rgba(255,255,255,.28);">#042</td>
+                        <td>Pungutan Liar Oknum Loket B Perizinan Ruko</td>
+                        <td><span style="background:rgba(167,139,250,.15);color:#c4b5fd;border:1px solid rgba(167,139,250,.24);padding:3px 9px;border-radius:6px;font-size:11px;font-weight:700;">Perizinan</span></td>
+                        <td><span class="bs bs-p"><i class="fa-solid fa-clock"></i>Diproses</span></td>
+                        <td><button @click="v='detail'" style="color:#c4b5fd;font-size:12px;font-weight:600;background:none;border:none;cursor:pointer;font-family:'Inter',sans-serif;">Lihat →</button></td>
+                    </tr>
+                    <tr>
+                        <td style="color:rgba(255,255,255,.28);">#029</td>
+                        <td>Sistem Cetak Berkas OSS Sering Down Jam Kerja</td>
+                        <td><span style="background:rgba(167,139,250,.15);color:#c4b5fd;border:1px solid rgba(167,139,250,.24);padding:3px 9px;border-radius:6px;font-size:11px;font-weight:700;">Website</span></td>
+                        <td><span class="bs bs-d"><i class="fa-solid fa-check-circle"></i>Selesai</span></td>
+                        <td><button @click="v='detail'" style="color:#c4b5fd;font-size:12px;font-weight:600;background:none;border:none;cursor:pointer;font-family:'Inter',sans-serif;">Lihat →</button></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
+
+<div x-show="v==='detail'" x-cloak class="inner" style="padding:36px 24px;max-width:820px;margin:0 auto;">
+    <button @click="v='dashboard-masyarakat'" style="display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:700;color:rgba(255,255,255,.46);background:none;border:none;cursor:pointer;margin-bottom:22px;font-family:'Inter',sans-serif;">
+        <i class="fa-solid fa-arrow-left"></i> Kembali
+    </button>
+    <div class="panel">
+        <div style="background:rgba(0,0,0,.18);padding:25px;border-bottom:1px solid rgba(255,255,255,.08);display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;">
+            <div>
+                <span class="bs bs-p" style="margin-bottom:9px;display:inline-flex;">ID Laporan: #042</span>
+                <h2 style="font-size:19px;font-weight:800;letter-spacing:-.02em;margin-top:8px;">Pungutan Liar Oknum Loket B Perizinan Ruko</h2>
+            </div>
+            <span class="bs bs-p" style="font-size:12px;padding:8px 15px;">STATUS: DIPROSES</span>
+        </div>
+        <div style="padding:25px;display:flex;flex-direction:column;gap:21px;">
+            <div>
+                <p style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.32);margin-bottom:8px;">Deskripsi Kejadian</p>
+                <p style="font-size:14px;line-height:1.72;color:rgba(225, 15, 15, 0.72);background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);padding:13px 17px;border-radius:12px;">
+                    Pada tanggal 15 Juni 2026 pukul 10:30 WIB, saya mengantre di Loket B untuk menyerahkan berkas validasi IMB. Oknum petugas meminta biaya tambahan sebesar Rp200.000 tanpa kuitansi resmi dengan dalih mempercepat proses berkas.
+                </p>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;">
+                <div><p style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.32);margin-bottom:4px;">Kategori</p><p style="font-size:14px;font-weight:700;color:#c4b5fd;">Perizinan / Pelayanan Publik</p></div>
+                <div><p style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.32);margin-bottom:4px;">Tanggal Kirim</p><p style="font-size:14px;font-weight:700;color:#c4b5fd;">15 Juni 2026 — 11:00 WIB</p></div>
+            </div>
+            <div style="border-top:1px solid rgba(255,255,255,.08);padding-top:19px;">
+                <h3 style="font-size:14px;font-weight:700;margin-bottom:15px;"><i class="fa-solid fa-clock-rotate-left" style="color:#a78bfa;margin-right:6px;"></i>Rekam Jejak Tindak Lanjut</h3>
+                <div class="tl-track">
+                    <div style="position:relative;">
+                        <div class="tl-dot"></div>
+                        <p style="font-size:10px;font-weight:700;color:rgba(255,255,255,.32);letter-spacing:.05em;">16 Juni 2026 — Inspektorat Internal</p>
+                        <p style="font-size:13px;font-weight:500;color:rgba(255,255,255,.68);margin-top:4px;line-height:1.62;">Laporan diterima oleh petugas, berkas diserahkan ke Kepala Program Penindakan untuk investigasi CCTV loket.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div x-show="v==='dashboard-petugas'" x-cloak class="inner" style="display:flex;min-height:100vh;">
+    <aside class="d-aside">
+        <div class="d-aside-head">
+            <div class="d-icon" style="background:rgba(252,211,77,.18);color:#fcd34d;"><i class="fa-solid fa-user-shield"></i></div>
+            <span style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#fcd34d;">Panel Petugas</span>
+        </div>
+        <div class="d-nav">
+            <button class="d-btn on water-hover" style="color:#fcd34d;border-color:rgba(252,211,77,.28);background:rgba(252,211,77,.1);"><i class="fa-solid fa-chart-bar"></i> Verifikasi</button>
+            <div style="flex:1;"></div>
+            <button @click="fetch('/api/auth/logout', {method:'POST'}).then(()=>{ sessionStorage.clear(); v='landing'; })" class="d-btn out water-hover"><i class="fa-solid fa-right-from-bracket"></i> Keluar</button>
+        </div>
+    </aside>
+    <main class="d-main" style="flex:1;padding:25px;display:flex;flex-direction:column;gap:19px;">
+        <header style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,.07);padding-bottom:16px;">
+            <div>
+                <h1 style="font-size:21px;font-weight:800;letter-spacing:-.03em;">Verifikasi &amp; Validasi Pengaduan</h1>
+                <p style="font-size:13px;color:rgba(255,255,255,.42);margin-top:2px;">Tinjau laporan masuk dari masyarakat</p>
+            </div>
+            <span style="font-size:11px;font-weight:700;background:rgba(252,211,77,.12);border:1px solid rgba(252,211,77,.24);padding:6px 13px;border-radius:999px;color:#fcd34d;">Tim Peninjau</span>
+        </header>
+        <div class="panel">
+            <table class="dtable">
+                <thead><tr><th>Pengadu</th><th>Subjek Masalah</th><th>Aksi</th></tr></thead>
+                <tbody>
+                    <tr>
+                        <td><p style="font-weight:700;color:#9eab5c;">Ahmad Subarjo</p><p style="font-size:11px;color:rgba(255,255,255,.28);margin-top:2px;">NIK 16710...</p></td>
+                        <td>Pungutan Liar Oknum Loket B Perizinan Ruko</td>
+                        <td><div style="display:flex;gap:7px;">
+                            <button @click="fire('Laporan Sukses Diterima & Masuk Tahap Investigasi!')" class="btn-sm btn-a"><i class="fa-solid fa-check" style="margin-right:4px;"></i>Terima</button>
+                            <button @click="fire('Laporan Ditolak karena Berkas Kurang Lengkap!')" class="btn-sm btn-rj"><i class="fa-solid fa-xmark" style="margin-right:4px;"></i>Tolak</button>
+                        </div></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
+
+<div x-show="v==='dashboard-admin'" x-cloak class="inner" style="display:flex;min-height:100vh;">
+    <aside class="d-aside">
+        <div class="d-aside-head">
+            <div class="d-icon" style="background:rgba(232,121,249,.16);color:#e879f9;"><i class="fa-solid fa-user-gear"></i></div>
+            <span style="font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#e879f9;">Super Admin</span>
+        </div>
+        <div class="d-nav">
+            <button class="d-btn on water-hover" style="color:#e879f9;border-color:rgba(232,121,249,.28);background:rgba(232,121,249,.1);"><i class="fa-solid fa-gauge"></i> Dashboard</button>
+            <div style="flex:1;"></div>
+            <button @click="fetch('/api/auth/logout', {method:'POST'}).then(()=>{ sessionStorage.clear(); v='landing'; })" class="d-btn out water-hover"><i class="fa-solid fa-right-from-bracket"></i> Keluar</button>
+        </div>
+    </aside>
+    <main class="d-main" style="flex:1;padding:25px;display:flex;flex-direction:column;gap:19px;">
+        <header style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,.07);padding-bottom:16px;flex-wrap:wrap;gap:10px;">
+            <div>
+                <h1 style="font-size:21px;font-weight:800;letter-spacing:-.03em;">Analitik Kendali Mutu</h1>
+                <p style="font-size:13px;color:rgba(255,255,255,.42);margin-top:2px;">Pantau seluruh aktivitas sistem DPMPTSP</p>
+            </div>
+            <button @click="fire('Dokumen Rekap PDF Berhasil Diexport!')" style="display:inline-flex;align-items:center;gap:7px;padding:9px 16px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.14);color:rgba(255,255,255,.78);border-radius:11px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;">
+                <i class="fa-solid fa-file-pdf"></i> Export PDF
+            </button>
+        </header>
+        <div style="display:grid;grid-template-columns:2fr 1fr;gap:15px;align-items:start;">
+            <div class="panel">
+                <div class="p-head"><h3 style="font-size:14px;font-weight:700;"><i class="fa-solid fa-chart-area" style="color:#e879f9;margin-right:6px;"></i>Volume Laporan Mingguan</h3></div>
+                <div style="padding:17px;height:245px;"><canvas id="adminChartMock"></canvas></div>
+            </div>
+            <div class="panel">
+                <div class="p-head"><h3 style="font-size:14px;font-weight:700;"><i class="fa-solid fa-users" style="color:#e879f9;margin-right:6px;"></i>Kelola User</h3></div>
+                <div style="padding:13px;display:flex;flex-direction:column;gap:8px;">
+                    <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:11px;padding:11px 13px;display:flex;justify-content:space-between;align-items:center;">
+                        <div><p style="font-size:13px;font-weight:700;">Pratama Wijaya</p><p style="font-size:11px;color:rgba(255,255,255,.32);margin-top:1px;">Petugas Loket</p></div>
+                        <button @click="fire('Data Petugas Berhasil Dihapus!')" style="width:30px;height:30px;border-radius:7px;background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.2);color:#fca5a5;cursor:pointer;font-size:12px;"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                    <div style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:11px;padding:11px 13px;display:flex;justify-content:space-between;align-items:center;">
+                        <div><p style="font-size:13px;font-weight:700;">Siti Aminah</p><p style="font-size:11px;color:rgba(255,255,255,.32);margin-top:1px;">Masyarakat</p></div>
+                        <button @click="fire('Data Akun Berhasil Dihapus!')" style="width:30px;height:30px;border-radius:7px;background:rgba(248,113,113,.12);border:1px solid rgba(248,113,113,.2);color:#fca5a5;cursor:pointer;font-size:12px;"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<div x-show="modal" x-cloak class="m-bg" @click.self="modal=false">
+    <div class="m-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(255,255,255,.1);padding-bottom:15px;margin-bottom:19px;">
+            <h3 style="font-size:17px;font-weight:800;letter-spacing:-.02em;"><i class="fa-solid fa-file-invoice" style="color:#c4b5fd;margin-right:8px;"></i>Form Pengaduan Resmi</h3>
+            <button @click="modal=false" style="width:29px;height:29px;background:rgba(255,255,255,.1);border:none;border-radius:8px;color:rgba(255,255,255,.46);cursor:pointer;font-size:15px;"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form @submit.prevent="modal=false; fire('Sukses Mengirimkan Laporan Ke Sistem!')" style="display:flex;flex-direction:column;gap:13px;">
+            <div><label class="a-label">Judul Ringkas Masalah</label><input type="text" required placeholder="Contoh: Pungutan Liar Oknum Loket Pelayanan" class="a-input"></div>
+            <div><label class="a-label">Kategori Layanan</label><select required class="a-input"><option value="">-- Pilih Kategori --</option><option>Pelayanan</option><option>Perizinan</option><option>Website / OSS</option><option>Sarana dan Prasarana</option></select></div>
+            <div><label class="a-label">Kronologi Jelas</label><textarea rows="3" required placeholder="Tulis rincian kronologi, waktu kejadian, nomor loket..." class="a-input"></textarea></div>
+            <div><label class="a-label">Lampiran / Bukti (Opsional)</label><input type="file" style="width:100%;font-size:12px;color:rgba(255,255,255,.38);"></div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;padding-top:5px;border-top:1px solid rgba(255,255,255,.08);margin-top:2px;">
+                <button type="button" @click="modal=false" class="btn-sm btn-g">Batal</button>
+                <button type="submit" style="padding:9px 20px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.28);color:#fff;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;">Kirim Laporan</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script src="js/App.js"></script>
+<script src="js/AdminChart.js"></script>
+<script src="js/AiChat.js"></script>
+<script src="js/SectionRevealAnimation.js"></script>
+<script src="js/ArcCarousel.js"></script>
+<script>
+  window.ScrubPostersConfig = {
+    items: [
+      'https://picsum.photos/id/1015/800/1000',
+      'https://picsum.photos/id/1016/800/1000',
+      'https://picsum.photos/id/1018/800/1000',
+      'https://picsum.photos/id/1020/800/1000'
+    ]
+  };
+</script>
+<script type="module" src="js/ScrubRevealAnimation.js"></script>
+
+<script src="js/QRCodeRevealAnimation.js"></script>
+<script src="js/MusicPlayer.js"></script>
+<script src="js/MapSection.js"></script>
+<script src="js/VideoRevealEffect.js"></script>
+<script>
+  window.FlipBookScrollConfig = {
+    // Tinggi scroll per buku (dalam vh). Makin besar, makin "lambat" buku
+    // itu terbuka & membalik halaman relatif terhadap kecepatan scroll.
+    segmentVh: 260,
+    books: [
+      {
+        title: 'Peluang Bisnis Investasi',
+        pages: [
+          'https://picsum.photos/id/1015/700/933',
+          'https://picsum.photos/id/1016/700/933',
+          'https://picsum.photos/id/1018/700/933',
+          'https://picsum.photos/id/1020/700/933',
+          'https://picsum.photos/id/1024/700/933'
+        ]
+      },
+      {
+        title: 'Katalog Investasi',
+        pages: [
+          'https://picsum.photos/id/1035/700/933',
+          'https://picsum.photos/id/1041/700/933',
+          'https://picsum.photos/id/1043/700/933',
+          'https://picsum.photos/id/1044/700/933',
+          'https://picsum.photos/id/1050/700/933'
+        ]
+      },
+      {
+        title: 'Profil Investasi',
+        pages: [
+          'https://picsum.photos/id/1056/700/933',
+          'https://picsum.photos/id/1060/700/933',
+          'https://picsum.photos/id/1062/700/933',
+          'https://picsum.photos/id/1067/700/933',
+          'https://picsum.photos/id/1074/700/933'
+        ]
+      }
+    ]
+  };
+</script>
+<script type="module" src="js/FlipBookScroll.js"></script>
+<script src="js/SplashCursor.js"></script>
+<script type="module" src="js/Particles.js" defer></script>
+
+
+</body>
+</html>

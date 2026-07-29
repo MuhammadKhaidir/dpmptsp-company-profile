@@ -1,0 +1,130 @@
+/* ==========================================================================
+   DASHBOARD & AUTH — login/register, sidebar, tables, buttons, modal
+   Dipakai bareng: js/App.js, js/AdminChart.js
+   ========================================================================== */
+
+.inner {
+    min-height: 100vh;
+    background: linear-gradient(160deg, #0a0a0a 0%, #161616 45%, #232323 100%);
+}
+
+.auth-card {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 22px; padding: 38px;
+    width: 100%; max-width: 440px;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+}
+.a-input {
+    width: 100%; padding: 13px 16px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.18);
+    border-radius: 12px; color: #fff;
+    font-size: 14px; font-family: 'Inter', sans-serif;
+    outline: none; transition: border-color .3s var(--ease), box-shadow .3s var(--ease);
+}
+.a-input::placeholder { color: rgba(255,255,255,0.28); }
+.a-input:focus { border-color: rgba(255,255,255,0.48); box-shadow: 0 0 0 3px rgba(255,255,255,0.09); }
+.a-input option { background: #161616; }
+.a-label {
+    display: block; font-size: 11px; font-weight: 700;
+    letter-spacing: .1em; text-transform: uppercase;
+    color: rgba(255,255,255,0.48); margin-bottom: 7px;
+}
+.a-btn {
+    width: 100%; padding: 14px;
+    background: rgba(255,255,255,0.18);
+    border: 1px solid rgba(255,255,255,0.28);
+    border-radius: 12px; color: #fff;
+    font-size: 14px; font-weight: 700; cursor: pointer;
+    font-family: 'Inter', sans-serif; transition: all .3s var(--ease);
+}
+.a-btn:hover { background: rgba(255,255,255,0.28); transform: translateY(-1px); }
+
+.d-aside {
+    width: 228px; flex-shrink: 0;
+    background: rgba(0,0,0,0.22);
+    border-right: 1px solid rgba(255,255,255,0.08);
+    display: flex; flex-direction: column;
+}
+.d-aside-head {
+    padding: 19px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    display: flex; align-items: center; gap: 10px;
+}
+.d-icon {
+    width: 32px; height: 32px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center; font-size: 14px;
+}
+.d-nav { flex: 1; padding: 13px; display: flex; flex-direction: column; gap: 5px; }
+.d-btn {
+    width: 100%; display: flex; align-items: center; gap: 11px;
+    padding: 11px 14px; border-radius: 11px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+    color: rgba(255,255,255,0.42); background: transparent; border: none;
+    text-align: left; transition: all .3s var(--ease); font-family: 'Inter', sans-serif;
+}
+.d-btn:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.82); }
+.d-btn.on { background: rgba(255,255,255,0.13); color: #fff; border: 1px solid rgba(255,255,255,0.14); }
+.d-btn.out { color: rgba(255,255,255,0.5); border-top: 1px solid rgba(255,255,255,0.08); margin-top: 4px; padding-top: 15px; }
+.d-btn.out:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+.d-main { flex: 1; background: linear-gradient(160deg, #0a0a0a 0%, #1e1e1e 100%); overflow-y: auto; }
+
+.s-card {
+    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.11);
+    border-radius: 16px; padding: 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    backdrop-filter: blur(6px);
+}
+.s-card-icon {
+    width: 44px; height: 44px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px; background: rgba(255,255,255,0.12);
+}
+
+.panel {
+    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 18px; overflow: hidden; backdrop-filter: blur(6px);
+}
+.p-head {
+    padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.08);
+    display: flex; justify-content: space-between; align-items: center;
+}
+
+.dtable { width: 100%; border-collapse: collapse; }
+.dtable th { padding: 12px 18px; font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,0.3); background: rgba(0,0,0,0.1); border-bottom: 1px solid rgba(255,255,255,0.07); text-align: left; }
+.dtable td { padding: 13px 18px; font-size: 13px; font-weight: 500; border-bottom: 1px solid rgba(255,255,255,0.05); color: rgba(255,255,255,0.8); }
+.dtable tr:last-child td { border-bottom: none; }
+.dtable tr:hover td { background: rgba(255,255,255,0.04); }
+
+.bs { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
+.bs-p { background: rgba(255,255,255,.06); color: rgba(255,255,255,.78); border: 1px dashed rgba(255,255,255,.32); }
+.bs-d { background: #ffffff; color: #000000; border: 1px solid #ffffff; }
+.bs-r { background: transparent; color: rgba(255,255,255,.4); border: 1px solid rgba(255,255,255,.18); text-decoration: line-through; }
+
+.btn-sm { padding: 7px 13px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all .3s var(--ease); font-family: 'Inter', sans-serif; }
+.btn-a { background: #ffffff; color: #000000; border: 1px solid #ffffff; }
+.btn-a:hover { background: rgba(255,255,255,.85); }
+.btn-rj { background: transparent; color: rgba(255,255,255,.72); border: 1px solid rgba(255,255,255,.3); }
+.btn-rj:hover { border-color: rgba(255,255,255,.55); color: #fff; }
+.btn-g { background: rgba(255,255,255,.1); color: rgba(255,255,255,.8); border: 1px solid rgba(255,255,255,.16); }
+.btn-g:hover { background: rgba(255,255,255,.18); color: #fff; }
+
+.m-bg {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(0,0,0,.75); backdrop-filter: blur(10px);
+    display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.m-box {
+    background: rgba(18,18,18,.9); border: 1px solid rgba(255,255,255,.2);
+    border-radius: 22px; padding: 30px; width: 100%; max-width: 505px;
+    backdrop-filter: blur(20px); box-shadow: 0 30px 80px rgba(0,0,0,.5);
+}
+
+.tl-track { border-left: 2px solid rgba(255,255,255,.14); padding-left: 18px; position: relative; }
+.tl-dot { position: absolute; left: -7px; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: #ffffff; border: 2px solid rgba(12,12,12,.92); box-shadow: 0 0 8px rgba(255,255,255,.45); }
+
+textarea.a-input { resize: vertical; }
+select.a-input { appearance: none; }

@@ -1,0 +1,27 @@
+/* ==========================================================================
+   FLYING POSTERS — galeri poster 3D yang bisa di-drag/scroll
+   Dipakai bareng: js/FlyingPosters.js
+   CATATAN: file ini sudah di-link di index.html. Kalau kamu sudah punya
+   css/FlyingPosters.css lain isinya, gabungkan manual dengan yang di bawah
+   ini supaya tidak saling menimpa.
+   ========================================================================== */
+
+#flyingPostersContainer {
+    position: relative;
+    width: 100%;
+    height: 600px;
+    overflow: hidden;
+}
+.posters-container {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+.posters-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    touch-action: none;
+}

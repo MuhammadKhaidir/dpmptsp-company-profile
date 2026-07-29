@@ -1,0 +1,602 @@
+(function () {
+    var CAT_ASSET_PATH = 'Assets/Video/';
+    var CAT_IDLE_FRAME_COUNT = 8;
+    var CAT_RUN_FRAME_COUNT = 8;
+    var CAT_ATTACK_FRAME_COUNT = 8;
+    var CAT_IDLE_FPS = 8;
+    var CAT_RUN_FPS = 12;
+    var CAT_ATTACK_FPS = 12;
+
+    var SLOT_LABELS = {
+        left: 'Peluang Bisnis Investasi',
+        center: 'Katalog Investasi',
+        right: 'Profil Investasi Kota Palembang'
+    };
+
+    function play(boxes) {
+        boxes.forEach(function (box) {
+            var scanLine = box.querySelector('.qr-scan-line');
+            if (scanLine) scanLine.classList.add('sweep');
+        });
+        setTimeout(function () {
+            boxes.forEach(function (box) { box.classList.add('verified-pulse'); });
+        }, 700);
+    }
+
+    function setupReveal(panel, boxes) {
+        if (!boxes.length) return;
+
+        if (!('IntersectionObserver' in window)) {
+            play(boxes);
+            return;
+        }
+
+        var played = false;
+        var observer = new IntersectionObserver(function (entries) {
+            entries.forEach(function (entry) {
+                if (entry.isIntersecting && !played) {
+                    played = true;
+                    play(boxes);
+                    observer.unobserve(panel);
+                }
+            });
+        }, { threshold: 0.4 });
+
+        observer.observe(panel);
+    }
+
+    function setupHover(panel) {
+        // Sengaja cuma BOX yang punya listener (bukan teksnya). Jadi status
+        // hover 100% ngikutin kursor di area box: begitu kursor keluar dari
+        // box, box langsung mengecil lagi -- walaupun kursor pindah ke area
+        // teks penjelasan di sebelahnya. Teksnya cuma "penumpang", gak ikut
+        // pegang status hover sama sekali.
+        var slots = [
+            { selector: '.qr-panel-left', hoverClass: 'is-hover-left' },
+            { selector: '.qr-panel-center', hoverClass: 'is-hover-center' },
+            { selector: '.qr-panel-right', hoverClass: 'is-hover-right' }
+        ];
+
+        var items = slots
+            .map(function (slot) {
+                return { el: panel.querySelector(slot.selector), hoverClass: slot.hoverClass };
+            })
+            .filter(function (item) { return !!item.el; });
+
+        if (!items.length) return;
+
+        var allHoverClasses = items.map(function (item) { return item.hoverClass; });
+
+        function setHover(activeClass) {
+            allHoverClasses.forEach(function (cls) {
+                if (cls === activeClass) {
+                    panel.classList.add(cls);
+                } else {
+                    panel.classList.remove(cls);
+                }
+            });
+        }
+        function clearHover() {
+            allHoverClasses.forEach(function (cls) { panel.classList.remove(cls); });
+        }
+
+        items.forEach(function (item) {
+            item.el.addEventListener('mouseenter', function () { setHover(item.hoverClass); });
+            item.el.addEventListener('focusin', function () { setHover(item.hoverClass); });
+            item.el.addEventListener('mouseleave', clearHover);
+            item.el.addEventListener('focusout', clearHover);
+        });
+    }
+
+    function goToFlipBook(bookIndex) {
+        var inst = window.__flipBookScrollInstance;
+        if (inst && typeof inst.goToBook === 'function') {
+            inst.goToBook(bookIndex);
+            return;
+        }
+        var fb = document.getElementById('flipbook-section');
+        if (fb) fb.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    /* ================================================================
+       Modal pilihan (klik box) + modal ganti gambar, latar & judul QR
+       ----------------------------------------------------------------
+       #qr-modal-root dibuat otomatis lewat JS (gak perlu nambah apapun
+       di index.html), dipakai ulang buat kedua modal (isinya diganti
+       total tiap buka modal baru).
+       ================================================================ */
+    function ensureQrModalRoot() {
+        var root = document.getElementById('qr-modal-root');
+        if (!root) {
+            root = document.createElement('div');
+            root.id = 'qr-modal-root';
+            document.body.appendChild(root);
+        }
+        return root;
+    }
+
+    function closeQrModal() {
+        var root = document.getElementById('qr-modal-root');
+        if (root) root.innerHTML = '';
+        document.removeEventListener('keydown', onEscCloseModal);
+    }
+
+    function onEscCloseModal(e) {
+        if (e.key === 'Escape') closeQrModal();
+    }
+
+    function fireToast(message) {
+        // Numpang ke fungsi fire() milik Alpine (lihat index.html: fire('...')
+        // dipakai buat toast sukses login/registrasi/dll). Dibungkus try/catch
+        // biar aman kalau somehow Alpine belum siap -- diamkan aja kalau gagal.
+        try {
+            var data = document.body._x_dataStack && document.body._x_dataStack[0];
+            if (data && typeof data.fire === 'function') {
+                data.fire(message);
+            }
+        } catch (err) { /* no-op */ }
+    }
+
+    function slotSelector(slot) {
+        return '.qr-panel-' + slot;
+    }
+
+    function escapeHtml(str) {
+        return String(str == null ? '' : str).replace(/[&<>"']/g, function (ch) {
+            return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+        });
+    }
+
+    function applyCustomImage(slot, entry) {
+        var panel = document.getElementById('qr-panel');
+        if (!panel) return;
+        var box = panel.querySelector(slotSelector(slot));
+        if (!box) return;
+        var img = box.querySelector('.qr-img');
+        if (!img) return;
+        var v = (entry && entry.updatedAt) ? entry.updatedAt : Date.now();
+        img.src = '/api/qr-images/file/' + slot + '?v=' + v;
+    }
+
+    function applyCustomTitle(slot, title) {
+        if (!title) return;
+
+        var panel = document.getElementById('qr-panel');
+        if (!panel) return;
+
+        var box = panel.querySelector(slotSelector(slot));
+        if (box) {
+            var caption = box.querySelector('.qr-caption');
+            if (caption) caption.textContent = title;
+        }
+
+        var hoverHeading = panel.querySelector('.qr-hover-text-' + slot + ' .qr-hover-text-inner h4');
+        if (hoverHeading) hoverHeading.textContent = title;
+
+        SLOT_LABELS[slot] = title;
+    }
+
+    /* ================================================================
+       BARU: Gambar LATAR BELAKANG (elemen .qr-hover-bg-left/center/right
+       yang muncul redup di belakang kotak saat di-hover). Ini gambar yang
+       BEDA dari gambar kode QR itu sendiri, disimpan lewat endpoint
+       terpisah (/api/qr-bg/...) yang didukung data/qrBgStore.js +
+       routes/qrBg.js -- keduanya independen dari sistem gambar QR yang
+       sudah ada, biar gak saling ganggu.
+
+       Diterapkan lewat inline style (bukan nambah/ubah class CSS), yang
+       otomatis menang atas rule .qr-hover-bg-left/center/right di CSS
+       (inline style selalu lebih diprioritaskan browser). Kalau belum
+       pernah di-upload custom, tampilan otomatis tetap pakai gambar
+       default dari CSS seperti biasa.
+       ================================================================ */
+    function applyCustomBgImage(slot, entry) {
+        var scene = document.getElementById('qr-scene');
+        if (!scene) return;
+        var bgEl = scene.querySelector('.qr-hover-bg-' + slot);
+        if (!bgEl) return;
+        var v = (entry && entry.updatedAt) ? entry.updatedAt : Date.now();
+        bgEl.style.backgroundImage = "url('/api/qr-bg/file/" + slot + "?v=" + v + "')";
+    }
+
+    function loadCustomQrBgImages() {
+        fetch('/api/qr-bg/meta')
+            .then(function (res) { return res.ok ? res.json() : null; })
+            .then(function (data) {
+                if (!data || !data.success || !data.meta) return;
+                ['left', 'center', 'right'].forEach(function (slot) {
+                    var info = data.meta[slot];
+                    if (info && info.hasCustom) {
+                        applyCustomBgImage(slot, info);
+                    }
+                });
+            })
+            .catch(function () {
+                // Backend fitur ganti-BG belum kepasang/offline -- diamkan
+                // aja, front-end tetap pakai gambar latar default dari CSS.
+            });
+    }
+
+    function loadCustomQrImages() {
+        fetch('/api/qr-images/meta')
+            .then(function (res) { return res.ok ? res.json() : null; })
+            .then(function (data) {
+                if (!data || !data.success || !data.meta) return;
+                ['left', 'center', 'right'].forEach(function (slot) {
+                    var info = data.meta[slot];
+                    if (info && info.hasCustom) {
+                        applyCustomImage(slot, info);
+                    }
+                    if (info && info.title) {
+                        applyCustomTitle(slot, info.title);
+                    }
+                });
+            })
+            .catch(function () {
+                // Backend fitur ganti-gambar belum kepasang/offline -- diamkan
+                // aja, front-end tetap pakai gambar default dari HTML.
+            });
+    }
+
+    function bindOverlayClose(root) {
+        var overlay = root.querySelector('.qr-modal-overlay');
+        overlay.addEventListener('click', function (e) {
+            if (e.target.hasAttribute('data-qr-close')) closeQrModal();
+        });
+        document.addEventListener('keydown', onEscCloseModal);
+    }
+
+    function openChoiceModal(slot, bookIndex) {
+        var root = ensureQrModalRoot();
+        var label = SLOT_LABELS[slot] || 'Kode QR Ini';
+
+        root.innerHTML =
+            '<div class="qr-modal-overlay" data-qr-close>' +
+                '<div class="qr-modal-box" role="dialog" aria-modal="true">' +
+                    '<h3 class="qr-modal-title">' + escapeHtml(label) + '</h3>' +
+                    '<p class="qr-modal-sub">Silakan pilih tindakan yang ingin dilakukan terhadap kode QR ini.</p>' +
+                    '<button type="button" class="qr-modal-btn qr-modal-btn-primary" data-action="book">' +
+                        '<i class="fa-solid fa-book-open"></i> Lihat Dokumen Terkait' +
+                    '</button>' +
+                    '<button type="button" class="qr-modal-btn qr-modal-btn-ghost" data-action="edit">' +
+                        '<i class="fa-solid fa-image"></i> Perbarui Tampilan Kode QR' +
+                    '</button>' +
+                    '<button type="button" class="qr-modal-cancel" data-qr-close>Batal</button>' +
+                '</div>' +
+            '</div>';
+
+        bindOverlayClose(root);
+
+        root.querySelector('[data-action="book"]').addEventListener('click', function () {
+            closeQrModal();
+            goToFlipBook(bookIndex);
+        });
+        root.querySelector('[data-action="edit"]').addEventListener('click', function () {
+            openEditModal(slot, label);
+        });
+    }
+
+    function openEditModal(slot, label) {
+        var root = ensureQrModalRoot();
+
+        root.innerHTML =
+            '<div class="qr-modal-overlay" data-qr-close>' +
+                '<div class="qr-modal-box" role="dialog" aria-modal="true">' +
+                    '<h3 class="qr-modal-title">Perbarui Kode QR — ' + escapeHtml(label) + '</h3>' +
+                    '<p class="qr-modal-sub">Masukkan kata sandi, lalu ubah judul, gambar kode QR, dan/atau gambar latar belakang untuk melanjutkan. Bagian yang dikosongkan tidak akan diubah.</p>' +
+                    '<form class="qr-edit-form" data-qr-edit-form>' +
+                        '<label class="qr-edit-label">Kata Sandi' +
+                            '<input type="password" class="qr-edit-input" name="password" required autocomplete="off">' +
+                        '</label>' +
+                        '<label class="qr-edit-label">Judul Kotak' +
+                            '<input type="text" class="qr-edit-input" name="title" maxlength="80" value="' + escapeHtml(label) + '">' +
+                        '</label>' +
+                        '<label class="qr-edit-label">Berkas Gambar Kode QR (Format PNG, JPG, WEBP, atau GIF — Maksimal 5MB, kosongkan jika tidak ingin mengganti)' +
+                            '<input type="file" class="qr-edit-input" name="image" accept="image/png,image/jpeg,image/webp,image/gif">' +
+                        '</label>' +
+                        '<label class="qr-edit-label">Berkas Gambar Latar Belakang (Tampil redup di belakang kotak saat di-hover — Maksimal 5MB, kosongkan jika tidak ingin mengganti)' +
+                            '<input type="file" class="qr-edit-input" name="bgImage" accept="image/png,image/jpeg,image/webp,image/gif">' +
+                        '</label>' +
+                        '<p class="qr-edit-error" data-qr-edit-error style="display:none;"></p>' +
+                        '<div class="qr-edit-actions">' +
+                            '<button type="button" class="qr-modal-cancel" data-qr-close>Batal</button>' +
+                            '<button type="submit" class="qr-modal-btn qr-modal-btn-primary" data-qr-edit-submit>' +
+                                '<i class="fa-solid fa-upload"></i> Simpan Perubahan' +
+                            '</button>' +
+                        '</div>' +
+                    '</form>' +
+                '</div>' +
+            '</div>';
+
+        bindOverlayClose(root);
+
+        var form = root.querySelector('[data-qr-edit-form]');
+        var errorEl = root.querySelector('[data-qr-edit-error]');
+        var submitBtn = root.querySelector('[data-qr-edit-submit]');
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            errorEl.style.display = 'none';
+
+            var passwordVal = form.querySelector('[name="password"]').value;
+            var titleVal = form.querySelector('[name="title"]').value;
+            var imageInput = form.querySelector('[name="image"]');
+            var bgInput = form.querySelector('[name="bgImage"]');
+            var imageFile = imageInput && imageInput.files[0];
+            var bgFile = bgInput && bgInput.files[0];
+
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = 'Sedang Menyimpan...';
+
+            // Tahap 1: kirim judul + (opsional) gambar kode QR ke endpoint
+            // yang sudah ada (/api/qr-images/:slot). Field bgImage SENGAJA
+            // TIDAK ikut dikirim di request ini -- kalau ikut, endpoint ini
+            // akan menolaknya karena hanya menerima satu field file
+            // bernama "image".
+            var qrFormData = new FormData();
+            qrFormData.append('password', passwordVal);
+            qrFormData.append('title', titleVal);
+            if (imageFile) qrFormData.append('image', imageFile);
+
+            fetch('/api/qr-images/' + slot, { method: 'POST', body: qrFormData })
+                .then(function (res) {
+                    return res.json().then(function (data) { return { ok: res.ok, data: data }; });
+                })
+                .then(function (result) {
+                    if (!result.ok || !result.data.success) {
+                        throw new Error(result.data.message || 'Gagal memperbarui kode QR.');
+                    }
+
+                    var entry = result.data.entry || {};
+                    if (entry.filename) {
+                        applyCustomImage(slot, entry);
+                    }
+                    if (entry.title) {
+                        applyCustomTitle(slot, entry.title);
+                        label = entry.title;
+                    }
+
+                    // Tahap 2 (opsional): kalau ada berkas gambar latar yang
+                    // dipilih, lanjut kirim ke endpoint TERPISAH
+                    // (/api/qr-bg/:slot) pakai kata sandi yang sama. Dipisah
+                    // jadi request sendiri karena target penyimpanannya
+                    // beda (lihat routes/qrBg.js), bukan karena kata sandinya
+                    // beda.
+                    if (bgFile) {
+                        var bgFormData = new FormData();
+                        bgFormData.append('password', passwordVal);
+                        bgFormData.append('image', bgFile);
+
+                        return fetch('/api/qr-bg/' + slot, { method: 'POST', body: bgFormData })
+                            .then(function (res2) {
+                                return res2.json().then(function (data2) { return { ok: res2.ok, data: data2 }; });
+                            })
+                            .then(function (result2) {
+                                if (!result2.ok || !result2.data.success) {
+                                    throw new Error(result2.data.message || 'Gagal memperbarui gambar latar.');
+                                }
+                                applyCustomBgImage(slot, result2.data.entry);
+                            });
+                    }
+                })
+                .then(function () {
+                    closeQrModal();
+                    fireToast('Kode QR "' + label + '" berhasil diperbarui.');
+                })
+                .catch(function (err) {
+                    errorEl.textContent = err.message || 'Terjadi kesalahan yang tidak diketahui.';
+                    errorEl.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '<i class="fa-solid fa-upload"></i> Simpan Perubahan';
+                });
+        });
+    }
+
+    function setupClick(panel) {
+        var mapping = [
+            { selector: '.qr-panel-left', bookIndex: 0, slot: 'left' },
+            { selector: '.qr-panel-center', bookIndex: 1, slot: 'center' },
+            { selector: '.qr-panel-right', bookIndex: 2, slot: 'right' }
+        ];
+
+        mapping.forEach(function (item) {
+            var box = panel.querySelector(item.selector);
+            if (!box) return;
+
+            box.addEventListener('click', function () {
+                openChoiceModal(item.slot, item.bookIndex);
+            });
+
+            box.setAttribute('role', 'button');
+            box.setAttribute('tabindex', '0');
+            box.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                    e.preventDefault();
+                    openChoiceModal(item.slot, item.bookIndex);
+                }
+            });
+        });
+    }
+
+    function buildFrames(prefix, count) {
+        var frames = [];
+        for (var i = 1; i <= count; i++) {
+            frames.push(CAT_ASSET_PATH + prefix + i + '.png');
+        }
+        return frames;
+    }
+
+    function preload(frames) {
+        frames.forEach(function (src) {
+            var img = new Image();
+            img.src = src;
+        });
+    }
+
+    function createFrameAnimator(imgEl, frames, fps) {
+        var interval = null;
+        var idx = 0;
+        var delay = 1000 / fps;
+
+        function start() {
+            stop();
+            idx = 0;
+            imgEl.src = frames[idx];
+            interval = setInterval(function () {
+                idx = (idx + 1) % frames.length;
+                imgEl.src = frames[idx];
+            }, delay);
+        }
+        function stop() {
+            if (interval) {
+                clearInterval(interval);
+                interval = null;
+            }
+        }
+        return { start: start, stop: stop };
+    }
+
+    function setupCat(panel) {
+        var cat = document.getElementById('qr-cat');
+        if (!cat) return;
+
+        cat.classList.remove('qr-cat');
+        cat.classList.add('cat-mascot');
+        if (cat.parentElement !== document.body) {
+            document.body.appendChild(cat);
+        }
+
+        var imgEl = cat.querySelector('.qr-cat-frame');
+        if (!imgEl) return;
+        imgEl.classList.add('cat-mascot-frame');
+
+        var hitbox = document.createElement('div');
+        hitbox.className = 'cat-hitbox';
+        cat.appendChild(hitbox);
+
+        var idleFrames = buildFrames('IdleCat', CAT_IDLE_FRAME_COUNT);
+        var runFrames = buildFrames('RunCat', CAT_RUN_FRAME_COUNT);
+        var attackFrames = buildFrames('CatAttack', CAT_ATTACK_FRAME_COUNT);
+        preload(idleFrames.concat(runFrames, attackFrames));
+        imgEl.src = idleFrames[0];
+
+        var idleAnimator = createFrameAnimator(imgEl, idleFrames, CAT_IDLE_FPS);
+        var runAnimator = createFrameAnimator(imgEl, runFrames, CAT_RUN_FPS);
+        var attackAnimator = createFrameAnimator(imgEl, attackFrames, CAT_ATTACK_FPS);
+
+        var state = 'hidden'; 
+        var isAttacking = false;
+
+        function stopAttack() {
+            if (!isAttacking) return;
+            isAttacking = false;
+            attackAnimator.stop();
+            cat.classList.remove('is-attacking');
+        }
+
+        function enterCat() {
+            if (state === 'idle' || state === 'entering') return;
+            state = 'entering';
+            stopAttack();
+            idleAnimator.stop();
+            cat.classList.remove('is-hidden', 'is-running-out', 'is-idle-pose');
+            cat.classList.add('is-running-in');
+            runAnimator.start();
+
+            cat.addEventListener('animationend', function onEnd() {
+                cat.removeEventListener('animationend', onEnd);
+                if (state !== 'entering') return;
+                state = 'idle';
+                cat.classList.remove('is-running-in');
+                cat.classList.add('is-idle-pose');
+                runAnimator.stop();
+                idleAnimator.start();
+            }, { once: true });
+        }
+
+        function exitCat() {
+            if (state === 'hidden' || state === 'exiting') return;
+            state = 'exiting';
+            stopAttack();
+            idleAnimator.stop();
+            cat.classList.remove('is-idle-pose', 'is-running-in');
+            cat.classList.add('is-running-out');
+            runAnimator.start();
+
+            cat.addEventListener('animationend', function onEnd() {
+                cat.removeEventListener('animationend', onEnd);
+                if (state !== 'exiting') return;
+                state = 'hidden';
+                cat.classList.remove('is-running-out');
+                cat.classList.add('is-hidden');
+                runAnimator.stop();
+            }, { once: true });
+        }
+
+        function hideCatInstant() {
+            if (state === 'hidden') return;
+            state = 'hidden';
+            stopAttack();
+            idleAnimator.stop();
+            runAnimator.stop();
+            cat.classList.remove('is-idle-pose', 'is-running-in', 'is-running-out');
+            cat.classList.add('is-hidden');
+        }
+
+        function enterAttack() {
+            if (state !== 'idle' || isAttacking) return;
+            isAttacking = true;
+            idleAnimator.stop();
+            cat.classList.remove('is-idle-pose');
+            cat.classList.add('is-attacking');
+            attackAnimator.start();
+        }
+
+        function exitAttack() {
+            if (!isAttacking) return;
+            isAttacking = false;
+            attackAnimator.stop();
+            cat.classList.remove('is-attacking');
+            if (state === 'idle') {
+                cat.classList.add('is-idle-pose');
+                idleAnimator.start();
+            }
+        }
+
+        hitbox.addEventListener('mouseenter', enterAttack);
+        hitbox.addEventListener('mouseleave', exitAttack);
+
+        if ('IntersectionObserver' in window) {
+            var io = new IntersectionObserver(function (entries) {
+                entries.forEach(function (entry) {
+                    if (entry.isIntersecting) {
+                        enterCat();
+                    } else if (entry.boundingClientRect.top < 0) {
+                        exitCat();
+                    } else {
+                        hideCatInstant();
+                    }
+                });
+            }, { threshold: 0.35 });
+            io.observe(panel);
+        } else {
+            cat.classList.remove('is-hidden');
+            cat.classList.add('is-idle-pose');
+            idleAnimator.start();
+            state = 'idle';
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        var panel = document.getElementById('qr-panel');
+        if (!panel) return;
+        var boxes = Array.prototype.slice.call(panel.querySelectorAll('.qr-panel-inner'));
+
+        setupReveal(panel, boxes);
+        setupHover(panel);
+        setupClick(panel);
+        setupCat(panel);
+        loadCustomQrImages();
+        loadCustomQrBgImages();
+    });
+})();

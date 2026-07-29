@@ -1,0 +1,479 @@
+.qr-panel {
+    position: relative;
+    z-index: 1;
+    max-width: 1000px; /* Diperlebar agar 3 kotak muat sejajar */
+    margin: 0 auto;
+    display: flex;
+    justify-content: center;
+    align-items:center;
+    gap: 0px;
+    flex-wrap: wrap;
+}
+
+.qr-panel-inner {
+    position: relative;
+    box-sizing: border-box;
+    flex-grow: 0;
+    flex-shrink: 0;
+    flex-basis: 260px; /* Permanen, gak diubah pas hover -> box gak geser */
+    z-index: 2;
+    background: rgba(17, 17, 17, 0.03);
+    border: 1px solid rgba(17, 17, 17, 0.09);
+    border-radius: 18px;
+    padding: 24px;
+    box-shadow: 0 6px 20px rgba(17, 17, 17, 0.05);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    transition:
+        box-shadow .6s ease,
+        transform .6s cubic-bezier(.4,0,.2,1),
+        opacity .5s ease;
+    will-change: transform, opacity;
+}
+.qr-panel-inner.verified-pulse {
+    box-shadow: 0 0 0 1px rgba(17,17,17,.28), 0 0 34px rgba(17,17,17,.28);
+}
+
+.qr-visual {
+    position: relative;
+    width: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+}
+.qr-img { width: 100%; height: auto; display: block; }
+
+.qr-scan-line {
+    position: absolute;
+    left: 6%;
+    right: 6%;
+    height: 3px;
+    top: 10px;
+    background: linear-gradient(90deg, transparent, #000 25%, #999 50%, #000 75%, transparent);
+    box-shadow: 0 0 12px 2px rgba(0,0,0,.4);
+    opacity: 0;
+    pointer-events: none;
+    border-radius: 3px;
+}
+.qr-scan-line.sweep {
+    animation: qrScanSweep .68s cubic-bezier(.4,0,.3,1) forwards;
+}
+@keyframes qrScanSweep {
+    0%   { top: 10px; opacity: 0; }
+    12%  { opacity: 1; }
+    88%  { opacity: 1; }
+    100% { top: calc(100% - 10px); opacity: 0; }
+}
+
+.qr-caption {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    text-align: center;
+}
+
+.qr-hover-text {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 1;
+    box-sizing: border-box;
+    opacity: 0;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    transition: opacity .45s ease .05s;
+}
+.qr-hover-text-inner {
+    flex: 1 1 auto;
+    width: 100%;
+    padding: 0 2px;
+}
+.qr-hover-text-inner h4 {
+    font-family: 'Fraunces', serif;
+    font-size: 40px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: rgba(17, 17, 17, .92);
+    margin-bottom: 8px;
+    text-shadow:
+        0 1px 14px rgba(255,255,255,.85),
+        0 1px 3px rgba(255,255,255,.9);
+}
+.qr-hover-text-inner p {
+    font-family: 'Inter', sans-serif;
+    font-size: 26px;
+    font-weight: 600;
+    line-height: 1.5;
+    color: rgba(17, 17, 17, .74);
+    text-shadow:
+        0 1px 10px rgba(255,255,255,.75),
+        0 1px 2px rgba(255,255,255,.85);
+}
+
+.qr-hover-text-left   { left: calc(50% - 130px); width: 480px; }
+.qr-hover-text-right  { left: calc(50% - 350px); width: 480px; }
+
+.qr-hover-text-center {
+    left: calc(50% + 130px);
+    width: 240px;
+}
+
+.qr-scene {
+    position: relative;
+    margin-top: -40px;
+}
+
+.qr-hover-bg {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.qr-hover-bg-img {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    opacity: 0;
+    transition: opacity .6s cubic-bezier(.4,0,.2,1);
+
+    -webkit-mask-image:
+        linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%),
+        linear-gradient(to bottom, transparent 0%, #000 14%, #000 86%, transparent 100%);
+    -webkit-mask-composite: source-in;
+    mask-image:
+        linear-gradient(to right, transparent 0%, #000 14%, #000 86%, transparent 100%),
+        linear-gradient(to bottom, transparent 0%, #000 14%, #000 86%, transparent 100%);
+    mask-composite: intersect;
+}
+
+.qr-hover-bg-left   { background-image: url('../Assets/Video/PeluangBisnisInvestasi.png'); }
+.qr-hover-bg-center { background-image: url('../Assets/Video/KatalogInvestasi.png'); }
+.qr-hover-bg-right  { background-image: url('../Assets/Video/PeluangInvestasiKotPal.png'); }
+
+
+@media (hover: hover) and (pointer: fine) {
+
+    .qr-panel.is-hover-left .qr-panel-left {
+        transform: scale(1.08);
+    }
+    .qr-panel.is-hover-left .qr-hover-text-left { opacity: 1; }
+    .qr-panel.is-hover-left .qr-panel-center {
+        opacity: 0;
+        transform: scale(.94);
+    }
+    .qr-panel.is-hover-left .qr-panel-right {
+        opacity: 0;
+        transform: scale(.94);
+    }
+
+    .qr-panel.is-hover-center .qr-panel-center {
+        transform: scale(1.08);
+    }
+    .qr-panel.is-hover-center .qr-hover-text-center { opacity: 1; }
+    .qr-panel.is-hover-center .qr-panel-left {
+        opacity: 0;
+        transform: scale(.94);
+    }
+    .qr-panel.is-hover-center .qr-panel-right {
+        opacity: 0;
+        transform: scale(.94);
+    }
+
+    .qr-panel.is-hover-right .qr-panel-right {
+        transform: scale(1.08);
+    }
+    .qr-panel.is-hover-right .qr-hover-text-right { opacity: 1; }
+    .qr-panel.is-hover-right .qr-panel-left {
+        opacity: 0;
+        transform: scale(.94);
+    }
+    .qr-panel.is-hover-right .qr-panel-center {
+        opacity: 0;
+        transform: scale(.94);
+    }
+
+    .qr-panel.is-hover-left ~ .qr-hover-bg .qr-hover-bg-left {
+        opacity: .5;
+    }
+    .qr-panel.is-hover-center ~ .qr-hover-bg .qr-hover-bg-center {
+        opacity: .5;
+    }
+    .qr-panel.is-hover-right ~ .qr-hover-bg .qr-hover-bg-right {
+        opacity: .5;
+    }
+}
+
+.cat-mascot {
+    position: fixed !important;
+    right: -250px !important;
+    bottom: -150px !important;
+    left: auto !important;
+    top: auto !important;
+    width: clamp(420px, 54vw, 820px) !important;
+    margin: 0;
+    opacity: 0;
+    pointer-events: none;
+    transform: translateX(60vw);
+    z-index: 30 !important;
+}
+
+.cat-mascot-frame {
+    width: 100%;
+    height: auto;
+    display: block;
+    image-rendering: pixelated;
+}
+
+.cat-hitbox {
+    position: absolute;
+    top: 18%;
+    left: 22%;
+    right: 18%;
+    bottom: 6%;
+    z-index: 2;
+    pointer-events: none;
+}
+
+.cat-mascot.is-idle-pose .cat-hitbox,
+.cat-mascot.is-attacking .cat-hitbox {
+    pointer-events: auto;
+}
+
+.cat-mascot.is-hidden {
+    opacity: 0;
+    transform: translateX(60vw);
+}
+
+.cat-mascot.is-idle-pose {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.cat-mascot.is-attacking {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.cat-mascot.is-running-in {
+    animation: catRunIn .65s linear forwards;
+}
+.cat-mascot.is-running-out {
+    animation: catRunOut .7s linear forwards;
+}
+
+@keyframes catRunIn {
+    0%   { transform: translateX(60vw); opacity: 0; }
+    15%  { opacity: 1; }
+    100% { transform: translateX(0); opacity: 1; }
+}
+@keyframes catRunOut {
+    0%   { transform: translateX(0); opacity: 1; }
+    85%  { opacity: 1; }
+    100% { transform: translateX(-160vw); opacity: 0; }
+}
+
+@media (max-width: 640px) {
+    .cat-mascot { display: none; }
+}
+
+/* ============================================================
+   MODAL "Pilih Tindakan" + MODAL "Perbarui Gambar QR"
+   ------------------------------------------------------------
+   Direstyle biar SATU BAHASA VISUAL sama bagian lain di situs ini:
+   - Kartu berbahan "kertas krem" (#faf9f5) dengan shadow bertumpuk
+     ala halaman FlipBook (lihat .fb-face-text di FlipBookScroll.css)
+   - Aksen pita emas di tepi atas, senada sama .fb-spine
+   - Tipografi Fraunces (judul) + Inter (isi), warna ink yang sama
+     persis dipakai di .qr-hover-text-inner (rgba(17,17,17,...))
+   Dibuat & di-inject via JS (lihat js/QRCodeRevealAnimation.js,
+   fungsi openChoiceModal/openEditModal) ke dalam #qr-modal-root
+   yang juga dibuat otomatis lewat JS -- gak perlu nambah apapun
+   di index.html.
+   ============================================================ */
+.qr-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(20, 16, 10, 0.55);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: qrModalFadeIn .25s ease;
+}
+@keyframes qrModalFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.qr-modal-box {
+    position: relative;
+    width: 100%;
+    max-width: 380px;
+    background: #faf9f5;
+    border-radius: 20px;
+    padding: 32px 28px 28px;
+    overflow: hidden;
+    box-shadow:
+        0 24px 60px -6px rgba(20, 16, 10, 0.32),
+        inset 0 0 0 1px rgba(0, 0, 0, 0.05),
+        4px 4px 0 -2px rgba(232, 226, 210, 1),
+        8px 8px 0 -4px rgba(216, 209, 191, 1);
+    animation: qrModalPopIn .3s cubic-bezier(.34,1.1,.64,1);
+}
+@keyframes qrModalPopIn {
+    from { opacity: 0; transform: translateY(14px) scale(.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.qr-modal-box::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #8a6a22, #cba454 45%, #fff6d8 55%, #cba454 70%, #6b4f18);
+    box-shadow: 0 0 14px rgba(203, 164, 84, 0.45);
+}
+
+.qr-modal-title {
+    font-family: 'Fraunces', serif;
+    font-size: 21px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    color: rgba(17, 17, 17, .92);
+    margin-bottom: 6px;
+}
+.qr-modal-sub {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: rgba(17, 17, 17, .58);
+    line-height: 1.6;
+    margin-bottom: 22px;
+}
+
+.qr-modal-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 13px 16px;
+    border-radius: 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    border: 1px solid transparent;
+    transition: transform .25s var(--ease, ease), box-shadow .25s ease, background .25s ease;
+    margin-bottom: 10px;
+}
+.qr-modal-btn:hover { transform: translateY(-2px); }
+
+.qr-modal-btn-primary {
+    background: linear-gradient(135deg, #2b2b2b, #000000);
+    color: #fbf8f1;
+    box-shadow:
+        0 0 14px rgba(255,255,255,0.14),
+        inset 0 0 0 1px rgba(255,255,255,0.08),
+        0 10px 24px rgba(20,16,10,0.26);
+}
+.qr-modal-btn-primary:hover {
+    box-shadow:
+        0 0 20px rgba(255,255,255,0.2),
+        inset 0 0 0 1px rgba(255,255,255,0.12),
+        0 14px 30px rgba(20,16,10,0.32);
+}
+
+.qr-modal-btn-ghost {
+    background: rgba(203, 164, 84, 0.12);
+    border-color: rgba(203, 164, 84, 0.42);
+    color: #8a6a22;
+}
+.qr-modal-btn-ghost:hover {
+    background: rgba(203, 164, 84, 0.2);
+    box-shadow: 0 0 16px rgba(203, 164, 84, 0.25);
+}
+
+.qr-modal-cancel {
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 10px 8px 0;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(17, 17, 17, .34);
+    cursor: pointer;
+    text-align: center;
+    transition: color .25s ease;
+}
+.qr-modal-cancel:hover { color: rgba(17, 17, 17, .68); }
+
+.qr-edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.qr-edit-label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(17, 17, 17, .48);
+    text-transform: uppercase;
+    letter-spacing: .08em;
+}
+.qr-edit-input {
+    font-family: 'Inter', sans-serif;
+    font-size: 13.5px;
+    font-weight: 500;
+    text-transform: none;
+    letter-spacing: normal;
+    color: rgba(17, 17, 17, .88);
+    background: rgba(17, 17, 17, 0.04);
+    border: 1px solid rgba(17, 17, 17, 0.14);
+    border-radius: 10px;
+    padding: 10px 12px;
+    transition: border-color .25s ease, background .25s ease;
+}
+.qr-edit-input:focus {
+    outline: none;
+    border-color: rgba(203, 164, 84, 0.65);
+    background: rgba(203, 164, 84, 0.06);
+}
+
+.qr-edit-error {
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #b3261e;
+    background: rgba(179, 38, 30, 0.08);
+    border: 1px solid rgba(179, 38, 30, 0.22);
+    border-radius: 10px;
+    padding: 9px 12px;
+    margin: 0;
+}
+
+.qr-edit-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .qr-modal-overlay, .qr-modal-box { animation: none; }
+}

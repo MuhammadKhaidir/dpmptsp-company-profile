@@ -1,0 +1,31 @@
+
+.belida-fish {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 0;
+    pointer-events: none;
+    z-index: 2;
+}
+
+.belida-fish-img {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: clamp(400px, 60vw, 820px);
+    height: auto;
+    transform: translate(-50%, -120%);
+    transition: opacity 0.5s ease;
+    will-change: transform;
+    user-select: none;
+    -webkit-user-drag: none;
+}
+
+.belida-fish-img.is-hidden {
+    opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .belida-fish { display: none; }
+}

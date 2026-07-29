@@ -1,0 +1,164 @@
+
+.arc-carousel {
+    /* --- parameter kurva 3D — semua berbasis clamp(min, ngikut-viewport, max) --- */
+    --arc-card-w: clamp(210px, 34vw, 358px);
+    --arc-card-h: clamp(190px, 28vh, 316px);
+    --arc-radius: clamp(190px, 26vh, 340px);   /* jarak dorong kartu dari titik pusat (translateZ). Max diturunin dari 400 -> 340 biar efek "kembung" perspective gak segede kemarin */
+
+
+    --arc-min-scale: 0.72;   /* skala kartu paling belakang (paling jauh) */
+    --arc-min-opacity: 0.12; /* opacity kartu paling belakang */
+    --arc-duration: 0.65s;
+
+    --arc-lift: clamp(14px, 2.4vh, 30px); /* geser grup kartu ke atas; sekarang ikut ngecil di layar pendek */
+
+    --arc-vertical-step: clamp(18px, 9vh, 96px);
+
+    position: relative;
+    z-index: 1;
+    max-width: 960px;
+    width: 100%;
+    margin: 0 auto;
+
+    /* WAJIB 3D: Kedalaman ruang kamera. */
+    perspective: 1700px;
+}
+
+.arc-track {
+    position: relative;
+
+    height: calc(var(--arc-card-h) + 20vh + var(--arc-vertical-step) * 2);
+    touch-action: pan-y;
+    cursor: grab;
+    -webkit-user-select: none;
+    user-select: none;
+
+    transform-style: preserve-3d;
+}
+.arc-track.is-dragging {
+    cursor: grabbing;
+}
+
+.arc-card {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    width: var(--arc-card-w);
+    height: 350px;
+    margin-left: calc(var(--arc-card-w) / -2);
+    margin-top: calc(var(--arc-card-h) / -2 - var(--arc-lift));
+    
+
+    border-radius: 20px;
+    padding: 30px 26px;
+    backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    cursor: pointer;
+
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+
+    /* Border neon kuning */
+    border: 1.5px solid rgba(27, 27, 27, 0.85);
+    box-shadow:
+        0 0 6px rgba(246, 245, 244, 0.962),
+        0 0 16px rgba(19, 19, 19, 0.35),
+        0 0 32px rgba(255, 221, 0, 0.18);
+
+    will-change: transform, opacity;
+    transition:
+        box-shadow .3s ease,
+        border-color .3s ease,
+        background .3s ease;
+}
+.arc-card.is-active {
+    cursor: default;
+    border-color: rgb(250, 249, 248);
+    box-shadow:
+        0 0 10px rgba(248, 248, 247, 0.75),
+        0 0 24px rgba(14, 13, 13, 0.5),
+        0 0 48px rgba(35, 35, 35, 0.28);
+}
+
+.arc-card .info-card-icon {
+    margin-bottom: 20px;
+}
+.arc-card .info-card-title {
+    margin-bottom: 0px;
+}
+.arc-card .info-card-text {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 8;
+    overflow: hidden;
+}
+
+.arc-nav {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    margin-top: 4px;
+}
+.arc-nav-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 1px solid rgba(17,17,17,0.12);
+    background: rgba(255,255,255,0.55);
+    color: var(--ink);
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: transform .25s var(--ease, ease), background .25s ease, border-color .25s ease;
+}
+.arc-nav-btn:hover {
+    transform: translateY(-2px);
+    background: rgba(255,255,255,0.85);
+    border-color: rgba(203,164,84,0.4);
+}
+.arc-nav-btn:active {
+    transform: translateY(0);
+}
+.arc-nav-btn:focus-visible {
+    outline: 2px solid #cba454;
+    outline-offset: 2px;
+}
+
+.arc-dots {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.arc-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    border: none;
+    padding: 0;
+    background: rgba(17,17,17,0.18);
+    cursor: pointer;
+    transition: background .25s ease, width .25s ease;
+}
+.arc-dot.is-active {
+    background: #cba454;
+    width: 22px;
+    border-radius: 5px;
+}
+.arc-dot:focus-visible {
+    outline: 2px solid #cba454;
+    outline-offset: 2px;
+}
+
+
+
+@media (prefers-reduced-motion: reduce) {
+    .arc-card {
+        transition: opacity .3s ease, box-shadow .3s ease, border-color .3s ease, background .3s ease;
+    }
+}
