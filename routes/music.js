@@ -38,7 +38,7 @@ const path = require('path');
 const crypto = require('crypto');
 const fs = require('fs');
 
-const store = require('../data/musicStore');
+const store = require('../data/MusicStore');
 
 const router = express.Router();
 
