@@ -1,552 +1,369 @@
-/* css/FlipBookEditor.css
-   Gaya untuk fitur EDIT KONTEN FLIPBOOK: tombol melayang pembuka, modal
-   password, dan panel edit utama. File baru, terpisah dari Flipbook.css
-   supaya perubahan gambar/halaman di Flipbook.css tetap minim & jelas. */
-
-:root {
-  --fbe-gold: #cba454;
-  --fbe-gold-deep: #8a6a22;
-  --fbe-gold-light: #fff6d8;
-  --fbe-cream: #faf9f5;
-  --fbe-cream-deep: #e8e2d2;
-  --fbe-ink: #16130f;
-  --fbe-ink-soft: rgba(20, 16, 10, 0.7);
-  --fbe-dark: #0b0b0d;
+.flipbook-scroll-wrap {
+  position: relative;
+  width: 100%;
+  overflow: clip; /* Mencegah scrollbar horizontal tanpa memotong ruang 3D di dalam */
 }
 
-/* ---- Tombol melayang pembuka editor ---- */
-
-.fbe-trigger {
-  position: fixed;
-  right: 22px;
-  bottom: 22px;
-  width: 46px;
-  height: 46px;
-  border-radius: 999px;
-  border: 1px solid rgba(203, 164, 84, 0.55);
-  background: radial-gradient(120% 140% at 30% 0%, #1c1c1f 0%, #0b0b0d 70%);
-  color: var(--fbe-gold-light);
+.flipbook-scroll-sticky {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  width: 100%;
+  overflow: visible; /* Menghilangkan pemotongan kotak di batas kanan & kiri */
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  z-index: 2147483000;
-  box-shadow: 0 8px 24px rgba(20, 16, 10, 0.4), 0 0 0 rgba(203, 164, 84, 0.5);
-  opacity: 0.55;
-  transition: opacity 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+
+  /* FIX: background premium krem/gold yang tadinya di sini (base gradient +
+     vignette + grid + spotlight gold + grain) sekarang dipindah jadi
+     background BARENG buat seluruh halaman lewat #site-bg di css/Hero.css,
+     biar section ini nyambung mulus sama section lain (Hero, Profil, QR,
+     Flipbook company profile), bukan punya background sendiri yang
+     "kepotong" di batas section. Section ini jadi transparent aja biar
+     #site-bg di belakangnya nembus. */
+  background: transparent;
 }
 
-.fbe-trigger:hover,
-.fbe-trigger:focus-visible {
-  opacity: 1;
-  transform: translateY(-2px);
-  box-shadow: 0 10px 28px rgba(20, 16, 10, 0.45), 0 0 16px rgba(203, 164, 84, 0.55);
-}
-
-.fbe-trigger svg {
-  width: 18px;
-  height: 18px;
-}
-
-/* ---- Overlay umum (dipakai modal password & panel editor) ---- */
-
-.fbe-overlay {
-  position: fixed;
+.fb-stage {
+  position: absolute;
   inset: 0;
-  background: rgba(10, 8, 5, 0.72);
-  backdrop-filter: blur(3px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2147483100;
-  padding: 24px;
-  font-family: 'Inter', sans-serif;
+  width: 100%;
+  height: 100%;
+  perspective: 2400px;
+  perspective-origin: 50% 50%;
+  transform-style: preserve-3d;
+  overflow: visible; /* Memastikan ruang 3D buku tidak terpotong panel samping */
 }
 
-/* ---- Modal password ---- */
-
-.fbe-auth-card {
-  width: min(92vw, 360px);
-  background: var(--fbe-cream);
-  border-radius: 14px;
-  border: 1px solid rgba(203, 164, 84, 0.4);
-  box-shadow: 0 30px 70px rgba(20, 16, 10, 0.5);
-  padding: 26px 24px 22px;
-}
-
-.fbe-auth-card h3 {
+/* Judul luar buku: posisi di kiri, warna hitam, z-index di bawah buku */
+.fb-caption {
+  position: absolute;
+  top: 50%;
+  left: 5%;
+  max-width: 24%;
+  z-index: 10; /* Dipastikan lebih rendah dari buku (z-index: 500) agar tidak menutupi buku */
   font-family: 'Fraunces', serif;
-  font-size: 19px;
+  font-size: clamp(24px, 3.8vw, 54px);
   font-weight: 700;
-  color: var(--fbe-ink);
-  margin: 0 0 6px;
+  line-height: 1.12;
+  letter-spacing: 0.005em;
+  color: #14100a;
+  text-align: left;
+  pointer-events: none;
+
+  opacity: var(--fb-reveal-o, 1);
+  transform: translateY(calc(-50% + var(--fb-reveal-y, 0px)));
+
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5), 0 12px 30px rgba(20, 16, 10, 0.10);
 }
 
-.fbe-auth-card p {
-  font-size: 12.5px;
-  color: var(--fbe-ink-soft);
-  margin: 0 0 16px;
-  line-height: 1.5;
+/* Garis aksen vertikal di sebelah judul, dikasih glow gold tipis */
+.fb-caption::before {
+  content: '';
+  position: absolute;
+  left: -20px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #8a6a22, #cba454 50%, #fff6d8);
+  box-shadow: 0 0 14px rgba(203, 164, 84, 0.45);
+  animation: fbAccentGlow 4s ease-in-out infinite;
 }
 
-.fbe-auth-card input[type="password"] {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid rgba(20, 16, 10, 0.18);
-  background: #fff;
-  font-size: 14px;
-  color: var(--fbe-ink);
-  margin-bottom: 10px;
+@keyframes fbAccentGlow {
+  0%, 100% { box-shadow: 0 0 10px rgba(203, 164, 84, 0.35); }
+  50% { box-shadow: 0 0 18px rgba(203, 164, 84, 0.65); }
 }
 
-.fbe-auth-card input[type="password"]:focus {
-  outline: none;
-  border-color: var(--fbe-gold);
-  box-shadow: 0 0 0 3px rgba(203, 164, 84, 0.22);
-}
-
-.fbe-auth-error {
-  font-size: 12px;
-  color: #a3372c;
-  margin: -4px 0 10px;
-  min-height: 15px;
-}
-
-.fbe-auth-actions {
+.fb-dots {
+  position: absolute;
+  bottom: 8%;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
+  gap: 10px;
+  z-index: 60;
 }
 
-/* ---- Tombol umum ---- */
-
-.fbe-btn {
-  font-family: 'Inter', sans-serif;
-  font-size: 12.5px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  border-radius: 8px;
-  padding: 8px 14px;
-  border: 1px solid transparent;
-  cursor: pointer;
-  transition: filter 0.15s ease, transform 0.1s ease;
+.fb-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(20, 16, 10, 0.2);
+  border: 1px solid rgba(20, 16, 10, 0.26);
+  transition: background 0.35s ease, transform 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
 }
 
-.fbe-btn:active {
-  transform: scale(0.98);
+.fb-dot.on {
+  background: linear-gradient(135deg, #fff6d8, #cba454 60%, #8a6a22);
+  border-color: rgba(138, 106, 34, 0.8);
+  box-shadow: 0 0 10px rgba(203, 164, 84, 0.55);
+  transform: scale(1.35);
 }
 
-.fbe-btn-primary {
-  background: linear-gradient(135deg, var(--fbe-gold-light), var(--fbe-gold) 60%, var(--fbe-gold-deep));
-  color: #201705;
+/* ---- Buku (Di Tengah Layar) ---- */
+
+.fb-book {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(40vw, 360px);
+  aspect-ratio: 3 / 4;
+  height: auto;
+  transform-style: preserve-3d;
+  will-change: transform, opacity;
+  pointer-events: none;
+  overflow: visible; /* Bebas terbuka tanpa terpotong kotak samping */
 }
 
-.fbe-btn-primary:hover {
-  filter: brightness(1.05);
+.fb-shadow {
+  position: absolute;
+  left: 3%;
+  right: 3%;
+  bottom: -10%;
+  height: 26%;
+  background: radial-gradient(ellipse at center, rgba(20, 16, 10, 0.4) 0%, rgba(20, 16, 10, 0) 72%);
+  filter: blur(10px);
+  transform: translateZ(-40px);
+  z-index: -1;
 }
 
-.fbe-btn-primary:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-  filter: none;
+.fb-page-face {
+  position: absolute;
+  inset: 0;
+  border-radius: 6px 12px 12px 6px;
+  box-shadow: 0 24px 60px -6px rgba(20, 16, 10, 0.5), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  /* overflow:hidden SENGAJA dihapus di sini — kalau dipasang bareng box-shadow
+     di elemen yang sama, shadow-nya ikut ke-clip dan jadi nggak kelihatan.
+     Border-radius tetap ngeclip background sendiri walau overflow visible. */
 }
 
-.fbe-btn-ghost {
-  background: transparent;
-  border-color: rgba(20, 16, 10, 0.22);
-  color: var(--fbe-ink);
-}
-
-.fbe-btn-ghost:hover {
-  border-color: var(--fbe-gold-deep);
-  color: var(--fbe-gold-deep);
-}
-
-.fbe-btn-danger {
-  background: transparent;
-  border-color: rgba(163, 55, 44, 0.4);
-  color: #a3372c;
-}
-
-.fbe-btn-danger:hover {
-  background: rgba(163, 55, 44, 0.08);
-}
-
-.fbe-btn-add {
-  width: 100%;
-  background: rgba(203, 164, 84, 0.1);
-  border: 1px dashed rgba(203, 164, 84, 0.55);
-  color: var(--fbe-gold-deep);
-  padding: 10px 14px;
-  margin-top: 10px;
-}
-
-.fbe-btn-add:hover {
-  background: rgba(203, 164, 84, 0.18);
-}
-
-.fbe-icon-btn {
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
-  border: 1px solid rgba(20, 16, 10, 0.18);
-  background: #fff;
-  color: var(--fbe-ink-soft);
-  font-size: 13px;
-  line-height: 1;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.fbe-icon-btn:hover {
-  border-color: var(--fbe-gold-deep);
-  color: var(--fbe-gold-deep);
-}
-
-.fbe-icon-btn-danger:hover {
-  border-color: #a3372c;
-  color: #a3372c;
-}
-
-/* ---- Panel editor utama ---- */
-
-.fbe-panel {
-  width: min(94vw, 760px);
-  max-height: 88vh;
-  background: var(--fbe-cream);
-  border-radius: 16px;
-  border: 1px solid rgba(203, 164, 84, 0.4);
-  box-shadow: 0 40px 90px rgba(20, 16, 10, 0.55);
+/* Sampul depan & belakang: material lebih mewah + foil frame + sheen halus */
+.fb-face-cover,
+.fb-face-back {
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  justify-content: flex-end;
+  padding: 9% 10%;
+  background-repeat: no-repeat, no-repeat;
+  background-size: 220% 220%, 100% 100%;
+  background-image:
+    linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.06) 45%, transparent 60%),
+    radial-gradient(120% 140% at 30% 0%, #1c1c1f 0%, #0b0b0d 55%, #060607 100%);
+  animation: fbCoverSheen 9s ease-in-out infinite;
 }
 
-.fbe-panel-header {
-  flex: 0 0 auto;
+@keyframes fbCoverSheen {
+  0%, 100% { background-position: 0% 0%, 0 0; }
+  50% { background-position: 100% 100%, 0 0; }
+}
+
+.fb-face-cover::before,
+.fb-face-back::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  border: 1px solid rgba(203, 164, 84, 0.32);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.fb-face-cover::after,
+.fb-face-back::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(0, 0, 0, 0.42) 100%);
+  pointer-events: none;
+}
+
+/* Halaman isi (kertas krem) + efek tumpukan kertas di sudut kanan-bawah */
+.fb-face-text {
+  background-color: #faf9f5;
+  box-shadow:
+    0 24px 60px -6px rgba(20, 16, 10, 0.38),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.06),
+    4px 4px 0 -2px rgba(232, 226, 210, 1),
+    8px 8px 0 -4px rgba(216, 209, 191, 1);
+  display: flex;
+  flex-direction: column;
+  padding: 11% 10%;
+}
+
+.fb-face-blank {
+  background-color: #faf9f5;
+  box-shadow:
+    0 24px 60px -6px rgba(20, 16, 10, 0.38),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.06),
+    4px 4px 0 -2px rgba(232, 226, 210, 1),
+    8px 8px 0 -4px rgba(216, 209, 191, 1);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px 20px;
-  background: radial-gradient(120% 140% at 30% 0%, #1c1c1f 0%, #0b0b0d 70%);
-  border-bottom: 1px solid rgba(203, 164, 84, 0.32);
+  justify-content: center;
 }
 
-.fbe-panel-header h2 {
-  font-family: 'Fraunces', serif;
-  font-size: 17px;
+.fb-face-blank::after {
+  content: '';
+  width: 14%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(203, 164, 84, 0.6), transparent);
+}
+
+.fb-kicker {
+  font-family: 'Inter', sans-serif;
+  font-size: clamp(8px, 0.9vw, 10.5px);
   font-weight: 700;
-  color: var(--fbe-gold-light);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0 0 8px;
+}
+
+.fb-cover-heading {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(15px, 1.9vw, 20px);
+  font-weight: 700;
+  line-height: 1.28;
+  color: #f4ead0;
   margin: 0;
 }
 
-.fbe-panel-header .fbe-close {
-  width: 30px;
-  height: 30px;
-  border-radius: 999px;
-  border: 1px solid rgba(203, 164, 84, 0.4);
-  background: transparent;
-  color: var(--fbe-gold-light);
-  font-size: 16px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.fbe-panel-header .fbe-close:hover {
-  background: rgba(203, 164, 84, 0.15);
-}
-
-.fbe-panel-body {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  padding: 18px 20px 8px;
-}
-
-.fbe-panel-body::-webkit-scrollbar {
-  width: 8px;
-}
-.fbe-panel-body::-webkit-scrollbar-thumb {
-  background: rgba(203, 164, 84, 0.4);
-  border-radius: 999px;
-}
-
-.fbe-loading,
-.fbe-empty-note {
-  font-size: 13px;
-  color: var(--fbe-ink-soft);
-  padding: 20px 4px;
-}
-
-/* Satu buku (accordion) */
-.fbe-book {
-  border: 1px solid rgba(20, 16, 10, 0.12);
-  border-radius: 12px;
-  margin-bottom: 14px;
-  background: #fff;
-  overflow: hidden;
-}
-
-.fbe-book > summary {
-  list-style: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 12px 14px;
-  background: rgba(203, 164, 84, 0.08);
-  font-family: 'Fraunces', serif;
-  font-weight: 700;
-  color: var(--fbe-ink);
-  font-size: 14.5px;
-}
-
-.fbe-book > summary::-webkit-details-marker {
-  display: none;
-}
-
-.fbe-book > summary::before {
-  content: '▸';
-  margin-right: 8px;
-  color: var(--fbe-gold-deep);
-  transition: transform 0.2s ease;
-}
-
-.fbe-book[open] > summary::before {
-  transform: rotate(90deg);
-}
-
-.fbe-book-title-preview {
-  flex: 1 1 auto;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.fbe-book-body {
-  padding: 16px 14px 18px;
-}
-
-.fbe-field {
-  display: block;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--fbe-ink-soft);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  margin: 0 0 14px;
-}
-
-.fbe-field input[type="text"],
-.fbe-field textarea {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  margin-top: 6px;
-  padding: 9px 11px;
-  border-radius: 8px;
-  border: 1px solid rgba(20, 16, 10, 0.16);
-  background: var(--fbe-cream);
+.fb-page-num {
   font-family: 'Inter', sans-serif;
-  font-size: 13.5px;
-  font-weight: 400;
-  text-transform: none;
-  letter-spacing: normal;
-  color: var(--fbe-ink);
-  resize: vertical;
-}
-
-.fbe-field input[type="text"]:focus,
-.fbe-field textarea:focus {
-  outline: none;
-  border-color: var(--fbe-gold);
-  box-shadow: 0 0 0 3px rgba(203, 164, 84, 0.18);
-}
-
-.fbe-fieldset {
-  border: 1px dashed rgba(20, 16, 10, 0.16);
-  border-radius: 10px;
-  padding: 14px 14px 6px;
-  margin: 0 0 16px;
-}
-
-.fbe-fieldset > legend {
-  font-family: 'Fraunces', serif;
-  font-size: 12.5px;
-  font-weight: 700;
-  color: var(--fbe-gold-deep);
-  padding: 0 6px;
-}
-
-.fbe-row-actions {
-  display: flex;
-  gap: 8px;
-  margin: -4px 0 14px;
-}
-
-/* Kontrol gambar (dipakai buat sampul depan/belakang & tiap halaman) */
-.fbe-image-control {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0 0 14px;
-  flex-wrap: wrap;
-}
-
-.fbe-image-preview {
-  width: 56px;
-  height: 56px;
-  border-radius: 8px;
-  overflow: hidden;
-  background: repeating-conic-gradient(#efe9d8 0% 25%, #fbf8f0 0% 50%) 0 0 / 12px 12px;
-  border: 1px solid rgba(20, 16, 10, 0.14);
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.fbe-image-preview img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.fbe-image-preview span {
   font-size: 9px;
-  color: var(--fbe-ink-soft);
-  text-align: center;
-  padding: 4px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(20, 16, 10, 0.35);
+  margin: 0 0 10px;
 }
 
-.fbe-image-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
+.fb-page-heading {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(12.5px, 1.5vw, 15.5px);
+  font-weight: 600;
+  color: #16130f;
+  margin: 0 0 8px;
+  line-height: 1.3;
 }
 
-.fbe-file-btn {
-  position: relative;
-  overflow: hidden;
+.fb-page-body {
+  font-family: 'Inter', sans-serif;
+  font-size: clamp(9.5px, 1vw, 11px);
+  line-height: 1.6;
+  color: rgba(20, 16, 10, 0.72);
+  margin: 0;
 }
 
-.fbe-file-btn input[type="file"] {
+.fb-back-heading {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(14px, 1.7vw, 17.5px);
+  font-weight: 700;
+  color: #f4ead0;
+  margin: 0 0 5px;
+}
+
+.fb-back-tagline {
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 0;
+}
+
+.fb-reveal { 
+  display: contents;
+  flex-direction: column;
+  opacity: var(--fb-reveal-o, 1);
+  transform: translateY(var(--fb-reveal-y, 0px));
+  /* Sebelumnya display:contents — itu bikin opacity & transform di atas   ini buat ngatur kanan kiri kotak biar gak muncul, setting ke content biar ilang itu kanan kiri
+     nggak ngefek sama sekali (elemen display:contents nggak generate box),
+     jadi animasi reveal teks pas halaman kebuka nggak pernah jalan. */
+}
+
+.fb-page {
   position: absolute;
   inset: 0;
+  transform-origin: left center;
+  transform-style: preserve-3d;
+}
+
+.fb-page-face {
+  backface-visibility: hidden;
+}
+
+.fb-page-back {
+  transform: rotateY(180deg);
+}
+
+.fb-page-shade {
+  position: absolute;
+  inset: 0;
+  background: #000;
   opacity: 0;
-  cursor: pointer;
+  pointer-events: none;
+  border-radius: inherit;
 }
 
-.fbe-image-status {
-  font-size: 11px;
-  color: var(--fbe-ink-soft);
+.fb-spine {
+  position: absolute;
+  left: -2px;
+  top: 3%;
+  bottom: 3%;
+  width: 12px;
+  border-radius: 6px 0 0 6px;
+  background-repeat: repeat, no-repeat;
+  background-size: 100% 10px, 100% 100%;
+  background-image:
+    repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.16) 0 2px, transparent 2px 10px),
+    linear-gradient(90deg, #8a6a22, #cba454 45%, #fff6d8 55%, #cba454 70%, #6b4f18);
+  box-shadow: 0 0 22px rgba(203, 164, 84, 0.35), inset 2px 0 4px rgba(0, 0, 0, 0.4);
+  z-index: 999;
+  pointer-events: none;
+  animation: fbSpineGlow 4.5s ease-in-out infinite;
 }
 
-.fbe-image-status.is-error {
-  color: #a3372c;
+@keyframes fbSpineGlow {
+  0%, 100% { box-shadow: 0 0 18px rgba(203, 164, 84, 0.3), inset 2px 0 4px rgba(0, 0, 0, 0.4); }
+  50% { box-shadow: 0 0 28px rgba(203, 164, 84, 0.55), inset 2px 0 4px rgba(0, 0, 0, 0.4); }
 }
 
-/* Kartu tiap halaman isi */
-.fbe-pages-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.fbe-page-card {
-  border: 1px solid rgba(20, 16, 10, 0.12);
-  border-radius: 10px;
-  padding: 12px 12px 4px;
-  background: var(--fbe-cream);
-}
-
-.fbe-page-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
-}
-
-.fbe-page-card-head span {
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--fbe-ink-soft);
-}
-
-.fbe-page-card-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.fbe-structure-note {
-  font-size: 11px;
-  color: var(--fbe-gold-deep);
-  background: rgba(203, 164, 84, 0.12);
-  border-radius: 6px;
-  padding: 6px 10px;
-  margin: 0 0 12px;
-}
-
-/* Footer panel: status simpan + tombol aksi */
-.fbe-panel-footer {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 20px;
-  border-top: 1px solid rgba(20, 16, 10, 0.1);
-  background: #fff;
-}
-
-.fbe-status {
-  font-size: 12px;
-  color: var(--fbe-ink-soft);
-  flex: 1 1 auto;
-}
-
-.fbe-status.is-error {
-  color: #a3372c;
-}
-
-.fbe-status.is-success {
-  color: #3f7d3a;
-}
-
-.fbe-footer-actions {
-  display: flex;
-  gap: 8px;
-  flex: 0 0 auto;
-}
-
-@media (max-width: 640px) {
-  .fbe-panel {
-    width: 100vw;
-    max-height: 100vh;
-    height: 100vh;
-    border-radius: 0;
+@media (max-width: 720px) {
+  .fb-book {
+    width: min(68vw, 240px);
   }
-  .fbe-trigger {
-    right: 14px;
-    bottom: 14px;
+  .fb-caption {
+    top: 8%;
+    left: 50%;
+    max-width: 85%;
+    text-align: center;
+    font-size: clamp(16px, 5vw, 22px);
+    color: #14100a;
+    transform: translateX(-50%) translateY(var(--fb-reveal-y, 0px));
+  }
+  .fb-caption::before {
+    display: none;
+  }
+  .fb-dots {
+    bottom: 6%;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .fbe-trigger,
-  .fbe-btn {
-    transition: none !important;
+  .fb-book {
+    transition: opacity 0.3s ease;
+  }
+  .flipbook-scroll-sticky,
+  .fb-caption::before,
+  .fb-face-cover,
+  .fb-face-back,
+  .fb-spine,
+  .fb-dot.on {
+    animation: none !important;
   }
 }
