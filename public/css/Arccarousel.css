@@ -1,148 +1,89 @@
+/* ============================================================
+   REDESIGN: dari carousel 3D yang muter jadi GRID BUKU STATIS,
+   niru referensi gambar (grid rapi, sampul buku polos berdiri
+   tegak, gold spine + gold rivet pojok, shadow lembut). Buku
+   SENGAJA gak bisa "dibuka" lagi (fitur flip lama dihapus total) --
+   judul sekarang jadi caption di ATAS sampul, link PDF jadi tombol
+   yang SELALU kelihatan di BAWAH sampul.
+
+   BG SENGAJA GAK DISENTUH SAMA SEKALI di file ini -- gak ada satu
+   pun `background` ditambahin ke .arc-carousel/.arc-track, biar
+   #site-bg tetap yang keliatan di belakang, sama kayak section lain.
+   ============================================================ */
+
 .arc-carousel {
-    /* --- parameter kurva 3D — semua berbasis clamp(min, ngikut-viewport, max) --- */
-    --arc-card-w: clamp(210px, 34vw, 358px);
-    --arc-card-h: clamp(190px, 28vh, 316px);
-    --arc-radius: clamp(190px, 26vh, 340px);   /* jarak dorong kartu dari titik pusat (translateZ). Max diturunin dari 400 -> 340 biar efek "kembung" perspective gak segede kemarin */
-
-
-    --arc-min-scale: 0.72;   /* skala kartu paling belakang (paling jauh) */
-    --arc-min-opacity: 0.12; /* opacity kartu paling belakang */
-    --arc-duration: 0.65s;
-
-    --arc-lift: clamp(14px, 2.4vh, 30px); /* geser grup kartu ke atas; sekarang ikut ngecil di layar pendek */
-
-    --arc-vertical-step: clamp(18px, 9vh, 96px);
+    --arc-card-w: clamp(190px, 22vw, 280px);
+    --arc-gap-x: clamp(28px, 4vw, 64px);
+    --arc-gap-y: clamp(40px, 5vw, 68px);
 
     position: relative;
     z-index: 1;
     max-width: 960px;
     width: 100%;
     margin: 0 auto;
-
-    /* WAJIB 3D: Kedalaman ruang kamera. */
-    perspective: 1700px;
 }
 
+/* .arc-track dulu "panggung 3D" yang diputer JS tiap frame -- sekarang
+   cuma CSS Grid biasa. minmax(min(var(--arc-card-w),100%), var(--arc-card-w))
+   + justify-content:center bikin kartu SELALU lebar tetap (gak ikut
+   melar ngisi baris kalau kartunya dikit), dan barisnya center kayak
+   di gambar referensi, bukan nempel rata kiri. */
 .arc-track {
-    position: relative;
-
-    height: calc(var(--arc-card-h) + 20vh + var(--arc-vertical-step) * 2);
-    touch-action: pan-y;
-    cursor: grab;
-    -webkit-user-select: none;
-    user-select: none;
-
-    transform-style: preserve-3d;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--arc-card-w), 100%), var(--arc-card-w)));
+    justify-content: center;
+    align-items: start;
+    gap: var(--arc-gap-y) var(--arc-gap-x);
+    padding: 8px 0;
 }
-.arc-track.is-dragging {
-    cursor: grabbing;
-}
-
-/* ============================================================
-   FITUR BUKU: kartu di-reskin jadi kelihatan kayak sampul buku 3D
-   (gelap + list emas + punggung/spine) — gantiin panel kaca neon
-   yang lama. Struktur DOM per kartu dibungkus OTOMATIS lewat
-   wrapCardForBookLook() di ArcCarousel.js, jadi:
-
-     .arc-card (posisi/ukuran di ruang 3D lengkung — DIATUR JS tiap
-                frame lewat render(). JANGAN taruh transform manual
-                langsung di sini, nanti tabrakan)
-       .arc-card-spine  -> list emas di kiri, statis, gak ikut flip
-       .arc-card-inner  -> yang di-FLIP pas kartu aktif diklik
-         .arc-card-front -> sampul depan: icon + judul asli kartu
-         .arc-card-back  -> halaman info: deskripsi asli + tombol PDF
-   ============================================================ */
 
 .arc-card {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    width: var(--arc-card-w);
-    height: 350px;
-    margin-left: calc(var(--arc-card-w) / -2);
-    margin-top: calc(var(--arc-card-h) / -2 - var(--arc-lift));
-
-    border-radius: 14px;
-    cursor: pointer;
-
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
-
-    /* Bayangan sampul buku (bukan neon lagi). Border/list emas sekarang
-       ada di .arc-card-front::before, BUKAN di sini — kalau box-shadow
-       ditaruh bareng elemen yang overflow:hidden, shadow-nya ikut
-       ke-clip (pelajaran yang sama kayak di FlipBookScroll.css). */
-    box-shadow: 0 24px 60px -6px rgba(20, 16, 10, 0.55);
-
-    /* Local 3D context KHUSUS buat anak-anaknya (.arc-card-inner) pas
-       di-flip -- ini TIDAK ikut memengaruhi posisi .arc-card itu
-       sendiri di lengkungan carousel (itu tetap murni dari perspective
-       punya .arc-carousel + transform yang di-set JS tiap frame lewat
-       render()). Jadi aman, gak bakal balikin bug "staircase" lama. */
-    perspective: 1200px;
-
-    will-change: transform, opacity;
-    transition: box-shadow .3s ease;
-}
-.arc-card:hover {
-    box-shadow: 0 30px 70px -6px rgba(20, 16, 10, 0.65), 0 0 26px rgba(203, 164, 84, 0.28);
-}
-.arc-card.is-active {
-    box-shadow: 0 30px 70px -6px rgba(20, 16, 10, 0.65), 0 0 32px rgba(203, 164, 84, 0.4);
-}
-.arc-card.is-active .arc-card-front::before {
-    border-color: rgba(203, 164, 84, 0.6);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    width: 100%;
 }
 
-/* Wrapper yang di-flip pas kartu aktif diklik */
-.arc-card-inner {
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    transform-style: preserve-3d;
-    transition: transform .65s cubic-bezier(.33,1,.4,1);
-}
-.arc-card-inner.is-flipped {
-    transform: rotateY(180deg);
-}
-/* Efek hover: sedikit "terangkat" -- CUMA pas belum kebuka, biar gak
-   tabrakan sama transform rotateY di atas waktu lagi flip. */
-.arc-card:hover .arc-card-inner:not(.is-flipped) {
-    transform: translateY(-10px) scale(1.02);
-}
-
-.arc-card-front,
-.arc-card-back {
-    position: absolute;
-    inset: 0;
-    border-radius: inherit;
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
-    /* overflow:hidden AMAN di sini (bukan di .arc-card) -- box-shadow
-       ada di .arc-card, jadi gak ikut ke-clip. */
+.arc-card-caption {
+    margin: 0;
+    font-family: 'Fraunces', serif;
+    font-size: clamp(13px, 1.35vw, 16px);
+    font-weight: 700;
+    line-height: 1.32;
+    color: #14100a;
+    text-align: center;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
 }
 
-/* Sampul depan: senada sama sampul FlipBook (gelap + sheen halus +
-   list emas tipis), isinya icon+judul asli kartu (dipindah apa adanya
-   lewat wrapCardForBookLook() di JS). */
-.arc-card-front {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    padding: 26px 24px;
+/* Sampul buku -- polos (gak ada teks/icon di atasnya lagi, biar sama
+   kayak referensi gambar), gold frame tipis + sheen halus niru material
+   sampul FlipBook, TAPI gak ada animasi flip/klik lagi. */
+.arc-card-cover {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 5 / 7;
+    border-radius: 8px 14px 14px 8px;
+    overflow: hidden;
     background-repeat: no-repeat, no-repeat;
     background-size: 220% 220%, 100% 100%;
     background-image:
         linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.06) 45%, transparent 60%),
         radial-gradient(120% 140% at 30% 0%, #1c1c1f 0%, #0b0b0d 55%, #060607 100%);
     animation: arcCoverSheen 9s ease-in-out infinite;
+    box-shadow: 0 20px 45px -10px rgba(20, 16, 10, 0.5), 0 6px 14px rgba(20, 16, 10, 0.28);
+    transition: transform 0.35s cubic-bezier(.33,1,.4,1), box-shadow 0.35s ease;
 }
 @keyframes arcCoverSheen {
     0%, 100% { background-position: 0% 0%, 0 0; }
     50% { background-position: 100% 100%, 0 0; }
 }
-.arc-card-front::before {
+
+/* List emas tipis di pinggir dalam sampul */
+.arc-card-cover::before {
     content: '';
     position: absolute;
     top: 10px; left: 10px; right: 10px; bottom: 10px;
@@ -151,7 +92,8 @@
     pointer-events: none;
     transition: border-color .3s ease;
 }
-.arc-card-front::after {
+/* Overlay gradasi lembut biar materialnya kerasa "kulit" bukan flat */
+.arc-card-cover::after {
     content: '';
     position: absolute;
     inset: 0;
@@ -159,105 +101,55 @@
     pointer-events: none;
 }
 
-/* Icon/judul asli kartu -- dinaikin di atas ::before/::after (yang
-   position:absolute) pakai z-index, sama direcolor biar kontras di
-   background gelap yang baru. */
-.arc-card .info-card-icon {
-    position: relative;
-    z-index: 1;
-    margin-bottom: 20px;
+/* FITUR HOVER: sampul kebangkat dikit + shadow nge-deep + glow gold
+   tipis muncul di list emasnya -- buku TETAP gak bisa diklik/dibuka,
+   ini murni animasi hover buat kesan "hidup" doang. */
+.arc-card:hover .arc-card-cover {
+    transform: translateY(-10px) scale(1.025);
+    box-shadow: 0 32px 65px -10px rgba(20, 16, 10, 0.62), 0 0 28px rgba(203, 164, 84, 0.3);
 }
-.arc-card .info-card-title {
-    position: relative;
-    z-index: 1;
-    margin-bottom: 0px;
-    font-family: 'Fraunces', serif;
-    color: #f4ead0;
+.arc-card:hover .arc-card-cover::before {
+    border-color: rgba(203, 164, 84, 0.62);
 }
 
-.arc-card-hint {
-    position: relative;
-    z-index: 1;
-    margin: 10px 0 0;
-    font-family: 'Inter', sans-serif;
-    font-size: 10.5px;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    color: rgba(244, 234, 208, 0.55);
-    display: none; /* cuma nongol pas kartu ini lagi jadi kartu aktif */
-}
-.arc-card.is-active .arc-card-hint {
-    display: block;
-}
-
-/* Punggung/spine emas -- statis, gak ikut flip, biar tetep "nempel" di
-   kiri kartu baik pas nampilin sampul maupun pas nampilin info. */
+/* Spiral/coil binding di kiri -- pola cincin kecil berulang (radial-gradient
+   repeat-y) ditumpuk di atas batang gradient emas, niru kesan spiral kawat
+   di gambar referensi. */
 .arc-card-spine {
     position: absolute;
-    left: -2px;
-    top: 3%;
-    bottom: 3%;
-    width: 10px;
-    border-radius: 6px 0 0 6px;
-    background-repeat: repeat, no-repeat;
-    background-size: 100% 10px, 100% 100%;
+    left: -6px;
+    top: 4%;
+    bottom: 4%;
+    width: 13px;
+    border-radius: 8px;
+    background-repeat: repeat-y, repeat, no-repeat;
+    background-size: 100% 15px, 100% 10px, 100% 100%;
+    background-position: center, 0 0, 0 0;
     background-image:
-        repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.16) 0 2px, transparent 2px 10px),
+        radial-gradient(circle at 50% 7px, #fff6d8 0 2.2px, rgba(20,16,10,0.35) 2.2px 3.4px, transparent 3.6px),
+        repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.14) 0 2px, transparent 2px 10px),
         linear-gradient(90deg, #8a6a22, #cba454 45%, #fff6d8 55%, #cba454 70%, #6b4f18);
-    box-shadow: 0 0 16px rgba(203, 164, 84, 0.35), inset 2px 0 4px rgba(0, 0, 0, 0.4);
-    z-index: 5;
+    box-shadow: 0 0 14px rgba(203, 164, 84, 0.32);
     pointer-events: none;
 }
 
-/* Halaman info (belakang) -- kertas krem senada sama halaman isi
-   FlipBook, isinya deskripsi asli kartu (.info-card-text yang otomatis
-   dipindah ke sini) + tombol unduh PDF. */
-.arc-card-back {
-    transform: rotateY(180deg);
-    background-color: #faf9f5;
-    display: flex;
-    flex-direction: column;
-    padding: 24px 22px;
-    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
-    overflow-y: auto;
+/* Rivet/stud emas bulat di pojok kanan atas sampul -- detail kecil yang
+   ada di foto referensi. */
+.arc-card-rivet {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 17px;
+    height: 17px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #fff6d8, #cba454 55%, #8a6a22 100%);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.5);
+    pointer-events: none;
 }
-.arc-card-back-kicker {
-    font-family: 'Inter', sans-serif;
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: rgba(20, 16, 10, 0.4);
-    margin: 0 0 8px;
-}
-.arc-card-back-heading {
-    font-family: 'Fraunces', serif;
-    font-size: clamp(15px, 1.8vw, 19px);
-    font-weight: 700;
-    color: #16130f;
-    margin: 0 0 10px;
-    line-height: 1.3;
-}
-.arc-card-back-desc {
-    font-family: 'Inter', sans-serif;
-    font-size: 12.5px;
-    line-height: 1.65;
-    color: rgba(20, 16, 10, 0.72);
-    margin: 0 0 16px;
-    flex: 1 1 auto;
-}
-/* Kalau elemen ini aslinya .info-card-text (dipindah dari sampul
-   depan), timpa batasan line-clamp bawaannya -- di panel info,
-   teksnya boleh utuh, gak usah kepotong 8 baris lagi. Selector sengaja
-   3 kelas biar spesifisitasnya pasti menang lawan `.arc-card .info-card-text`. */
-.arc-card .info-card-text.arc-card-back-desc {
-    display: block;
-    -webkit-line-clamp: unset;
-    overflow: visible;
-    color: rgba(20, 16, 10, 0.72);
-}
+
+/* Tombol/link PDF -- SELALU kelihatan di bawah sampul, gak lagi
+   disembunyiin di balik panel flip. */
 .arc-card-download {
-    align-self: flex-start;
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -285,85 +177,29 @@
     pointer-events: none;
     box-shadow: none;
 }
-.arc-card-back-hint {
-    margin: 10px 0 0;
-    font-family: 'Inter', sans-serif;
-    font-size: 10px;
-    font-style: italic;
-    color: rgba(20, 16, 10, 0.4);
-}
 
-.arc-nav {
-    position: relative;
-    z-index: 2;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 18px;
-    margin-top: 4px;
-}
-.arc-nav-btn {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    border: 1px solid rgba(17,17,17,0.12);
-    background: rgba(255,255,255,0.55);
-    color: var(--ink);
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: transform .25s var(--ease, ease), background .25s ease, border-color .25s ease;
-}
-.arc-nav-btn:hover {
-    transform: translateY(-2px);
-    background: rgba(255,255,255,0.85);
-    border-color: rgba(203,164,84,0.4);
-}
-.arc-nav-btn:active {
-    transform: translateY(0);
-}
-.arc-nav-btn:focus-visible {
-    outline: 2px solid #cba454;
-    outline-offset: 2px;
-}
-
+/* Nav panah + dots lama -- DISEMBUNYIIN aja (bukan dihapus), soalnya
+   konsep "kartu aktif di tengah" udah gak ada lagi di grid statis ini.
+   Aman kalau HTML kamu masih ada tombolnya, tinggal gak kelihatan. */
+.arc-nav,
 .arc-dots {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-.arc-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    border: none;
-    padding: 0;
-    background: rgba(17,17,17,0.18);
-    cursor: pointer;
-    transition: background .25s ease, width .25s ease;
-}
-.arc-dot.is-active {
-    background: #cba454;
-    width: 22px;
-    border-radius: 5px;
-}
-.arc-dot:focus-visible {
-    outline: 2px solid #cba454;
-    outline-offset: 2px;
+    display: none !important;
 }
 
-
+@media (max-width: 720px) {
+    .arc-carousel {
+        --arc-card-w: clamp(150px, 42vw, 220px);
+        --arc-gap-x: clamp(18px, 6vw, 32px);
+        --arc-gap-y: clamp(28px, 7vw, 44px);
+    }
+}
 
 @media (prefers-reduced-motion: reduce) {
-    .arc-card {
+    .arc-card-cover {
+        animation: none;
         transition: box-shadow .3s ease;
     }
-    .arc-card-inner {
-        transition: none;
-    }
-    .arc-card-front {
-        animation: none;
+    .arc-card:hover .arc-card-cover {
+        transform: none;
     }
 }
