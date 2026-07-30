@@ -256,7 +256,128 @@
   font-size: clamp(9.5px, 1vw, 11px);
   line-height: 1.6;
   color: rgba(20, 16, 10, 0.72);
+  margin: 0 0 8px;
+}
+
+.fb-page-body:last-child {
+  margin-bottom: 0;
+}
+
+/* DIPERLUAS: daftar bullet, dipakai kalau halaman punya field `list`
+   (lihat skema data di komentar atas DEFAULT_BOOKS di flipbook-scroll.js) */
+.fb-page-list {
   margin: 0;
+  padding: 0 0 0 16px;
+  list-style: disc;
+}
+
+.fb-page-list li {
+  font-family: 'Inter', sans-serif;
+  font-size: clamp(9.5px, 1vw, 11px);
+  line-height: 1.6;
+  color: rgba(20, 16, 10, 0.72);
+  margin: 0 0 4px;
+}
+
+.fb-page-list li:last-child {
+  margin-bottom: 0;
+}
+
+/* ================================================================
+   DIPERLUAS: gambar di halaman isi (field `image` pada data halaman).
+   Halaman yang TIDAK punya field `image` sama sekali tidak kena style
+   di bawah ini, tampilannya PERSIS seperti sebelumnya.
+
+   .fb-image-top  -> gambar bleed ke tepi atas halaman, teks (heading/
+                     body/list) tetap mengalir normal di bawahnya.
+   .fb-image-full -> gambar mengisi SATU HALAMAN PENUH jadi latar;
+                     kalau halaman itu juga punya teks, class
+                     .fb-overlay-text ikut ditambahkan supaya muncul
+                     gradasi gelap + teks di bagian bawah foto (biar
+                     tetap kebaca di atas gambar apa pun).
+   ================================================================ */
+
+.fb-page-image-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: 6px;
+  background: #efece3; /* warna placeholder selagi gambar dimuat */
+}
+
+.fb-page-image {
+  display: block;
+  width: 100%;
+  object-fit: cover;
+}
+
+.fb-page-image-caption {
+  font-family: 'Inter', sans-serif;
+  font-size: clamp(8.5px, 0.95vw, 10px);
+  font-style: italic;
+  line-height: 1.4;
+  color: rgba(20, 16, 10, 0.5);
+  margin: 6px 8px 0;
+  padding: 0;
+}
+
+/* Layout "top": gambar bleed sampai tepi kiri/kanan/atas halaman
+   (menembus padding fb-face-text), tinggi mengikuti aspect-ratio
+   supaya proporsional di segala ukuran layar, bukan dipatok px/vh. */
+.fb-face-text.fb-image-top .fb-page-image-wrap {
+  width: calc(100% + 20%);
+  margin: -11% -10% 9% -10%;
+  border-radius: 6px 12px 0 0;
+  flex-shrink: 0;
+}
+
+.fb-face-text.fb-image-top .fb-page-image {
+  aspect-ratio: 16 / 10;
+}
+
+/* Layout "full": gambar jadi latar satu halaman, menempel penuh ke
+   fb-page-face (position:absolute dari base class-nya) */
+.fb-face-text.fb-image-full {
+  padding: 0;
+}
+
+.fb-face-text.fb-image-full .fb-page-image-wrap {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  border-radius: inherit;
+}
+
+.fb-face-text.fb-image-full .fb-page-image {
+  height: 100%;
+}
+
+.fb-face-text.fb-image-full .fb-reveal {
+  position: relative;
+  z-index: 1;
+  height: 100%;
+  justify-content: flex-end;
+}
+
+.fb-face-text.fb-image-full.fb-overlay-text .fb-reveal {
+  padding: 8% 9%;
+  background: linear-gradient(180deg, transparent 42%, rgba(20, 16, 10, 0.8) 100%);
+}
+
+/* Teks di atas foto full-bleed perlu kontras terang, bukan warna kertas krem */
+.fb-face-text.fb-image-full .fb-page-num {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.fb-face-text.fb-image-full .fb-page-heading {
+  color: #fff9ec;
+}
+
+.fb-face-text.fb-image-full .fb-page-body {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.fb-face-text.fb-image-full .fb-page-list li {
+  color: rgba(255, 255, 255, 0.85);
 }
 
 .fb-back-heading {
@@ -276,14 +397,20 @@
   margin: 0;
 }
 
-.fb-reveal { 
-  display: contents;
+.fb-reveal {
+  /* FIX: sebelumnya "display: contents" -- itu bikin elemen ini TIDAK
+     generate box sama sekali, jadi opacity & transform (custom property
+     --fb-reveal-o / --fb-reveal-y di bawah) yang di-set programatik saat
+     halaman kebuka TIDAK PERNAH kelihatan efeknya (diset ke elemen yang
+     "tidak ada" secara render). Diganti ke flex column biasa: karena
+     parent-nya (fb-face-cover/back/text) juga sudah flex column, .fb-reveal
+     jadi satu flex-item yang stretch ngisi lebar penuh -- hasil layout-nya
+     sama seperti sebelumnya, TAPI sekarang animasi reveal teks (fade in +
+     naik dikit) beneran jalan waktu halaman kebuka. */
+  display: flex;
   flex-direction: column;
   opacity: var(--fb-reveal-o, 1);
   transform: translateY(var(--fb-reveal-y, 0px));
-  /* Sebelumnya display:contents — itu bikin opacity & transform di atas   ini buat ngatur kanan kiri kotak biar gak muncul, setting ke content biar ilang itu kanan kiri
-     nggak ngefek sama sekali (elemen display:contents nggak generate box),
-     jadi animasi reveal teks pas halaman kebuka nggak pernah jalan. */
 }
 
 .fb-page {
@@ -351,6 +478,11 @@
   }
   .fb-dots {
     bottom: 6%;
+  }
+  /* Layout "top" di layar sempit: tinggi gambar dikasih rasio lebih pendek
+     biar teks di bawahnya masih kebagian ruang yang cukup */
+  .fb-face-text.fb-image-top .fb-page-image {
+    aspect-ratio: 16 / 9;
   }
 }
 
