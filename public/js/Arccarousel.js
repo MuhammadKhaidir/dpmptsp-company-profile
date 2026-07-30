@@ -22,7 +22,7 @@
         return Number.isNaN(n) ? fallback : n;
     };
 
-    class ArcCarousel {
+    class Arccarousel {
         constructor(root) {
             this.root = root;
             this.track = root.querySelector('[data-arc-track]');
