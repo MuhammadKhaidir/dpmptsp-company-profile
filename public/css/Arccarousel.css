@@ -1,4 +1,3 @@
-
 .arc-carousel {
     /* --- parameter kurva 3D — semua berbasis clamp(min, ngikut-viewport, max) --- */
     --arc-card-w: clamp(210px, 34vw, 358px);
@@ -39,6 +38,21 @@
     cursor: grabbing;
 }
 
+/* ============================================================
+   FITUR BUKU: kartu di-reskin jadi kelihatan kayak sampul buku 3D
+   (gelap + list emas + punggung/spine) — gantiin panel kaca neon
+   yang lama. Struktur DOM per kartu dibungkus OTOMATIS lewat
+   wrapCardForBookLook() di ArcCarousel.js, jadi:
+
+     .arc-card (posisi/ukuran di ruang 3D lengkung — DIATUR JS tiap
+                frame lewat render(). JANGAN taruh transform manual
+                langsung di sini, nanti tabrakan)
+       .arc-card-spine  -> list emas di kiri, statis, gak ikut flip
+       .arc-card-inner  -> yang di-FLIP pas kartu aktif diklik
+         .arc-card-front -> sampul depan: icon + judul asli kartu
+         .arc-card-back  -> halaman info: deskripsi asli + tombol PDF
+   ============================================================ */
+
 .arc-card {
     position: fixed;
     top: 50%;
@@ -47,51 +61,236 @@
     height: 350px;
     margin-left: calc(var(--arc-card-w) / -2);
     margin-top: calc(var(--arc-card-h) / -2 - var(--arc-lift));
-    
 
-    border-radius: 20px;
-    padding: 30px 26px;
-    backdrop-filter: blur(8px);
-    display: flex;
-    flex-direction: column;
+    border-radius: 14px;
     cursor: pointer;
 
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
 
-    /* Border neon kuning */
-    border: 1.5px solid rgba(27, 27, 27, 0.85);
-    box-shadow:
-        0 0 6px rgba(246, 245, 244, 0.962),
-        0 0 16px rgba(19, 19, 19, 0.35),
-        0 0 32px rgba(255, 221, 0, 0.18);
+    /* Bayangan sampul buku (bukan neon lagi). Border/list emas sekarang
+       ada di .arc-card-front::before, BUKAN di sini — kalau box-shadow
+       ditaruh bareng elemen yang overflow:hidden, shadow-nya ikut
+       ke-clip (pelajaran yang sama kayak di FlipBookScroll.css). */
+    box-shadow: 0 24px 60px -6px rgba(20, 16, 10, 0.55);
+
+    /* Local 3D context KHUSUS buat anak-anaknya (.arc-card-inner) pas
+       di-flip -- ini TIDAK ikut memengaruhi posisi .arc-card itu
+       sendiri di lengkungan carousel (itu tetap murni dari perspective
+       punya .arc-carousel + transform yang di-set JS tiap frame lewat
+       render()). Jadi aman, gak bakal balikin bug "staircase" lama. */
+    perspective: 1200px;
 
     will-change: transform, opacity;
-    transition:
-        box-shadow .3s ease,
-        border-color .3s ease,
-        background .3s ease;
+    transition: box-shadow .3s ease;
+}
+.arc-card:hover {
+    box-shadow: 0 30px 70px -6px rgba(20, 16, 10, 0.65), 0 0 26px rgba(203, 164, 84, 0.28);
 }
 .arc-card.is-active {
-    cursor: default;
-    border-color: rgb(250, 249, 248);
-    box-shadow:
-        0 0 10px rgba(248, 248, 247, 0.75),
-        0 0 24px rgba(14, 13, 13, 0.5),
-        0 0 48px rgba(35, 35, 35, 0.28);
+    box-shadow: 0 30px 70px -6px rgba(20, 16, 10, 0.65), 0 0 32px rgba(203, 164, 84, 0.4);
+}
+.arc-card.is-active .arc-card-front::before {
+    border-color: rgba(203, 164, 84, 0.6);
 }
 
+/* Wrapper yang di-flip pas kartu aktif diklik */
+.arc-card-inner {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    transform-style: preserve-3d;
+    transition: transform .65s cubic-bezier(.33,1,.4,1);
+}
+.arc-card-inner.is-flipped {
+    transform: rotateY(180deg);
+}
+/* Efek hover: sedikit "terangkat" -- CUMA pas belum kebuka, biar gak
+   tabrakan sama transform rotateY di atas waktu lagi flip. */
+.arc-card:hover .arc-card-inner:not(.is-flipped) {
+    transform: translateY(-10px) scale(1.02);
+}
+
+.arc-card-front,
+.arc-card-back {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+    /* overflow:hidden AMAN di sini (bukan di .arc-card) -- box-shadow
+       ada di .arc-card, jadi gak ikut ke-clip. */
+    overflow: hidden;
+}
+
+/* Sampul depan: senada sama sampul FlipBook (gelap + sheen halus +
+   list emas tipis), isinya icon+judul asli kartu (dipindah apa adanya
+   lewat wrapCardForBookLook() di JS). */
+.arc-card-front {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 26px 24px;
+    background-repeat: no-repeat, no-repeat;
+    background-size: 220% 220%, 100% 100%;
+    background-image:
+        linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.06) 45%, transparent 60%),
+        radial-gradient(120% 140% at 30% 0%, #1c1c1f 0%, #0b0b0d 55%, #060607 100%);
+    animation: arcCoverSheen 9s ease-in-out infinite;
+}
+@keyframes arcCoverSheen {
+    0%, 100% { background-position: 0% 0%, 0 0; }
+    50% { background-position: 100% 100%, 0 0; }
+}
+.arc-card-front::before {
+    content: '';
+    position: absolute;
+    top: 10px; left: 10px; right: 10px; bottom: 10px;
+    border: 1px solid rgba(203, 164, 84, 0.32);
+    border-radius: 4px;
+    pointer-events: none;
+    transition: border-color .3s ease;
+}
+.arc-card-front::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(0, 0, 0, 0.42) 100%);
+    pointer-events: none;
+}
+
+/* Icon/judul asli kartu -- dinaikin di atas ::before/::after (yang
+   position:absolute) pakai z-index, sama direcolor biar kontras di
+   background gelap yang baru. */
 .arc-card .info-card-icon {
+    position: relative;
+    z-index: 1;
     margin-bottom: 20px;
 }
 .arc-card .info-card-title {
+    position: relative;
+    z-index: 1;
     margin-bottom: 0px;
+    font-family: 'Fraunces', serif;
+    color: #f4ead0;
 }
-.arc-card .info-card-text {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 8;
-    overflow: hidden;
+
+.arc-card-hint {
+    position: relative;
+    z-index: 1;
+    margin: 10px 0 0;
+    font-family: 'Inter', sans-serif;
+    font-size: 10.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: rgba(244, 234, 208, 0.55);
+    display: none; /* cuma nongol pas kartu ini lagi jadi kartu aktif */
+}
+.arc-card.is-active .arc-card-hint {
+    display: block;
+}
+
+/* Punggung/spine emas -- statis, gak ikut flip, biar tetep "nempel" di
+   kiri kartu baik pas nampilin sampul maupun pas nampilin info. */
+.arc-card-spine {
+    position: absolute;
+    left: -2px;
+    top: 3%;
+    bottom: 3%;
+    width: 10px;
+    border-radius: 6px 0 0 6px;
+    background-repeat: repeat, no-repeat;
+    background-size: 100% 10px, 100% 100%;
+    background-image:
+        repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.16) 0 2px, transparent 2px 10px),
+        linear-gradient(90deg, #8a6a22, #cba454 45%, #fff6d8 55%, #cba454 70%, #6b4f18);
+    box-shadow: 0 0 16px rgba(203, 164, 84, 0.35), inset 2px 0 4px rgba(0, 0, 0, 0.4);
+    z-index: 5;
+    pointer-events: none;
+}
+
+/* Halaman info (belakang) -- kertas krem senada sama halaman isi
+   FlipBook, isinya deskripsi asli kartu (.info-card-text yang otomatis
+   dipindah ke sini) + tombol unduh PDF. */
+.arc-card-back {
+    transform: rotateY(180deg);
+    background-color: #faf9f5;
+    display: flex;
+    flex-direction: column;
+    padding: 24px 22px;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
+    overflow-y: auto;
+}
+.arc-card-back-kicker {
+    font-family: 'Inter', sans-serif;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: rgba(20, 16, 10, 0.4);
+    margin: 0 0 8px;
+}
+.arc-card-back-heading {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(15px, 1.8vw, 19px);
+    font-weight: 700;
+    color: #16130f;
+    margin: 0 0 10px;
+    line-height: 1.3;
+}
+.arc-card-back-desc {
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    line-height: 1.65;
+    color: rgba(20, 16, 10, 0.72);
+    margin: 0 0 16px;
+    flex: 1 1 auto;
+}
+/* Kalau elemen ini aslinya .info-card-text (dipindah dari sampul
+   depan), timpa batasan line-clamp bawaannya -- di panel info,
+   teksnya boleh utuh, gak usah kepotong 8 baris lagi. Selector sengaja
+   3 kelas biar spesifisitasnya pasti menang lawan `.arc-card .info-card-text`. */
+.arc-card .info-card-text.arc-card-back-desc {
+    display: block;
+    -webkit-line-clamp: unset;
+    overflow: visible;
+    color: rgba(20, 16, 10, 0.72);
+}
+.arc-card-download {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 9px 18px;
+    border-radius: 999px;
+    text-decoration: none;
+    color: #14100a;
+    background: linear-gradient(135deg, #fff6d8, #cba454 60%, #8a6a22);
+    box-shadow: 0 6px 16px rgba(20, 16, 10, 0.2);
+    transition: transform .2s ease, box-shadow .2s ease;
+    cursor: pointer;
+}
+.arc-card-download:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px rgba(20, 16, 10, 0.28);
+}
+.arc-card-download.is-disabled {
+    background: rgba(20, 16, 10, 0.12);
+    color: rgba(20, 16, 10, 0.4);
+    cursor: default;
+    pointer-events: none;
+    box-shadow: none;
+}
+.arc-card-back-hint {
+    margin: 10px 0 0;
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    font-style: italic;
+    color: rgba(20, 16, 10, 0.4);
 }
 
 .arc-nav {
@@ -159,6 +358,12 @@
 
 @media (prefers-reduced-motion: reduce) {
     .arc-card {
-        transition: opacity .3s ease, box-shadow .3s ease, border-color .3s ease, background .3s ease;
+        transition: box-shadow .3s ease;
+    }
+    .arc-card-inner {
+        transition: none;
+    }
+    .arc-card-front {
+        animation: none;
     }
 }

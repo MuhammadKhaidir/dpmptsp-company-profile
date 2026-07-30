@@ -1,4 +1,3 @@
-
 (() => {
     const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -52,6 +51,16 @@
             // derajat putar per px geser mouse/jari
             this.dragSensitivity = parseFloat(root.dataset.dragSensitivity) || 0.6;
 
+            // FITUR BUKU: index kartu yang lagi "kebuka" (nampilin panel info +
+            // tombol download). null = gak ada kartu yang lagi kebuka.
+            this.flippedIndex = null;
+
+            // FITUR BUKU: ubah tampilan tiap kartu jadi "sampul buku" (depan)
+            // + "halaman info" (belakang) — dibungkus otomatis di sini, TIDAK
+            // ganggu konten asli (icon/title/text apapun yang udah ada di
+            // dalam [data-arc-card] dipindah apa adanya, cuma dibungkus ulang).
+            this.cards.forEach((card) => this.wrapCardForBookLook(card));
+
             this.readTokens();
             this.buildDots();
             this.bindEvents();
@@ -62,6 +71,95 @@
                 this.render(false);
             };
             window.addEventListener('resize', this._onResize, { passive: true });
+        }
+
+        // FITUR BUKU: bungkus konten kartu yang SUDAH ADA jadi struktur
+        // sampul-buku (depan) + halaman-info (belakang), tanpa perlu tau
+        // persis markup aslinya (icon/title/text apapun ikut aja apa adanya).
+        // Idempoten (aman dipanggil ulang) lewat flag data-arc-wrapped.
+        //
+        // Sumber data buat panel belakang, urutan prioritas:
+        // - Judul   : elemen .info-card-title yang udah ada, atau atribut
+        //             data-arc-title di [data-arc-card] kalau mau dioverride.
+        // - Deskripsi: elemen .info-card-text yang udah ada DIPINDAH (bukan
+        //             diduplikat) ke panel belakang -- itulah "informasi"
+        //             yang baru kelihatan pas kartu diklik. Kalau gak ada,
+        //             coba atribut data-arc-desc.
+        // - Link PDF : atribut data-arc-pdf di [data-arc-card], WAJIB diisi
+        //             manual per kartu di HTML, misal:
+        //             data-arc-pdf="/assets/pdf/buku-1.pdf"
+        //             Kalau belum diisi, tombolnya otomatis nonaktif
+        //             ("PDF belum tersedia") biar gak ada link rusak yang keklik.
+        wrapCardForBookLook(card) {
+            if (card.dataset.arcWrapped === '1') return;
+            card.dataset.arcWrapped = '1';
+
+            const front = document.createElement('div');
+            front.className = 'arc-card-front';
+            while (card.firstChild) front.appendChild(card.firstChild);
+
+            const titleEl = front.querySelector('.info-card-title');
+            const existingText = front.querySelector('.info-card-text');
+
+            const back = document.createElement('div');
+            back.className = 'arc-card-back';
+
+            const backKicker = document.createElement('p');
+            backKicker.className = 'arc-card-back-kicker';
+            backKicker.textContent = 'Info Selengkapnya';
+            back.appendChild(backKicker);
+
+            const backHeading = document.createElement('h4');
+            backHeading.className = 'arc-card-back-heading';
+            backHeading.textContent = card.dataset.arcTitle || (titleEl ? titleEl.textContent : '');
+            back.appendChild(backHeading);
+
+            if (existingText) {
+                // Dipindah (bukan clone) biar markup/format aslinya kebawa persis.
+                existingText.classList.add('arc-card-back-desc');
+                back.appendChild(existingText);
+            } else if (card.dataset.arcDesc) {
+                const p = document.createElement('p');
+                p.className = 'arc-card-back-desc';
+                p.textContent = card.dataset.arcDesc;
+                back.appendChild(p);
+            }
+
+            const pdfUrl = card.dataset.arcPdf || '';
+            const downloadEl = document.createElement(pdfUrl ? 'a' : 'span');
+            downloadEl.className = pdfUrl ? 'arc-card-download' : 'arc-card-download is-disabled';
+            downloadEl.textContent = pdfUrl ? 'Unduh PDF' : 'PDF belum tersedia';
+            if (pdfUrl) {
+                downloadEl.href = pdfUrl;
+                downloadEl.setAttribute('download', '');
+                downloadEl.target = '_blank';
+                downloadEl.rel = 'noopener';
+                // stopPropagation: biar klik link gak ikut kehitung sebagai
+                // "klik kartu" yang nutup panel info (lihat bindEvents()).
+                downloadEl.addEventListener('click', (e) => e.stopPropagation());
+            }
+            back.appendChild(downloadEl);
+
+            const closeHint = document.createElement('p');
+            closeHint.className = 'arc-card-back-hint';
+            closeHint.textContent = 'Klik kartu untuk tutup';
+            back.appendChild(closeHint);
+
+            const hint = document.createElement('p');
+            hint.className = 'arc-card-hint';
+            hint.textContent = 'Klik untuk lihat info';
+            front.appendChild(hint);
+
+            const spine = document.createElement('div');
+            spine.className = 'arc-card-spine';
+
+            const inner = document.createElement('div');
+            inner.className = 'arc-card-inner';
+            inner.appendChild(front);
+            inner.appendChild(back);
+
+            card.appendChild(spine);
+            card.appendChild(inner);
         }
 
         readTokens() {
@@ -101,7 +199,13 @@
             this.cards.forEach((card, i) => {
                 card.addEventListener('click', () => {
                     if (this.dragMoved) return;
-                    if (i !== this.active) this.goTo(i);
+                    if (i !== this.active) {
+                        this.goTo(i);
+                        return;
+                    }
+                    // FITUR BUKU: klik kartu yang LAGI AKTIF (bukan pindah
+                    // kartu) -- buka/tutup panel info + tombol download.
+                    this.toggleFlip(i);
                 });
             });
 
@@ -120,6 +224,29 @@
             // (ScrubRevealAnimation.js), bukan bikin sistem kedua yang rebutan.
         }
 
+        // FITUR BUKU: buka/tutup panel info kartu ke-i (toggle class
+        // is-flipped di .arc-card-inner). Dipanggil cuma buat kartu yang
+        // LAGI AKTIF (lihat bindEvents()).
+        toggleFlip(i) {
+            const card = this.cards[i];
+            const inner = card && card.querySelector(':scope > .arc-card-inner');
+            if (!inner) return;
+            const isFlipped = inner.classList.toggle('is-flipped');
+            this.flippedIndex = isFlipped ? i : null;
+        }
+
+        // FITUR BUKU: tutup paksa kartu yang lagi kebuka (dipanggil pas mau
+        // pindah kartu aktif -- lewat klik kartu lain, drag, nav/dots, panah
+        // keyboard, atau scroll -- biar gak ada kartu "kebuka" yang
+        // ketinggalan pas udah bukan kartu aktif lagi).
+        resetFlip() {
+            if (this.flippedIndex === null) return;
+            const card = this.cards[this.flippedIndex];
+            const inner = card && card.querySelector(':scope > .arc-card-inner');
+            if (inner) inner.classList.remove('is-flipped');
+            this.flippedIndex = null;
+        }
+
         onPointerDown(e) {
             this.dragging = true;
             this.dragMoved = false;
@@ -132,7 +259,13 @@
         onPointerMove(e) {
             if (!this.dragging) return;
             const dx = e.clientX - this.dragStartX;
-            if (Math.abs(dx) > 4) this.dragMoved = true;
+            if (Math.abs(dx) > 4) {
+                // Reset di sini (bukan di onPointerDown) biar klik biasa buat
+                // NUTUP kartu yang lagi kebuka gak keburu ke-reset duluan
+                // sebelum listener klik-nya sempet jalan.
+                if (!this.dragMoved) this.resetFlip();
+                this.dragMoved = true;
+            }
 
             this.currentAngle = this.dragStartAngle + dx * this.dragSensitivity;
             this.render(false);
@@ -150,6 +283,7 @@
         }
 
         goTo(index) {
+            this.resetFlip();
             this.active = ((index % this.count) + this.count) % this.count;
             this.animateTo(this.active);
         }
@@ -175,8 +309,17 @@
             if (this.count < 2) return;
             const clamped = clamp(t, 0, 1);
             const logicalIndex = clamped * (this.count - 1);
+            const newActive = Math.round(logicalIndex);
+
+            // FITUR BUKU: kartu aktif berubah gara-gara scroll -> tutup dulu
+            // kartu yang tadinya kebuka biar gak "nyangkut" kebuka pas udah
+            // gak jadi kartu di tengah lagi.
+            if (this.flippedIndex !== null && this.flippedIndex !== newActive) {
+                this.resetFlip();
+            }
+
             this.currentAngle = -logicalIndex * this.angleStep;
-            this.active = Math.round(logicalIndex);
+            this.active = newActive;
             this.render(false);
         }
 
