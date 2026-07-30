@@ -428,10 +428,46 @@
         return frames;
     }
 
+    // ================================================================
+    // FIX: stuck/macet animasi kucing pas ada interaksi lain (peta,
+    // musik, fetch data, dll) -- HANYA terjadi di production (Vercel),
+    // gak di localhost.
+    //
+    // Root cause: Image() yang dibikin lewat preload() itu gak nempel ke
+    // DOM dan gak disimpen reference-nya. Browser (Chrome dkk) ngasih
+    // prioritas fetch RENDAH buat gambar kayak gini. Begitu ada request
+    // lain jalan bareng (load tile peta, streaming musik, fetch data),
+    // browser bisa nge-CANCEL request gambar prioritas-rendah ini duluan
+    // buat ngasih jalan ke request yang dianggap lebih penting -- persis
+    // kayak yang kelihatan di Network tab (CatAttack1-6.png berstatus
+    // "canceled"). Pas itu kejadian, <img> kucingnya ya cuma diem
+    // nampilin frame terakhir yang sukses -- makanya keliatan "macet".
+    //
+    // Di localhost latency-nya ~0ms jadi request selalu kelar duluan
+    // sebelum sempat di-cancel -- makanya normal-normal aja di situ.
+    //
+    // Fix: (1) kasih fetchPriority "high" biar browser gak nyepelein
+    // request ini, (2) simpen reference-nya di catPreloadedImages biar
+    // gak sempet di-garbage-collect, (3) auto-retry kalau ada frame yang
+    // tetep gagal/ke-cancel, baik pas preload maupun pas lagi tampil
+    // (self-healing, gak nyangkut permanen).
+    // ================================================================
+    var catPreloadedImages = [];
+
     function preload(frames) {
-        frames.forEach(function (src) {
+        return frames.map(function (src) {
             var img = new Image();
+            img.decoding = 'async';
+            try { img.fetchPriority = 'high'; } catch (e) { /* browser lama, abaikan */ }
+            img.setAttribute('fetchpriority', 'high');
+            img.addEventListener('error', function () {
+                // Request-nya gagal/ke-cancel -- coba fetch ulang sekali
+                // abis jeda dikit biar gak nyangkut permanen.
+                setTimeout(function () { img.src = src; }, 300);
+            }, { once: true });
             img.src = src;
+            catPreloadedImages.push(img);
+            return img;
         });
     }
 
@@ -484,6 +520,17 @@ function createFrameAnimator(imgEl, frames, fps) {
         var imgEl = cat.querySelector('.qr-cat-frame');
         if (!imgEl) return;
         imgEl.classList.add('cat-mascot-frame');
+        imgEl.decoding = 'async';
+        try { imgEl.fetchPriority = 'high'; } catch (e) { /* browser lama, abaikan */ }
+        imgEl.setAttribute('fetchpriority', 'high');
+        imgEl.addEventListener('error', function () {
+            // Frame yang lagi aktif ditampilin gagal/ke-cancel loading-nya
+            // (biasanya kalah prioritas sama request lain yang jalan
+            // bareng) -- coba ulang sekali abis jeda dikit biar animasi
+            // gak nyangkut permanen di frame terakhir yang sempat sukses.
+            var failedSrc = imgEl.src;
+            setTimeout(function () { imgEl.src = failedSrc; }, 250);
+        });
 
         var hitbox = document.createElement('div');
         hitbox.className = 'cat-hitbox';
