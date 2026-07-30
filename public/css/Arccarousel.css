@@ -9,32 +9,49 @@
    BG SENGAJA GAK DISENTUH SAMA SEKALI di file ini -- gak ada satu
    pun `background` ditambahin ke .arc-carousel/.arc-track, biar
    #site-bg tetap yang keliatan di belakang, sama kayak section lain.
+
+   FITUR TAMBAH & HAPUS BUKU: grid ini sekarang di-render dari data
+   dinamis (lihat js/Arccarousel.js + routes/arcCarouselContent.js),
+   jumlah kartu bisa berubah-ubah kapan aja. Aturan spacing di
+   .arc-carousel di bawah ini DIPERTAHANKAN persis sesuai hasil
+   tuning manual sebelumnya -- CUMA ditambah max-height+scroll di
+   .arc-track (lihat bagian FITUR TAMBAH & HAPUS BUKU di bawah) biar
+   tetap aman kalau jumlah bukunya nanti nambah banyak.
    ============================================================ */
 
 .arc-carousel {
-    --arc-card-w: clamp(190px, 22vw, 280px);
-    --arc-gap-x: clamp(28px, 4vw, 64px);
-    --arc-gap-y: clamp(40px, 5vw, 68px);
+    --arc-card-w: clamp(150px, 17vw, 320px);
+    --arc-gap-x: clamp(20px, 3vw, 140px);
+    --arc-gap-y: clamp(32px, 4vw, 152px);
 
     position: relative;
     z-index: 1;
     max-width: 960px;
     width: 100%;
     margin: 0 auto;
+    margin-bottom: -700px;
+    /* FIX: grid buku ini kepotong/nabrak section QR di bawahnya --
+       dikasih jarak aman lewat PADDING (bukan margin), soalnya padding
+       gak ikut "collapse" biarpun section sesudahnya (QR) punya margin
+       negatif kayak .qr-scene { margin-top: -40px }. */
+    padding-bottom: clamp(780px, 7vw, 96px);
 }
 
 /* .arc-track dulu "panggung 3D" yang diputer JS tiap frame -- sekarang
-   cuma CSS Grid biasa. minmax(min(var(--arc-card-w),100%), var(--arc-card-w))
-   + justify-content:center bikin kartu SELALU lebar tetap (gak ikut
-   melar ngisi baris kalau kartunya dikit), dan barisnya center kayak
-   di gambar referensi, bukan nempel rata kiri. */
+   cuma CSS Grid biasa. Kolom DIPAKSA 2 tetap (bukan auto-fit lagi) --
+   biar jumlah baris konsisten 4 baris (bukan 2) buat jumlah kartu yang
+   sama, dan biar ngecilin --arc-card-w gak ikut nambahin jumlah kolom.
+   max-width + margin:auto di sini yang bikin blok 2-kolomnya center,
+   gak melar ngisi seluruh lebar .arc-carousel. */
 .arc-track {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(min(var(--arc-card-w), 100%), var(--arc-card-w)));
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     justify-content: center;
     align-items: start;
     gap: var(--arc-gap-y) var(--arc-gap-x);
     padding: 8px 0;
+    max-width: calc(var(--arc-card-w) * 4 + var(--arc-gap-x));
+    margin: 0 auto;
 }
 
 .arc-card {
@@ -43,6 +60,8 @@
     align-items: center;
     gap: 16px;
     width: 100%;
+    max-width: var(--arc-card-w);
+    margin: 0 auto;
 }
 
 .arc-card-caption {
@@ -188,9 +207,19 @@
 
 @media (max-width: 720px) {
     .arc-carousel {
-        --arc-card-w: clamp(150px, 42vw, 220px);
-        --arc-gap-x: clamp(18px, 6vw, 32px);
-        --arc-gap-y: clamp(28px, 7vw, 44px);
+        --arc-card-w: clamp(130px, 30vw, 180px);
+        --arc-gap-x: clamp(14px, 4vw, 24px);
+        --arc-gap-y: clamp(22px, 5vw, 34px);
+    }
+}
+
+/* Layar sangat sempit -- 2 kolom kerasa kesempitan (apalagi kalau
+   .arc-carousel ini lagi berdampingan sama satu lagi via .pv-grid),
+   turun jadi 1 kolom aja biar sampulnya gak keremes. */
+@media (max-width: 420px) {
+    .arc-track {
+        grid-template-columns: 1fr;
+        max-width: var(--arc-card-w);
     }
 }
 
@@ -202,4 +231,215 @@
     .arc-card:hover .arc-card-cover {
         transform: none;
     }
+}
+
+/* ============================================================
+   FITUR TAMBAH & HAPUS BUKU
+   Grid buku sekarang di-render dari data DINAMIS (fetch dari
+   /api/arc-carousel/content), bukan dari HTML statis lagi -- lihat
+   js/Arccarousel.js. Tombol "+ Tambah Buku" nempel di bawah grid,
+   tiap kartu punya tombol "×" kecil buat hapus. Keduanya lewat modal
+   password (pola sama kayak fitur edit FlipBook/QR).
+   ============================================================ */
+
+.arc-loading,
+.arc-empty {
+    grid-column: 1 / -1;
+    text-align: center;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: rgba(20, 16, 10, 0.45);
+    padding: 24px 12px;
+}
+
+/* Safety net: jumlah buku sekarang open-ended (bisa terus nambah lewat
+   tombol Tambah Buku), jadi grid dikasih tinggi maksimum + scroll
+   internal, biar gak terus-terusan manjang ngedorong/nabrak section
+   sesudahnya kalau bukunya udah banyak. Gampang dihapus/diubah kalau
+   ternyata gak diperlukan -- tinggal buang blok .arc-track ini. */
+.arc-track {
+    max-height: 60vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(203, 164, 84, 0.5) transparent;
+}
+.arc-track::-webkit-scrollbar {
+    width: 6px;
+}
+.arc-track::-webkit-scrollbar-thumb {
+    background: rgba(203, 164, 84, 0.5);
+    border-radius: 999px;
+}
+
+.arc-card-delete {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(20, 16, 10, 0.55);
+    color: #f4ead0;
+    font-size: 14px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0.65;
+    transition: opacity .2s ease, background .2s ease, transform .2s ease;
+}
+.arc-card-delete:hover,
+.arc-card-delete:focus-visible {
+    opacity: 1;
+    background: rgba(179, 38, 30, 0.85);
+    transform: scale(1.08);
+}
+
+.arc-add-book-btn {
+    display: block;
+    margin: 20px auto 0;
+    border: 1px solid rgba(203, 164, 84, 0.55);
+    background: rgba(250, 249, 245, 0.75);
+    color: #14100a;
+    font-family: 'Inter', sans-serif;
+    font-size: 12.5px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    padding: 9px 20px;
+    border-radius: 999px;
+    cursor: pointer;
+    box-shadow: 0 6px 16px rgba(20, 16, 10, 0.14);
+    transition: background .2s ease, transform .2s ease;
+}
+.arc-add-book-btn:hover {
+    background: #fff;
+    transform: translateY(-2px);
+}
+
+/* Modal tambah/hapus buku -- niru struktur & bahasa visual modal QR
+   (.qr-modal-*) / FlipBook, biar konsisten satu situs. */
+.arc-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 99999;
+    background: rgba(15, 12, 8, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.arc-modal-box {
+    position: relative;
+    width: min(92vw, 420px);
+    max-height: 86vh;
+    overflow-y: auto;
+    background: #faf9f5;
+    border-radius: 14px;
+    padding: 28px 24px 22px;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+    font-family: 'Inter', sans-serif;
+}
+
+.arc-modal-close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    background: none;
+    border: none;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+    color: rgba(20, 16, 10, 0.5);
+}
+
+.arc-modal-title {
+    font-family: 'Fraunces', serif;
+    font-size: 19px;
+    font-weight: 700;
+    color: #14100a;
+    margin: 0 0 6px;
+}
+
+.arc-modal-sub {
+    font-size: 12.5px;
+    color: rgba(20, 16, 10, 0.55);
+    line-height: 1.55;
+    margin: 0 0 16px;
+}
+
+.arc-modal-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.arc-modal-field-label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: rgba(20, 16, 10, 0.55);
+}
+
+.arc-modal-field-input {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: normal;
+    color: #14100a;
+    padding: 9px 11px;
+    border-radius: 8px;
+    border: 1px solid rgba(20, 16, 10, 0.18);
+    background: #fff;
+}
+
+.arc-modal-error {
+    font-size: 12.5px;
+    color: #b3261e;
+    margin: 0 0 12px;
+}
+
+.arc-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.arc-modal-cancel,
+.arc-modal-submit {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 9px 18px;
+    border-radius: 999px;
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+
+.arc-modal-cancel {
+    background: transparent;
+    border-color: rgba(20, 16, 10, 0.2);
+    color: rgba(20, 16, 10, 0.7);
+}
+
+.arc-modal-submit {
+    background: linear-gradient(135deg, #fff6d8, #cba454 60%, #8a6a22);
+    color: #14100a;
+}
+.arc-modal-submit:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .arc-modal-overlay { animation: none; }
 }
