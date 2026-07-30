@@ -256,128 +256,7 @@
   font-size: clamp(9.5px, 1vw, 11px);
   line-height: 1.6;
   color: rgba(20, 16, 10, 0.72);
-  margin: 0 0 8px;
-}
-
-.fb-page-body:last-child {
-  margin-bottom: 0;
-}
-
-/* DIPERLUAS: daftar bullet, dipakai kalau halaman punya field `list`
-   (lihat skema data di komentar atas DEFAULT_BOOKS di flipbook-scroll.js) */
-.fb-page-list {
   margin: 0;
-  padding: 0 0 0 16px;
-  list-style: disc;
-}
-
-.fb-page-list li {
-  font-family: 'Inter', sans-serif;
-  font-size: clamp(9.5px, 1vw, 11px);
-  line-height: 1.6;
-  color: rgba(20, 16, 10, 0.72);
-  margin: 0 0 4px;
-}
-
-.fb-page-list li:last-child {
-  margin-bottom: 0;
-}
-
-/* ================================================================
-   DIPERLUAS: gambar di halaman isi (field `image` pada data halaman).
-   Halaman yang TIDAK punya field `image` sama sekali tidak kena style
-   di bawah ini, tampilannya PERSIS seperti sebelumnya.
-
-   .fb-image-top  -> gambar bleed ke tepi atas halaman, teks (heading/
-                     body/list) tetap mengalir normal di bawahnya.
-   .fb-image-full -> gambar mengisi SATU HALAMAN PENUH jadi latar;
-                     kalau halaman itu juga punya teks, class
-                     .fb-overlay-text ikut ditambahkan supaya muncul
-                     gradasi gelap + teks di bagian bawah foto (biar
-                     tetap kebaca di atas gambar apa pun).
-   ================================================================ */
-
-.fb-page-image-wrap {
-  position: relative;
-  overflow: hidden;
-  border-radius: 6px;
-  background: #efece3; /* warna placeholder selagi gambar dimuat */
-}
-
-.fb-page-image {
-  display: block;
-  width: 100%;
-  object-fit: cover;
-}
-
-.fb-page-image-caption {
-  font-family: 'Inter', sans-serif;
-  font-size: clamp(8.5px, 0.95vw, 10px);
-  font-style: italic;
-  line-height: 1.4;
-  color: rgba(20, 16, 10, 0.5);
-  margin: 6px 8px 0;
-  padding: 0;
-}
-
-/* Layout "top": gambar bleed sampai tepi kiri/kanan/atas halaman
-   (menembus padding fb-face-text), tinggi mengikuti aspect-ratio
-   supaya proporsional di segala ukuran layar, bukan dipatok px/vh. */
-.fb-face-text.fb-image-top .fb-page-image-wrap {
-  width: calc(100% + 20%);
-  margin: -11% -10% 9% -10%;
-  border-radius: 6px 12px 0 0;
-  flex-shrink: 0;
-}
-
-.fb-face-text.fb-image-top .fb-page-image {
-  aspect-ratio: 16 / 10;
-}
-
-/* Layout "full": gambar jadi latar satu halaman, menempel penuh ke
-   fb-page-face (position:absolute dari base class-nya) */
-.fb-face-text.fb-image-full {
-  padding: 0;
-}
-
-.fb-face-text.fb-image-full .fb-page-image-wrap {
-  position: absolute;
-  inset: 0;
-  margin: 0;
-  border-radius: inherit;
-}
-
-.fb-face-text.fb-image-full .fb-page-image {
-  height: 100%;
-}
-
-.fb-face-text.fb-image-full .fb-reveal {
-  position: relative;
-  z-index: 1;
-  height: 100%;
-  justify-content: flex-end;
-}
-
-.fb-face-text.fb-image-full.fb-overlay-text .fb-reveal {
-  padding: 8% 9%;
-  background: linear-gradient(180deg, transparent 42%, rgba(20, 16, 10, 0.8) 100%);
-}
-
-/* Teks di atas foto full-bleed perlu kontras terang, bukan warna kertas krem */
-.fb-face-text.fb-image-full .fb-page-num {
-  color: rgba(255, 255, 255, 0.62);
-}
-
-.fb-face-text.fb-image-full .fb-page-heading {
-  color: #fff9ec;
-}
-
-.fb-face-text.fb-image-full .fb-page-body {
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.fb-face-text.fb-image-full .fb-page-list li {
-  color: rgba(255, 255, 255, 0.85);
 }
 
 .fb-back-heading {
@@ -397,20 +276,14 @@
   margin: 0;
 }
 
-.fb-reveal {
-  /* FIX: sebelumnya "display: contents" -- itu bikin elemen ini TIDAK
-     generate box sama sekali, jadi opacity & transform (custom property
-     --fb-reveal-o / --fb-reveal-y di bawah) yang di-set programatik saat
-     halaman kebuka TIDAK PERNAH kelihatan efeknya (diset ke elemen yang
-     "tidak ada" secara render). Diganti ke flex column biasa: karena
-     parent-nya (fb-face-cover/back/text) juga sudah flex column, .fb-reveal
-     jadi satu flex-item yang stretch ngisi lebar penuh -- hasil layout-nya
-     sama seperti sebelumnya, TAPI sekarang animasi reveal teks (fade in +
-     naik dikit) beneran jalan waktu halaman kebuka. */
-  display: flex;
+.fb-reveal { 
+  display: contents;
   flex-direction: column;
   opacity: var(--fb-reveal-o, 1);
   transform: translateY(var(--fb-reveal-y, 0px));
+  /* Sebelumnya display:contents — itu bikin opacity & transform di atas   ini buat ngatur kanan kiri kotak biar gak muncul, setting ke content biar ilang itu kanan kiri
+     nggak ngefek sama sekali (elemen display:contents nggak generate box),
+     jadi animasi reveal teks pas halaman kebuka nggak pernah jalan. */
 }
 
 .fb-page {
@@ -479,11 +352,6 @@
   .fb-dots {
     bottom: 6%;
   }
-  /* Layout "top" di layar sempit: tinggi gambar dikasih rasio lebih pendek
-     biar teks di bawahnya masih kebagian ruang yang cukup */
-  .fb-face-text.fb-image-top .fb-page-image {
-    aspect-ratio: 16 / 9;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -497,5 +365,268 @@
   .fb-spine,
   .fb-dot.on {
     animation: none !important;
+  }
+}
+
+/* ============================================================
+   FITUR EDIT PER HALAMAN
+   Klik pensil kecil di pojok halaman buat edit tulisan/gambar,
+   tombol "+ Tambah Halaman" buat nambah halaman baru di buku yang
+   lagi aktif. Terhubung ke routes/flipbookContent.js +
+   data/flipbookStore.js di backend (Vercel Blob + Upstash Redis).
+   ============================================================ */
+
+/* Gambar per-halaman (opsional) -- diselipkan sebagai layer paling
+   belakang di tiap face, di bawah tulisan (.fb-reveal dirender
+   sesudahnya di DOM jadi ketimpa di atas). Di sampul depan/belakang
+   udah otomatis digelapkan sama ::after yang sudah ada. Di halaman isi
+   (kertas krem) opacity-nya diturunin biar tetap jadi "watermark"
+   lembut, bukan foto full yang bikin teks susah dibaca. */
+.fb-face-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.fb-face-text .fb-face-image {
+  opacity: 0.28;
+}
+
+.fb-edit-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(20, 16, 10, 0.18);
+  background: linear-gradient(135deg, #fff6d8, #cba454 65%, #8a6a22);
+  color: #14100a;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto; /* override .fb-book { pointer-events: none } */
+  opacity: 0.6;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(20, 16, 10, 0.3);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.fb-edit-btn:hover,
+.fb-edit-btn:focus-visible {
+  opacity: 1;
+  transform: scale(1.08);
+}
+
+.fb-add-page-btn {
+  position: absolute;
+  bottom: 14%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  pointer-events: auto;
+  border: 1px solid rgba(203, 164, 84, 0.55);
+  background: rgba(250, 249, 245, 0.92);
+  color: #14100a;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 8px 16px;
+  border-radius: 999px;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(20, 16, 10, 0.18);
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.fb-add-page-btn:hover {
+  background: #fff;
+  transform: translateX(-50%) scale(1.04);
+}
+
+.fb-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40vh;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  color: rgba(20, 16, 10, 0.5);
+}
+
+.fb-edit-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 12, 8, 0.55);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.fb-edit-modal {
+  position: relative;
+  width: min(92vw, 440px);
+  max-height: 86vh;
+  overflow-y: auto;
+  background: #faf9f5;
+  border-radius: 14px;
+  padding: 28px 24px 22px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+  font-family: 'Inter', sans-serif;
+}
+
+.fb-edit-close {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  background: none;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+  color: rgba(20, 16, 10, 0.5);
+}
+
+.fb-edit-title {
+  font-family: 'Fraunces', serif;
+  font-size: 19px;
+  font-weight: 700;
+  color: #14100a;
+  margin: 0 0 16px;
+}
+
+.fb-edit-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.fb-edit-field-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: rgba(20, 16, 10, 0.55);
+}
+
+.fb-edit-field-input {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: #14100a;
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 1px solid rgba(20, 16, 10, 0.18);
+  background: #fff;
+  resize: vertical;
+}
+
+textarea.fb-edit-field-input {
+  min-height: 90px;
+}
+
+.fb-edit-image-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.fb-edit-image-preview {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(20, 16, 10, 0.15);
+}
+
+.fb-edit-image-input {
+  font-size: 12px;
+  flex: 1;
+}
+
+.fb-edit-password-label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: rgba(20, 16, 10, 0.55);
+  margin-bottom: 10px;
+}
+
+.fb-edit-password-input {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: #14100a;
+  padding: 9px 11px;
+  border-radius: 8px;
+  border: 1px solid rgba(20, 16, 10, 0.18);
+  background: #fff;
+}
+
+.fb-edit-error {
+  font-size: 12.5px;
+  color: #b3261e;
+  margin: 0 0 12px;
+}
+
+.fb-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.fb-edit-cancel,
+.fb-edit-save {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 9px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.fb-edit-cancel {
+  background: transparent;
+  border-color: rgba(20, 16, 10, 0.2);
+  color: rgba(20, 16, 10, 0.7);
+}
+
+.fb-edit-save {
+  background: linear-gradient(135deg, #fff6d8, #cba454 60%, #8a6a22);
+  color: #14100a;
+}
+
+.fb-edit-save:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (max-width: 720px) {
+  .fb-add-page-btn {
+    bottom: 5%;
+    font-size: 11px;
+    padding: 7px 14px;
   }
 }

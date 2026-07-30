@@ -11,43 +11,13 @@ const SIDE_ROT = 30;
 const OPEN_SCALE_BUMP = 0.14;
 const TEXT_REVEAL_RISE = 18;
 
-/* ================================================================
-   SKEMA DATA satu halaman ISI (dipakai di array `content` tiap buku
-   di DEFAULT_BOOKS, atau di data buku yang dikirim lewat
-   window.FlipBookScrollConfig).
-
-   Semua field OPSIONAL -- kalau cuma diisi heading/body seperti versi
-   lama, tampilannya PERSIS sama seperti sebelumnya, tidak ada yang
-   berubah untuk data lama:
-
-   {
-     page: '04',                    // nomor halaman -> "Hal. 04"
-     heading: 'Judul Halaman',      // opsional
-     body: 'Satu paragraf'          // opsional -- STRING atau ARRAY
-           atau ['Paragraf 1', 'Paragraf 2'],   supaya bisa nulis lebih
-                                                  dari satu paragraf
-     list: ['Poin 1', 'Poin 2'],    // opsional -- daftar bullet
-     image: {                        // opsional -- DIPERLUAS: gambar
-       src: '/img/contoh.jpg',       // WAJIB kalau `image` dipakai
-       alt: 'Deskripsi gambar',      // opsional, disarankan diisi
-       caption: 'Teks di bawah foto', // opsional (diabaikan kalau
-                                       // layout: 'full')
-       layout: 'top' | 'full'        // opsional. Kalau tidak diisi,
-                                      // otomatis: 'full' kalau cuma
-                                      // ada gambar (tanpa heading/
-                                      // body/list di halaman itu),
-                                      // atau 'top' kalau gambar
-                                      // digabung sama teks
-     }
-   }
-
-   CARA NAMBAH HALAMAN: tinggal tambah satu object lagi ke array
-   `content` milik buku yang mau ditambah -- jumlah halaman ('n' di
-   FlipBook.update) dihitung otomatis dari panjang array, tidak ada
-   batas jumlah halaman yang di-hardcode. Kalau halamannya jadi
-   banyak, pertimbangkan naikkan `segmentVh` (lihat FlipBookScroll)
-   biar jarak scroll per halaman tetap nyaman.
-   ================================================================ */
+// FITUR EDIT: endpoint backend (routes/flipbookContent.js), dipasang di
+// server lewat app.use('/api/flipbook', require('./routes/flipbookContent')).
+const FLIPBOOK_API = {
+  content: '/api/flipbook/content',
+  editPage: '/api/flipbook/page',
+  addPage: '/api/flipbook/page/add'
+};
 
 const DEFAULT_BOOKS = [
   {
@@ -85,25 +55,7 @@ const DEFAULT_BOOKS = [
     content: [
       { page: '01', heading: 'Loket Pelayanan', body: 'Setiap permohonan diterima lewat loket terpadu, diverifikasi kelengkapan berkasnya, lalu diproses lintas bidang teknis terkait.' },
       { page: '02', heading: 'Tim Verifikasi', body: 'Petugas verifikasi meninjau kelayakan berkas dan menindaklanjuti laporan atau pengaduan yang masuk dari masyarakat.' },
-      { page: '03', heading: 'Pengawasan Internal', body: 'Inspektorat internal memantau proses pelayanan agar tetap sesuai standar, termasuk menindak dugaan pelanggaran oleh petugas.' },
-      // CONTOH pemakaian field `image` (layout otomatis jadi 'top' karena
-      // halaman ini juga punya heading+list). GANTI src di bawah dengan
-      // path/URL gambar asli sebelum dipakai -- kalau tidak, browser akan
-      // menampilkan ikon gambar rusak karena filenya belum ada.
-      {
-        page: '04',
-        heading: 'Gedung Pelayanan',
-        image: {
-          src: '/img/gedung-dpmptsp.jpg',
-          alt: 'Gedung DPMPTSP Kota Palembang',
-          caption: 'Kantor DPMPTSP Kota Palembang'
-        },
-        list: [
-          'Loket pelayanan terpadu satu pintu',
-          'Ruang tunggu ber-AC',
-          'Layanan konsultasi teknis'
-        ]
-      }
+      { page: '03', heading: 'Pengawasan Internal', body: 'Inspektorat internal memantau proses pelayanan agar tetap sesuai standar, termasuk menindak dugaan pelanggaran oleh petugas.' }
     ],
     backCover: { heading: 'Struktur', tagline: '& Layanan' }
   }
@@ -121,110 +73,98 @@ function text(tag, className, content) {
   return node;
 }
 
-function buildCoverFace(data) {
+// FITUR EDIT: tombol pensil kecil buat buka modal edit. Selalu tampil
+// separuh transparan (bukan cuma pas hover) -- soalnya .fb-book pakai
+// pointer-events:none, jadi hover di FACE-nya gak pernah nyampe ke CSS
+// (event-nya udah "tembus" duluan). Tombolnya sendiri tetap punya
+// pointer-events:auto jadi tetap bisa diklik & punya hover-nya sendiri.
+function buildEditButton(onEdit) {
+  const btn = el('button', 'fb-edit-btn');
+  btn.type = 'button';
+  btn.setAttribute('aria-label', 'Edit halaman ini');
+  btn.textContent = '✎';
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (onEdit) onEdit();
+  });
+  return btn;
+}
+
+function buildCoverFace(data, onEdit) {
   const face = el('div', 'fb-page-face fb-face-cover');
+  const img = el('img', 'fb-face-image');
+  img.hidden = !(data.image && data.image.url);
+  if (data.image && data.image.url) img.src = data.image.url;
   const reveal = el('div', 'fb-reveal');
-  reveal.appendChild(text('p', 'fb-kicker', data.kicker));
-  reveal.appendChild(text('h3', 'fb-cover-heading', data.heading));
+  const kickerEl = text('p', 'fb-kicker', data.kicker);
+  const headingEl = text('h3', 'fb-cover-heading', data.heading);
+  reveal.appendChild(kickerEl);
+  reveal.appendChild(headingEl);
+  face.appendChild(img);
   face.appendChild(reveal);
-  return { el: face, reveal };
+  if (onEdit) face.appendChild(buildEditButton(onEdit));
+  return {
+    el: face,
+    reveal,
+    image: img,
+    fields: { kicker: kickerEl, heading: headingEl }
+  };
 }
 
-/* ================================================================
-   DIPERLUAS: halaman isi sekarang bisa punya gambar (`data.image`),
-   teks lebih dari satu paragraf (`data.body` boleh array), dan
-   daftar bullet (`data.list`). Halaman yang cuma diisi heading/body
-   seperti sebelumnya TIDAK berubah tampilannya sama sekali -- semua
-   penambahan di bawah ini cuma aktif kalau field terkait diisi.
-   Lihat komentar skema data di atas DEFAULT_BOOKS untuk detail field.
-   ================================================================ */
-function buildTextFace(data) {
+function buildTextFace(data, onEdit) {
   const face = el('div', 'fb-page-face fb-face-text');
+  const img = el('img', 'fb-face-image');
+  img.hidden = !(data.image && data.image.url);
+  if (data.image && data.image.url) img.src = data.image.url;
   const reveal = el('div', 'fb-reveal');
-
-  const hasTextContent = Boolean(data.heading || data.body || (data.list && data.list.length));
-  const hasImage = Boolean(data.image && data.image.src);
-
-  if (hasImage) {
-    // 'full' kalau cuma ada gambar (halaman jadi foto satu halaman penuh),
-    // 'top' kalau gambar digabung sama heading/body/list (gambar di atas,
-    // teks tetap mengalir normal di bawahnya seperti sebelumnya).
-    const layout = data.image.layout || (hasTextContent ? 'top' : 'full');
-    face.classList.add(`fb-image-${layout}`);
-
-    const figure = el('figure', 'fb-page-image-wrap');
-    const img = el('img', 'fb-page-image');
-    img.src = data.image.src;
-    img.alt = data.image.alt || '';
-    img.loading = 'lazy';
-    img.decoding = 'async';
-    figure.appendChild(img);
-
-    // Caption cuma dipakai di layout 'top' -- di layout 'full', gambar
-    // mengisi seluruh halaman jadi tidak ada ruang buat figcaption
-    // terpisah; pakai heading/body kalau butuh teks di atas foto penuh.
-    if (data.image.caption && layout !== 'full') {
-      figure.appendChild(text('figcaption', 'fb-page-image-caption', data.image.caption));
-    }
-
-    face.appendChild(figure);
-
-    // Modifier ini yang menentukan apakah overlay gradasi gelap + padding
-    // dimunculkan di atas gambar full-bleed (supaya teks tetap kebaca).
-    // Kalau halaman full-image tidak punya teks sama sekali, overlay ini
-    // TIDAK ditambahkan, jadi fotonya polos tanpa gradasi yang tidak perlu.
-    if (layout === 'full' && (hasTextContent || data.page)) {
-      face.classList.add('fb-overlay-text');
-    }
-  }
-
-  if (data.page) {
-    reveal.appendChild(text('p', 'fb-page-num', `Hal. ${data.page}`));
-  }
-
-  if (data.heading) {
-    reveal.appendChild(text('h4', 'fb-page-heading', data.heading));
-  }
-
-  if (data.body) {
-    // Boleh string biasa (1 paragraf, perilaku lama) ATAU array of string
-    // kalau mau nulis beberapa paragraf di satu halaman.
-    const paragraphs = Array.isArray(data.body) ? data.body : [data.body];
-    paragraphs.forEach(p => {
-      reveal.appendChild(text('p', 'fb-page-body', p));
-    });
-  }
-
-  if (data.list && data.list.length) {
-    const ul = el('ul', 'fb-page-list');
-    data.list.forEach(item => {
-      ul.appendChild(text('li', '', item));
-    });
-    reveal.appendChild(ul);
-  }
-
+  const pageNumEl = text('p', 'fb-page-num', data.page ? `Hal. ${data.page}` : '');
+  const headingEl = text('h4', 'fb-page-heading', data.heading);
+  const bodyEl = text('p', 'fb-page-body', data.body);
+  reveal.appendChild(pageNumEl);
+  reveal.appendChild(headingEl);
+  reveal.appendChild(bodyEl);
+  face.appendChild(img);
   face.appendChild(reveal);
-  return { el: face, reveal };
+  if (onEdit) face.appendChild(buildEditButton(onEdit));
+  return {
+    el: face,
+    reveal,
+    image: img,
+    fields: { pageNum: pageNumEl, heading: headingEl, body: bodyEl }
+  };
 }
 
-function buildBackFace(data) {
+function buildBackFace(data, onEdit) {
   const face = el('div', 'fb-page-face fb-face-back');
+  const img = el('img', 'fb-face-image');
+  img.hidden = !(data.image && data.image.url);
+  if (data.image && data.image.url) img.src = data.image.url;
   const reveal = el('div', 'fb-reveal');
-  reveal.appendChild(text('h4', 'fb-back-heading', data.heading));
-  reveal.appendChild(text('p', 'fb-back-tagline', data.tagline));
+  const headingEl = text('h4', 'fb-back-heading', data.heading);
+  const taglineEl = text('p', 'fb-back-tagline', data.tagline);
+  reveal.appendChild(headingEl);
+  reveal.appendChild(taglineEl);
+  face.appendChild(img);
   face.appendChild(reveal);
-  return { el: face, reveal };
+  if (onEdit) face.appendChild(buildEditButton(onEdit));
+  return {
+    el: face,
+    reveal,
+    image: img,
+    fields: { heading: headingEl, tagline: taglineEl }
+  };
 }
 
 function buildBlankFace() {
-  return { el: el('div', 'fb-page-face fb-face-blank'), reveal: null };
+  return { el: el('div', 'fb-page-face fb-face-blank'), reveal: null, image: null, fields: {} };
 }
 
-function buildFace(entry) {
-  if (entry.kind === 'cover') return buildCoverFace(entry);
-  if (entry.kind === 'back') return buildBackFace(entry);
+function buildFace(entry, onEdit) {
+  if (entry.kind === 'cover') return buildCoverFace(entry, onEdit);
+  if (entry.kind === 'back') return buildBackFace(entry, onEdit);
   if (entry.kind === 'blank') return buildBlankFace();
-  return buildTextFace(entry);
+  return buildTextFace(entry, onEdit);
 }
 
 function openScaleBump(spreadT) {
@@ -232,8 +172,9 @@ function openScaleBump(spreadT) {
 }
 
 class FlipBook {
-  constructor(stage, book, index) {
+  constructor(stage, book, index, callbacks) {
     this.index = index;
+    this.callbacks = callbacks || {};
 
     this.enterSide = index % 2 === 0 ? -1 : 1;
     this.exitSide = -this.enterSide;
@@ -258,17 +199,37 @@ class FlipBook {
     this.root.appendChild(this.shadow);
 
     this.pageEls = [];
+
+    // FITUR EDIT: referensi tiap face yang BOLEH diedit, dipakai sama
+    // applyEdit() buat update tulisan/gambar langsung di DOM tanpa
+    // bongkar ulang seluruh buku (biar gak ganggu animasi yang lagi
+    // jalan). editableFronts[0] = sampul depan, editableFronts[1..] =
+    // halaman isi (index p, sama kayak posisi leaf). editableBack =
+    // sampul belakang (cuma ada di leaf terakhir).
+    this.editableFronts = [];
+    this.editableBack = null;
+
     leaves.forEach((leafData, p) => {
       const page = el('div', 'fb-page');
+      const leafType = p === 0 ? 'cover' : 'content';
+      const contentIndex = p === 0 ? null : p - 1;
 
-      const frontBuilt = buildFace(leafData);
+      const frontBuilt = buildFace(leafData, () => {
+        if (this.callbacks.onEdit) this.callbacks.onEdit(leafType, contentIndex);
+      });
       const front = frontBuilt.el;
       front.classList.add('fb-page-front');
+      this.editableFronts[p] = { leafType, contentIndex, built: frontBuilt };
 
       const isLast = p === leaves.length - 1;
-      const backBuilt = buildFace(isLast ? backData : { kind: 'blank' });
+      const backBuilt = isLast
+        ? buildFace(backData, () => {
+            if (this.callbacks.onEdit) this.callbacks.onEdit('back', null);
+          })
+        : buildFace({ kind: 'blank' });
       const back = backBuilt.el;
       back.classList.add('fb-page-back');
+      if (isLast) this.editableBack = { leafType: 'back', contentIndex: null, built: backBuilt };
 
       const shade = el('div', 'fb-page-shade');
 
@@ -300,6 +261,36 @@ class FlipBook {
     }
     const vw = window.innerWidth || 1000;
     this.travelPx = vw / 2 + this.pageWidth / 2 + SIDE_MARGIN;
+  }
+
+  // FITUR EDIT: update tulisan/gambar satu leaf langsung di DOM yang
+  // sudah ada, tanpa rebuild. leafData = objek leaf terbaru dari server
+  // (hasil response backend), berisi field teks + { image: { url } }.
+  applyEdit(leafType, contentIndex, leafData) {
+    let target;
+    if (leafType === 'cover') target = this.editableFronts[0];
+    else if (leafType === 'back') target = this.editableBack;
+    else target = this.editableFronts[contentIndex + 1];
+
+    if (!target) return;
+    const built = target.built;
+    const fields = built.fields || {};
+
+    if (fields.kicker) fields.kicker.textContent = leafData.kicker || '';
+    if (fields.heading) fields.heading.textContent = leafData.heading || '';
+    if (fields.body) fields.body.textContent = leafData.body || '';
+    if (fields.tagline) fields.tagline.textContent = leafData.tagline || '';
+    if (fields.pageNum) fields.pageNum.textContent = leafData.page ? `Hal. ${leafData.page}` : '';
+
+    if (built.image) {
+      if (leafData.image && leafData.image.url) {
+        built.image.src = leafData.image.url;
+        built.image.hidden = false;
+      } else {
+        built.image.hidden = true;
+        built.image.removeAttribute('src');
+      }
+    }
   }
 
   update(local) {
@@ -413,6 +404,11 @@ class FlipBookScroll {
     this.pinEnd = 0;
     this.totalDistance = 1;
 
+    // FITUR EDIT: state modal edit / tambah halaman.
+    this.editModalOpen = false;
+    this.editState = null;
+    this.editFieldRefs = {};
+
     this.build();
     this.addEvents();
 
@@ -439,7 +435,283 @@ class FlipBookScroll {
     this.books.forEach(() => this.dotsWrap.appendChild(el('span', 'fb-dot')));
     this.sticky.appendChild(this.dotsWrap);
 
-    this.flipBooks = this.books.map((book, i) => new FlipBook(this.stage, book, i));
+    // FITUR EDIT: tombol tambah halaman buat buku yang lagi aktif kelihatan.
+    this.addPageBtn = el('button', 'fb-add-page-btn');
+    this.addPageBtn.type = 'button';
+    this.addPageBtn.textContent = '+ Tambah Halaman';
+    this.addPageBtn.addEventListener('click', () => this.openAddPageModal(this.activeIndex));
+    this.sticky.appendChild(this.addPageBtn);
+
+    this.flipBooks = this.books.map((book, i) => new FlipBook(this.stage, book, i, {
+      onEdit: (leafType, contentIndex) => this.openEditModal(i, leafType, contentIndex)
+    }));
+
+    this.buildEditOverlay();
+  }
+
+  // FITUR EDIT: modal edit / tambah halaman -- dibangun SEKALI, dipasang
+  // langsung ke <body> (bukan di dalam .fb-stage) biar posisinya gak
+  // kena reflow/transform dari animasi buku, sama kayak alasan cat
+  // mascot dipindah ke position:fixed nempel di <body>.
+  buildEditOverlay() {
+    const overlay = el('div', 'fb-edit-overlay');
+    overlay.hidden = true;
+
+    const modal = el('div', 'fb-edit-modal');
+    overlay.appendChild(modal);
+
+    const closeBtn = el('button', 'fb-edit-close');
+    closeBtn.type = 'button';
+    closeBtn.textContent = '×';
+    closeBtn.setAttribute('aria-label', 'Tutup');
+    modal.appendChild(closeBtn);
+
+    const title = text('h4', 'fb-edit-title', 'Edit Halaman');
+    modal.appendChild(title);
+
+    const fieldsWrap = el('div', 'fb-edit-fields');
+    modal.appendChild(fieldsWrap);
+
+    const imageRow = el('div', 'fb-edit-image-row');
+    const imagePreview = el('img', 'fb-edit-image-preview');
+    imagePreview.hidden = true;
+    const imageInput = el('input', 'fb-edit-image-input');
+    imageInput.type = 'file';
+    imageInput.accept = 'image/png,image/jpeg,image/webp,image/gif';
+    imageRow.appendChild(imagePreview);
+    imageRow.appendChild(imageInput);
+    modal.appendChild(imageRow);
+
+    const passwordLabel = el('label', 'fb-edit-password-label');
+    passwordLabel.textContent = 'Kata sandi edit';
+    const passwordInput = el('input', 'fb-edit-password-input');
+    passwordInput.type = 'password';
+    passwordInput.placeholder = 'Masukkan kata sandi';
+    passwordLabel.appendChild(passwordInput);
+    modal.appendChild(passwordLabel);
+
+    const errorMsg = el('p', 'fb-edit-error');
+    errorMsg.hidden = true;
+    modal.appendChild(errorMsg);
+
+    const actions = el('div', 'fb-edit-actions');
+    const cancelBtn = el('button', 'fb-edit-cancel');
+    cancelBtn.type = 'button';
+    cancelBtn.textContent = 'Batal';
+    const saveBtn = el('button', 'fb-edit-save');
+    saveBtn.type = 'button';
+    saveBtn.textContent = 'Simpan';
+    actions.appendChild(cancelBtn);
+    actions.appendChild(saveBtn);
+    modal.appendChild(actions);
+
+    document.body.appendChild(overlay);
+
+    this.editOverlay = overlay;
+    this.editModal = modal;
+    this.editTitleEl = title;
+    this.editFieldsWrap = fieldsWrap;
+    this.editImageRow = imageRow;
+    this.editImagePreview = imagePreview;
+    this.editImageInput = imageInput;
+    this.editPasswordInput = passwordInput;
+    this.editErrorEl = errorMsg;
+    this.editSaveBtn = saveBtn;
+
+    imageInput.addEventListener('change', () => {
+      const file = imageInput.files && imageInput.files[0];
+      if (!file) return;
+      imagePreview.src = URL.createObjectURL(file);
+      imagePreview.hidden = false;
+    });
+
+    closeBtn.addEventListener('click', () => this.closeEditModal());
+    cancelBtn.addEventListener('click', () => this.closeEditModal());
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) this.closeEditModal();
+    });
+    saveBtn.addEventListener('click', () => this.submitEditModal());
+  }
+
+  // FITUR EDIT: buka modal buat ngedit satu leaf (cover/content/back).
+  openEditModal(bookIndex, leafType, contentIndex) {
+    const book = this.books[bookIndex];
+    if (!book) return;
+
+    let leaf;
+    if (leafType === 'cover') leaf = book.cover || {};
+    else if (leafType === 'back') leaf = book.backCover || {};
+    else leaf = (book.content && book.content[contentIndex]) || {};
+
+    this.editState = { mode: 'edit', bookIndex, leafType, contentIndex };
+
+    this.editTitleEl.textContent = 'Edit Halaman';
+    this.editSaveBtn.textContent = 'Simpan';
+    this.editFieldsWrap.hidden = false;
+    this.editFieldsWrap.innerHTML = '';
+    this.editFieldRefs = {};
+
+    const addField = (key, labelText, value, multiline) => {
+      const label = el('label', 'fb-edit-field-label');
+      label.textContent = labelText;
+      const input = el(multiline ? 'textarea' : 'input', 'fb-edit-field-input');
+      if (!multiline) input.type = 'text';
+      input.value = value || '';
+      label.appendChild(input);
+      this.editFieldsWrap.appendChild(label);
+      this.editFieldRefs[key] = input;
+    };
+
+    if (leafType === 'cover') {
+      addField('kicker', 'Label kecil', leaf.kicker, false);
+      addField('heading', 'Judul sampul', leaf.heading, false);
+    } else if (leafType === 'back') {
+      addField('heading', 'Judul sampul belakang', leaf.heading, false);
+      addField('tagline', 'Tagline', leaf.tagline, false);
+    } else {
+      addField('page', 'Nomor halaman', leaf.page, false);
+      addField('heading', 'Judul halaman', leaf.heading, false);
+      addField('body', 'Isi halaman', leaf.body, true);
+    }
+
+    this.editImageRow.hidden = false;
+    this.editImageInput.value = '';
+    if (leaf.image && leaf.image.url) {
+      this.editImagePreview.src = leaf.image.url;
+      this.editImagePreview.hidden = false;
+    } else {
+      this.editImagePreview.hidden = true;
+      this.editImagePreview.removeAttribute('src');
+    }
+
+    this.editErrorEl.hidden = true;
+    this.editPasswordInput.value = '';
+
+    this.editModalOpen = true;
+    this.editOverlay.hidden = false;
+  }
+
+  // FITUR EDIT: buka modal buat nambah halaman baru di buku yang lagi aktif.
+  openAddPageModal(bookIndex) {
+    if (bookIndex == null || bookIndex < 0 || !this.books[bookIndex]) return;
+    this.editState = { mode: 'add', bookIndex };
+
+    this.editTitleEl.textContent = 'Tambah Halaman Baru';
+    this.editSaveBtn.textContent = 'Tambah';
+    this.editFieldsWrap.hidden = true;
+    this.editFieldsWrap.innerHTML = '';
+    this.editFieldRefs = {};
+
+    this.editImageRow.hidden = true;
+    this.editImageInput.value = '';
+    this.editImagePreview.hidden = true;
+    this.editImagePreview.removeAttribute('src');
+
+    this.editErrorEl.hidden = true;
+    this.editPasswordInput.value = '';
+
+    this.editModalOpen = true;
+    this.editOverlay.hidden = false;
+  }
+
+  closeEditModal() {
+    this.editModalOpen = false;
+    this.editOverlay.hidden = true;
+    this.editState = null;
+  }
+
+  showEditError(message) {
+    this.editErrorEl.textContent = message;
+    this.editErrorEl.hidden = false;
+  }
+
+  async submitEditModal() {
+    if (!this.editState) return;
+    const password = this.editPasswordInput.value;
+    if (!password) {
+      this.showEditError('Kata sandi wajib diisi.');
+      return;
+    }
+
+    this.editSaveBtn.disabled = true;
+    this.editErrorEl.hidden = true;
+
+    try {
+      if (this.editState.mode === 'add') {
+        await this.submitAddPage(this.editState.bookIndex, password);
+      } else {
+        await this.submitPageEdit(this.editState, password);
+      }
+    } finally {
+      this.editSaveBtn.disabled = false;
+    }
+  }
+
+  async submitPageEdit(state, password) {
+    const fd = new FormData();
+    fd.append('bookIndex', String(state.bookIndex));
+    fd.append('leafType', state.leafType);
+    if (state.leafType === 'content') fd.append('contentIndex', String(state.contentIndex));
+    Object.keys(this.editFieldRefs).forEach((key) => {
+      fd.append(key, this.editFieldRefs[key].value);
+    });
+    fd.append('password', password);
+    const file = this.editImageInput.files && this.editImageInput.files[0];
+    if (file) fd.append('image', file);
+
+    try {
+      const res = await fetch(FLIPBOOK_API.editPage, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!data.success) {
+        this.showEditError(data.message || 'Gagal menyimpan perubahan.');
+        return;
+      }
+      this.books[state.bookIndex] = data.book;
+      const fb = this.flipBooks[state.bookIndex];
+      const leaf = state.leafType === 'cover' ? data.book.cover
+        : state.leafType === 'back' ? data.book.backCover
+        : data.book.content[state.contentIndex];
+      if (fb) fb.applyEdit(state.leafType, state.contentIndex, leaf || {});
+      this.closeEditModal();
+    } catch (err) {
+      console.error('[FlipBookScroll] Gagal menyimpan halaman:', err);
+      this.showEditError('Gagal terhubung ke server. Coba lagi.');
+    }
+  }
+
+  async submitAddPage(bookIndex, password) {
+    const fd = new FormData();
+    fd.append('bookIndex', String(bookIndex));
+    fd.append('password', password);
+
+    try {
+      const res = await fetch(FLIPBOOK_API.addPage, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!data.success) {
+        this.showEditError(data.message || 'Gagal menambah halaman.');
+        return;
+      }
+      this.rebuildBook(bookIndex, data.book);
+      this.closeEditModal();
+    } catch (err) {
+      console.error('[FlipBookScroll] Gagal menambah halaman:', err);
+      this.showEditError('Gagal terhubung ke server. Coba lagi.');
+    }
+  }
+
+  // FITUR EDIT: jumlah halaman berubah -> bongkar DOM buku itu aja, buku
+  // lain gak disentuh, terus render ulang.
+  rebuildBook(bookIndex, newBookData) {
+    const old = this.flipBooks[bookIndex];
+    if (old && old.root && old.root.parentNode) {
+      old.root.parentNode.removeChild(old.root);
+    }
+    this.books[bookIndex] = newBookData;
+    const rebuilt = new FlipBook(this.stage, newBookData, bookIndex, {
+      onEdit: (leafType, contentIndex) => this.openEditModal(bookIndex, leafType, contentIndex)
+    });
+    this.flipBooks[bookIndex] = rebuilt;
+    this.render();
   }
 
   addEvents() {
@@ -572,6 +844,7 @@ class FlipBookScroll {
   }
 
   onWheel(e) {
+    if (this.editModalOpen) return;
     if (!this.locked) return;
     e.preventDefault();
     this.applyDelta(e.deltaY);
@@ -583,6 +856,7 @@ class FlipBookScroll {
   }
 
   onTouchMove(e) {
+    if (this.editModalOpen) return;
     if (!this.locked || !e.touches || e.touches.length > 1) return;
     const y = e.touches[0].clientY;
     const delta = this.touchY - y;
@@ -593,6 +867,14 @@ class FlipBookScroll {
   }
 
   onKeydown(e) {
+    if (this.editModalOpen) {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        this.closeEditModal();
+      }
+      return;
+    }
+
     if (!this.locked) return;
 
     const activeTag = document.activeElement && document.activeElement.tagName;
@@ -781,52 +1063,44 @@ class FlipBookScroll {
     window.removeEventListener('resize', this.onResize);
     if (this.observer) this.observer.disconnect();
     if (this.locked) this.unlockBodyScroll(this.savedScrollY);
+    if (this.editOverlay && this.editOverlay.parentNode) {
+      this.editOverlay.parentNode.removeChild(this.editOverlay);
+    }
   }
 }
 
-/* ================================================================
-   DIPERLUAS: dulu buku SELALU dari DEFAULT_BOOKS (atau dari
-   window.FlipBookScrollConfig.books kalau diisi manual). Sekarang,
-   KALAU config.books TIDAK diisi manual, kita fetch override hasil
-   panel admin (routes/flipbook.js) dari /api/flipbook/books, lalu
-   gabungkan per-buku dengan DEFAULT_BOOKS: buku yang belum pernah
-   diedit tetap pakai versi bawaan, buku yang sudah diedit pakai versi
-   dari server.
-
-   Kalau window.FlipBookScrollConfig.books SUDAH diisi manual (dipakai
-   halaman lain yang meng-embed FlipBookScroll dengan datanya sendiri),
-   fetch ini DILEWATI SAMA SEKALI -- TIDAK ADA PERUBAHAN buat pemakaian
-   itu. Kalau fetch gagal (server/Redis down, offline, dst), otomatis
-   jatuh balik ke DEFAULT_BOOKS penuh supaya situs tetap tampil normal.
-   ================================================================ */
-async function fetchBookOverrides() {
+// FITUR EDIT: ambil data buku dari backend (routes/flipbookContent.js).
+// Kalau gagal (server down / belum di-deploy route-nya / offline), balik
+// null biar caller fallback ke DEFAULT_BOOKS / config.books kayak biasa.
+async function fetchFlipbookContent() {
   try {
-    const res = await fetch('/api/flipbook/books');
-    if (!res.ok) throw new Error('Respons server tidak OK: ' + res.status);
+    const res = await fetch(FLIPBOOK_API.content);
+    if (!res.ok) throw new Error('bad status ' + res.status);
     const data = await res.json();
-    return Array.isArray(data.books) ? data.books : [];
+    if (data && data.success && Array.isArray(data.books) && data.books.length) {
+      return data.books;
+    }
   } catch (err) {
-    console.warn('[FlipBookScroll] Gagal ambil override dari server, pakai konten bawaan:', err);
-    return [];
+    console.warn('[FlipBookScroll] Gagal memuat konten dari server, pakai data bawaan:', err);
   }
-}
-
-function mergeBooks(overrides) {
-  return DEFAULT_BOOKS.map((defaultBook, i) => (overrides && overrides[i]) ? overrides[i] : defaultBook);
+  return null;
 }
 
 async function init() {
   const container = document.getElementById('flipbookContainer');
   if (!container) return;
+
+  const loadingEl = el('div', 'fb-loading');
+  loadingEl.textContent = 'Memuat konten...';
+  container.appendChild(loadingEl);
+
   const config = window.FlipBookScrollConfig || {};
+  const serverBooks = await fetchFlipbookContent();
 
-  let books = config.books;
-  if (!books || !books.length) {
-    const overrides = await fetchBookOverrides();
-    books = mergeBooks(overrides);
-  }
+  if (loadingEl.parentNode) loadingEl.parentNode.removeChild(loadingEl);
 
-  window.__flipBookScrollInstance = new FlipBookScroll(container, { ...config, books });
+  const finalConfig = Object.assign({}, config, { books: serverBooks || config.books });
+  window.__flipBookScrollInstance = new FlipBookScroll(container, finalConfig);
 }
 
 if (document.readyState === 'loading') {
