@@ -1,0 +1,320 @@
+/* css/flipbook-admin.css
+   Panel edit konten flipbook (tambah/ubah/hapus halaman, ganti gambar,
+   ubah judul & sampul). Trigger-nya nempel di pojok section flipbook
+   (lihat js/flipbook-admin.js), pakai palet warna yang sama dengan
+   flipbook-scroll.css (krem/gold/dark ink). */
+
+.fba-trigger {
+  position: absolute;
+  right: 4%;
+  top: 6%;
+  z-index: 70;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(20, 16, 10, 0.18);
+  background: rgba(250, 249, 245, 0.6);
+  color: rgba(20, 16, 10, 0.45);
+  font-size: 15px;
+  cursor: pointer;
+  opacity: 0.35;
+  transition: opacity 0.25s ease, transform 0.25s ease, background 0.25s ease;
+}
+
+.fba-trigger:hover {
+  opacity: 1;
+  background: #faf9f5;
+  color: #14100a;
+  transform: scale(1.06);
+}
+
+.fba-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(15, 12, 8, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.fba-panel {
+  width: min(680px, 100%);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: #faf9f5;
+  border-radius: 10px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.fba-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid rgba(20, 16, 10, 0.1);
+}
+
+.fba-panel-header h3 {
+  font-family: 'Fraunces', serif;
+  font-size: 19px;
+  font-weight: 700;
+  color: #14100a;
+  margin: 0;
+}
+
+.fba-close {
+  border: none;
+  background: none;
+  font-size: 22px;
+  line-height: 1;
+  color: rgba(20, 16, 10, 0.5);
+  cursor: pointer;
+}
+.fba-close:hover { color: #14100a; }
+
+.fba-book-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 12px 22px 0;
+  flex-wrap: wrap;
+}
+
+.fba-book-tab {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(20, 16, 10, 0.18);
+  background: transparent;
+  color: rgba(20, 16, 10, 0.6);
+  cursor: pointer;
+}
+
+.fba-book-tab.on {
+  background: linear-gradient(135deg, #fff6d8, #cba454 70%, #8a6a22);
+  border-color: transparent;
+  color: #14100a;
+  font-weight: 600;
+}
+
+.fba-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 18px 22px;
+}
+
+.fba-cover-section {
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px dashed rgba(20, 16, 10, 0.16);
+}
+
+.fba-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.fba-field label {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: rgba(20, 16, 10, 0.55);
+}
+
+.fba-input,
+.fba-textarea {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  color: #14100a;
+  border: 1px solid rgba(20, 16, 10, 0.2);
+  border-radius: 6px;
+  padding: 8px 10px;
+  background: #fff;
+  resize: vertical;
+}
+
+.fba-input:focus,
+.fba-textarea:focus {
+  outline: none;
+  border-color: #cba454;
+  box-shadow: 0 0 0 3px rgba(203, 164, 84, 0.2);
+}
+
+.fba-pages-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.fba-page-card {
+  border: 1px solid rgba(20, 16, 10, 0.14);
+  border-radius: 8px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.fba-page-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.fba-page-card-title {
+  font-family: 'Fraunces', serif;
+  font-weight: 700;
+  font-size: 13.5px;
+  color: #14100a;
+}
+
+.fba-page-remove {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: #a4432b;
+  background: none;
+  border: 1px solid rgba(164, 67, 43, 0.35);
+  border-radius: 999px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.fba-page-remove:hover {
+  background: rgba(164, 67, 43, 0.08);
+}
+
+.fba-image-row {
+  display: flex;
+  gap: 14px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.fba-image-preview {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #efece3;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fba-image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.fba-image-preview.empty::after {
+  content: 'Belum ada gambar';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Inter', sans-serif;
+  font-size: 9px;
+  color: rgba(20, 16, 10, 0.4);
+  text-align: center;
+  padding: 0 8px;
+}
+
+.fba-image-preview.empty img { display: none; }
+
+.fba-image-controls {
+  flex: 1;
+  min-width: 200px;
+}
+
+.fba-remove-image {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: #a4432b;
+  background: none;
+  border: none;
+  padding: 2px 0 10px;
+  cursor: pointer;
+  text-decoration: underline;
+  display: block;
+}
+
+.fba-add-page-btn {
+  align-self: flex-start;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #14100a;
+  background: transparent;
+  border: 1px dashed rgba(20, 16, 10, 0.3);
+  border-radius: 8px;
+  padding: 10px 16px;
+  cursor: pointer;
+  margin-top: 4px;
+}
+.fba-add-page-btn:hover {
+  border-color: #cba454;
+  color: #8a6a22;
+}
+
+.fba-status {
+  min-height: 18px;
+  padding: 0 22px;
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: rgba(20, 16, 10, 0.6);
+}
+.fba-status.error { color: #a4432b; }
+.fba-status.success { color: #4c7a3d; }
+
+.fba-panel-footer {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 14px 22px 20px;
+  border-top: 1px solid rgba(20, 16, 10, 0.1);
+}
+
+.fba-panel-footer .fba-field {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.fba-save-btn {
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #14100a;
+  background: linear-gradient(135deg, #fff6d8, #cba454 60%, #8a6a22);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.fba-save-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (max-width: 720px) {
+  .fba-panel {
+    max-height: 92vh;
+  }
+  .fba-image-row {
+    flex-direction: column;
+  }
+  .fba-panel-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
