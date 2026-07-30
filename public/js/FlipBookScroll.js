@@ -11,44 +11,6 @@ const SIDE_ROT = 30;
 const OPEN_SCALE_BUMP = 0.14;
 const TEXT_REVEAL_RISE = 18;
 
-/* ================================================================
-   SKEMA DATA satu halaman ISI (dipakai di array `content` tiap buku
-   di DEFAULT_BOOKS, atau di data buku yang dikirim lewat
-   window.FlipBookScrollConfig).
-
-   Semua field OPSIONAL -- kalau cuma diisi heading/body seperti versi
-   lama, tampilannya PERSIS sama seperti sebelumnya, tidak ada yang
-   berubah untuk data lama:
-
-   {
-     page: '04',                    // nomor halaman -> "Hal. 04"
-     heading: 'Judul Halaman',      // opsional
-     body: 'Satu paragraf'          // opsional -- STRING atau ARRAY
-           atau ['Paragraf 1', 'Paragraf 2'],   supaya bisa nulis lebih
-                                                  dari satu paragraf
-     list: ['Poin 1', 'Poin 2'],    // opsional -- daftar bullet
-     image: {                        // opsional -- DIPERLUAS: gambar
-       src: '/img/contoh.jpg',       // WAJIB kalau `image` dipakai
-       alt: 'Deskripsi gambar',      // opsional, disarankan diisi
-       caption: 'Teks di bawah foto', // opsional (diabaikan kalau
-                                       // layout: 'full')
-       layout: 'top' | 'full'        // opsional. Kalau tidak diisi,
-                                      // otomatis: 'full' kalau cuma
-                                      // ada gambar (tanpa heading/
-                                      // body/list di halaman itu),
-                                      // atau 'top' kalau gambar
-                                      // digabung sama teks
-     }
-   }
-
-   CARA NAMBAH HALAMAN: tinggal tambah satu object lagi ke array
-   `content` milik buku yang mau ditambah -- jumlah halaman ('n' di
-   FlipBook.update) dihitung otomatis dari panjang array, tidak ada
-   batas jumlah halaman yang di-hardcode. Kalau halamannya jadi
-   banyak, pertimbangkan naikkan `segmentVh` (lihat FlipBookScroll)
-   biar jarak scroll per halaman tetap nyaman.
-   ================================================================ */
-
 const DEFAULT_BOOKS = [
   {
     title: 'Sejarah & Latar Belakang',
@@ -85,25 +47,7 @@ const DEFAULT_BOOKS = [
     content: [
       { page: '01', heading: 'Loket Pelayanan', body: 'Setiap permohonan diterima lewat loket terpadu, diverifikasi kelengkapan berkasnya, lalu diproses lintas bidang teknis terkait.' },
       { page: '02', heading: 'Tim Verifikasi', body: 'Petugas verifikasi meninjau kelayakan berkas dan menindaklanjuti laporan atau pengaduan yang masuk dari masyarakat.' },
-      { page: '03', heading: 'Pengawasan Internal', body: 'Inspektorat internal memantau proses pelayanan agar tetap sesuai standar, termasuk menindak dugaan pelanggaran oleh petugas.' },
-      // CONTOH pemakaian field `image` (layout otomatis jadi 'top' karena
-      // halaman ini juga punya heading+list). GANTI src di bawah dengan
-      // path/URL gambar asli sebelum dipakai -- kalau tidak, browser akan
-      // menampilkan ikon gambar rusak karena filenya belum ada.
-      {
-        page: '04',
-        heading: 'Gedung Pelayanan',
-        image: {
-          src: '/img/gedung-dpmptsp.jpg',
-          alt: 'Gedung DPMPTSP Kota Palembang',
-          caption: 'Kantor DPMPTSP Kota Palembang'
-        },
-        list: [
-          'Loket pelayanan terpadu satu pintu',
-          'Ruang tunggu ber-AC',
-          'Layanan konsultasi teknis'
-        ]
-      }
+      { page: '03', heading: 'Pengawasan Internal', body: 'Inspektorat internal memantau proses pelayanan agar tetap sesuai standar, termasuk menindak dugaan pelanggaran oleh petugas.' }
     ],
     backCover: { heading: 'Struktur', tagline: '& Layanan' }
   }
@@ -130,79 +74,12 @@ function buildCoverFace(data) {
   return { el: face, reveal };
 }
 
-/* ================================================================
-   DIPERLUAS: halaman isi sekarang bisa punya gambar (`data.image`),
-   teks lebih dari satu paragraf (`data.body` boleh array), dan
-   daftar bullet (`data.list`). Halaman yang cuma diisi heading/body
-   seperti sebelumnya TIDAK berubah tampilannya sama sekali -- semua
-   penambahan di bawah ini cuma aktif kalau field terkait diisi.
-   Lihat komentar skema data di atas DEFAULT_BOOKS untuk detail field.
-   ================================================================ */
 function buildTextFace(data) {
   const face = el('div', 'fb-page-face fb-face-text');
   const reveal = el('div', 'fb-reveal');
-
-  const hasTextContent = Boolean(data.heading || data.body || (data.list && data.list.length));
-  const hasImage = Boolean(data.image && data.image.src);
-
-  if (hasImage) {
-    // 'full' kalau cuma ada gambar (halaman jadi foto satu halaman penuh),
-    // 'top' kalau gambar digabung sama heading/body/list (gambar di atas,
-    // teks tetap mengalir normal di bawahnya seperti sebelumnya).
-    const layout = data.image.layout || (hasTextContent ? 'top' : 'full');
-    face.classList.add(`fb-image-${layout}`);
-
-    const figure = el('figure', 'fb-page-image-wrap');
-    const img = el('img', 'fb-page-image');
-    img.src = data.image.src;
-    img.alt = data.image.alt || '';
-    img.loading = 'lazy';
-    img.decoding = 'async';
-    figure.appendChild(img);
-
-    // Caption cuma dipakai di layout 'top' -- di layout 'full', gambar
-    // mengisi seluruh halaman jadi tidak ada ruang buat figcaption
-    // terpisah; pakai heading/body kalau butuh teks di atas foto penuh.
-    if (data.image.caption && layout !== 'full') {
-      figure.appendChild(text('figcaption', 'fb-page-image-caption', data.image.caption));
-    }
-
-    face.appendChild(figure);
-
-    // Modifier ini yang menentukan apakah overlay gradasi gelap + padding
-    // dimunculkan di atas gambar full-bleed (supaya teks tetap kebaca).
-    // Kalau halaman full-image tidak punya teks sama sekali, overlay ini
-    // TIDAK ditambahkan, jadi fotonya polos tanpa gradasi yang tidak perlu.
-    if (layout === 'full' && (hasTextContent || data.page)) {
-      face.classList.add('fb-overlay-text');
-    }
-  }
-
-  if (data.page) {
-    reveal.appendChild(text('p', 'fb-page-num', `Hal. ${data.page}`));
-  }
-
-  if (data.heading) {
-    reveal.appendChild(text('h4', 'fb-page-heading', data.heading));
-  }
-
-  if (data.body) {
-    // Boleh string biasa (1 paragraf, perilaku lama) ATAU array of string
-    // kalau mau nulis beberapa paragraf di satu halaman.
-    const paragraphs = Array.isArray(data.body) ? data.body : [data.body];
-    paragraphs.forEach(p => {
-      reveal.appendChild(text('p', 'fb-page-body', p));
-    });
-  }
-
-  if (data.list && data.list.length) {
-    const ul = el('ul', 'fb-page-list');
-    data.list.forEach(item => {
-      ul.appendChild(text('li', '', item));
-    });
-    reveal.appendChild(ul);
-  }
-
+  reveal.appendChild(text('p', 'fb-page-num', data.page ? `Hal. ${data.page}` : ''));
+  reveal.appendChild(text('h4', 'fb-page-heading', data.heading));
+  reveal.appendChild(text('p', 'fb-page-body', data.body));
   face.appendChild(reveal);
   return { el: face, reveal };
 }
