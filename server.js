@@ -39,6 +39,10 @@ app.use('/api/music', musicRouter);
 const mapRouter = require('./routes/map');
 app.use('/api/map', mapRouter);
 
+const flipbookContentRouter = require('./routes/flipbookContent');
+app.use('/api/flipbook', flipbookContentRouter);
+
+
 // Semua route non-API jatuh ke index.html — routing halaman (login/dashboard/dll)
 // ditangani di sisi client oleh Alpine.js (public/js/App.js), bukan server.
 app.get('*', (req, res) => {
