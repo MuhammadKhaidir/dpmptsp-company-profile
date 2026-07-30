@@ -243,7 +243,7 @@
     const init = () => {
         document.querySelectorAll('[data-arc-carousel]').forEach((el) => {
             if (!el.__arcCarouselInstance) {
-                el.__arcCarouselInstance = new Arccarousel(el);
+                el.__arcCarouselInstance = new ArcCarousel(el);
             }
         });
     };
@@ -254,5 +254,5 @@
         init();
     }
 
-    window.Arccarousel = Arccarousel;
+    window.Arccarousel = ArcCarousel;
 })();
