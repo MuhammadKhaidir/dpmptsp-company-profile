@@ -535,7 +535,7 @@ function createFrameAnimator(imgEl, frames, fps) {
     // Fallback kalau animationend gak nembak (ke-interupsi transisi lain,
     // reduced-motion aktif, atau main thread lagi sibuk) -- state tetap
     // dipaksa lanjut biar gak nyangkut permanen.
-    setTimeout(settle, 500);
+    setTimeout(settle, 750);
 }
 
 function exitCat() {
@@ -560,7 +560,7 @@ function exitCat() {
     }
     function onEnd() { settle(); }
     cat.addEventListener('animationend', onEnd, { once: true });
-    setTimeout(settle, 500);
+    setTimeout(settle, 800);
 }
 
         function hideCatInstant() {
