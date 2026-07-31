@@ -42,6 +42,9 @@ app.use('/api/map', mapRouter);
 const flipbookContentRouter = require('./routes/flipbookContent');
 app.use('/api/flipbook', flipbookContentRouter);
 
+const arcCarouselRouter = require('./routes/arcCarouselContent');
+app.use('/api/arc-carousel', arcCarouselRouter);
+
 
 // Semua route non-API jatuh ke index.html — routing halaman (login/dashboard/dll)
 // ditangani di sisi client oleh Alpine.js (public/js/App.js), bukan server.
