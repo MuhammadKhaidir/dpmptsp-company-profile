@@ -217,6 +217,18 @@ class FlipBook {
     this.root.style.zIndex = '0';
     this.root.style.display = 'none';
 
+    // FITUR: TOMBOL AKSI BUKU (TAMBAH/HAPUS) CUMA MUNCUL PAS BUKU DIKLIK
+    // Klik di badan buku (bukan di tombol pensil/tempat sampah kecil yang
+    // masing-masing sudah e.stopPropagation() duluan di buildEditButton/
+    // buildDeleteButton) buat toggle tampil/sembunyi panel "Tambah
+    // Halaman"/"Hapus Buku Ini" di FlipBookScroll. Ditaruh di root
+    // .fb-book (bukan di satu face doang) soalnya semua halaman/sampul
+    // numpuk penuh (inset:0) ngisi seluruh badan buku ini, jadi klik di
+    // face mana pun tetap ke-bubble sampai sini.
+    this.root.addEventListener('click', () => {
+      if (this.callbacks.onBookClick) this.callbacks.onBookClick(this.index);
+    });
+
     this.shadow = el('div', 'fb-shadow');
     this.root.appendChild(this.shadow);
 
@@ -434,6 +446,11 @@ class FlipBookScroll {
     this.pinEnd = 0;
     this.totalDistance = 1;
 
+    // FITUR: state buka/tutup panel tombol "Tambah Halaman"/"Hapus Buku
+    // Ini" -- defaultnya TERTUTUP total, baru kebuka kalau badan buku
+    // yang lagi aktif diklik (lihat toggleBookActions()).
+    this.actionsOpen = false;
+
     // FITUR EDIT: state modal edit / tambah halaman / hapus.
     this.editModalOpen = false;
     this.editState = null;
@@ -467,7 +484,9 @@ class FlipBookScroll {
 
     // FITUR EDIT + HAPUS: wrapper buat tombol "+ Tambah Halaman" &
     // "Hapus Buku Ini" biar bisa disandingkan di posisi yang sama
-    // (dulu cuma ada satu tombol tambah halaman doang di sini).
+    // (dulu cuma ada satu tombol tambah halaman doang di sini). Defaultnya
+    // disembunyikan lewat CSS (.fb-book-actions), baru muncul lewat class
+    // .is-open pas buku aktif diklik (lihat toggleBookActions() di bawah).
     this.bookActionsWrap = el('div', 'fb-book-actions');
     this.sticky.appendChild(this.bookActionsWrap);
 
@@ -490,12 +509,33 @@ class FlipBookScroll {
 
   // FITUR HAPUS: dipusatkan di sini (dipakai pas build() awal, maupun
   // pas rebuildBook()/rebuildAll() sesudah tambah/hapus halaman/buku),
-  // biar callback onEdit/onDeletePage-nya konsisten di semua jalur.
+  // biar callback onEdit/onDeletePage/onBookClick-nya konsisten di semua
+  // jalur.
   makeFlipBook(book, index) {
     return new FlipBook(this.stage, book, index, {
       onEdit: (leafType, contentIndex) => this.openEditModal(index, leafType, contentIndex),
-      onDeletePage: (contentIndex) => this.openDeletePageModal(index, contentIndex)
+      onDeletePage: (contentIndex) => this.openDeletePageModal(index, contentIndex),
+      onBookClick: () => this.toggleBookActions(index)
     });
+  }
+
+  // FITUR: TOMBOL AKSI BUKU (TAMBAH/HAPUS) CUMA MUNCUL PAS BUKU DIKLIK
+  // Toggle tampil/sembunyi this.bookActionsWrap. Dipanggil dari listener
+  // 'click' yang dipasang di FlipBook.root (lihat constructor FlipBook).
+  // Guard `index !== this.activeIndex` -- cuma buku yang LAGI AKTIF di
+  // layar yang boleh buka panelnya (buku yang lagi transisi masuk/keluar
+  // diabaikan; lagipula begitu opacity-nya ~0, buku itu display:none jadi
+  // gak akan pernah "kena klik").
+  toggleBookActions(index) {
+    if (index !== this.activeIndex) return;
+    this.actionsOpen = !this.actionsOpen;
+    this.bookActionsWrap.classList.toggle('is-open', this.actionsOpen);
+  }
+
+  closeBookActions() {
+    if (!this.actionsOpen) return;
+    this.actionsOpen = false;
+    this.bookActionsWrap.classList.remove('is-open');
   }
 
   // FITUR EDIT: modal edit / tambah halaman / hapus -- dibangun SEKALI,
@@ -899,6 +939,10 @@ class FlipBookScroll {
     this.flipBooks = this.books.map((book, i) => this.makeFlipBook(book, i));
 
     this.activeIndex = -1;
+    // FITUR: daftar buku berubah total (ada yang kehapus, index geser) ->
+    // tutup panel tombol aksi biar gak nyangkut ke buku yang udah gak
+    // valid lagi.
+    this.closeBookActions();
     this.recomputeBounds();
     this.progress = clamp01(this.progress);
     this.render();
@@ -911,6 +955,7 @@ class FlipBookScroll {
     this.onKeydown = this.onKeydown.bind(this);
     this.onScroll = this.onScroll.bind(this);
     this.onResize = this.onResize.bind(this);
+    this.onDocumentClick = this.onDocumentClick.bind(this);
 
     window.addEventListener('wheel', this.onWheel, { passive: false });
     window.addEventListener('touchstart', this.onTouchStart, { passive: true });
@@ -918,6 +963,9 @@ class FlipBookScroll {
     window.addEventListener('keydown', this.onKeydown);
     window.addEventListener('scroll', this.onScroll, { passive: true });
     window.addEventListener('resize', this.onResize);
+    // FITUR: klik di luar buku & di luar panel tombol aksi -> otomatis
+    // nutup panel "Tambah Halaman"/"Hapus Buku Ini" kalau lagi kebuka.
+    document.addEventListener('click', this.onDocumentClick);
 
     if ('IntersectionObserver' in window) {
       this.observer = new IntersectionObserver(
@@ -1100,6 +1148,20 @@ class FlipBookScroll {
     this.scheduleRender();
   }
 
+  // FITUR: klik DI LUAR buku aktif & di luar panel tombol aksi (dan di
+  // luar overlay modal edit, biar tombol Batal/Simpan di modal nggak
+  // ikut nutup panel aksi di belakangnya) -> otomatis nutup panel
+  // "Tambah Halaman"/"Hapus Buku Ini". Pola sama kayak overlay modal
+  // yang nutup pas klik area gelap di luar .fb-edit-modal.
+  onDocumentClick(e) {
+    if (!this.actionsOpen) return;
+    const insideBook = e.target.closest && e.target.closest('.fb-book');
+    const insideActions = e.target.closest && e.target.closest('.fb-book-actions');
+    const insideEditOverlay = e.target.closest && e.target.closest('.fb-edit-overlay');
+    if (insideBook || insideActions || insideEditOverlay) return;
+    this.closeBookActions();
+  }
+
   applyDelta(deltaY) {
     if (!deltaY) return;
     if (this.progress >= 1 && deltaY > 0) { this.releaseLock(1); return; }
@@ -1132,6 +1194,10 @@ class FlipBookScroll {
       Array.from(this.dotsWrap.children).forEach((dot, i) => {
         dot.classList.toggle('on', i === activeIndex);
       });
+      // FITUR: pindah ke buku lain (activeIndex berubah) -> otomatis
+      // tutup panel "Tambah Halaman"/"Hapus Buku Ini" biar gak "nyangkut"
+      // ke buku yang salah pas user geser scroll.
+      this.closeBookActions();
     }
 
     // FITUR HAPUS: gak boleh hapus buku terakhir yang tersisa -- tombol
@@ -1258,6 +1324,7 @@ class FlipBookScroll {
     window.removeEventListener('keydown', this.onKeydown);
     window.removeEventListener('scroll', this.onScroll);
     window.removeEventListener('resize', this.onResize);
+    document.removeEventListener('click', this.onDocumentClick);
     if (this.observer) this.observer.disconnect();
     if (this.locked) this.unlockBodyScroll(this.savedScrollY);
     if (this.editOverlay && this.editOverlay.parentNode) {

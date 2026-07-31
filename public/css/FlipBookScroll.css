@@ -104,6 +104,19 @@
 
 /* ---- Buku (Di Tengah Layar) ---- */
 
+/* FITUR: TOMBOL AKSI BUKU (TAMBAH/HAPUS) CUMA MUNCUL PAS BUKU DIKLIK
+   pointer-events sebelumnya "none" total di sini (buku cuma "hiasan"
+   visual, yang bisa diklik cuma tombol pensil/tempat sampah kecil yang
+   eksplisit pointer-events:auto). Sekarang diubah jadi "auto" supaya
+   klik di MANA AJA di badan buku bisa kepakai buat toggle tampil/
+   sembunyi panel "Tambah Halaman"/"Hapus Buku Ini" (lihat listener
+   'click' yang dipasang di this.root pas constructor FlipBook, JS).
+   Buku lain yang lagi transisi masuk/keluar otomatis display:none pas
+   opacity-nya udah ~0 (lihat FlipBook.update()), jadi gak ikut "kena
+   klik" walau pointer-events-nya sama-sama auto. Tombol pensil/tempat
+   sampah kecil yang sudah pointer-events:auto duluan jadi redundant
+   (gak masalah, tetap valid) karena sekarang otomatis ke-inherit juga
+   dari sini. */
 .fb-book {
   position: absolute;
   top: 50%;
@@ -113,7 +126,8 @@
   height: auto;
   transform-style: preserve-3d;
   will-change: transform, opacity;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
   overflow: visible; /* Bebas terbuka tanpa terpotong kotak samping */
 }
 
@@ -466,25 +480,46 @@
    .fb-add-page-btn DAN .fb-delete-book-btn bisa disandingkan rapi lewat
    flexbox -- sebelumnya (tanpa fix ini) dua tombol itu numpuk persis di
    titik yang sama karena masing-masing mencoba position:absolute sendiri
-   ke koordinat yang identik. */
+   ke koordinat yang identik.
+
+   FITUR: TOMBOL AKSI BUKU CUMA MUNCUL PAS BUKU DIKLIK
+   Defaultnya wrapper ini disembunyikan total (opacity:0 + pointer-events:
+   none), jadi gak numpuk/ganggu tampilan pas lagi baca buku. Baru muncul
+   (class .is-open ditambahin lewat FlipBookScroll.toggleBookActions())
+   kalau user KLIK badan buku yang lagi aktif di layar. pointer-events:none
+   pas tersembunyi juga mencegah tombol yang gak keliatan tetap "kena
+   klik"/ke-fokus keyboard walau opacity 0. */
 .fb-book-actions {
   position: absolute;
   bottom: 14%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateY(10px);
   z-index: 60;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
   gap: 10px;
-  pointer-events: auto;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s ease, transform 0.28s ease;
 }
 
+.fb-book-actions.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* FITUR: pointer-events sengaja DIHAPUS dari sini (dulu di-hardcode
+   "auto" langsung di tombolnya). Kalau tetap auto di sini, tombolnya
+   bakal tetap "kena klik" walau lagi disembunyikan (opacity:0,
+   pointer-events:none) di .fb-book-actions induknya -- sekarang tombol
+   ini ngikutin state induknya (none pas tersembunyi, auto pas
+   .fb-book-actions.is-open). */
 .fb-add-page-btn,
 .fb-delete-book-btn {
   position: static;
-  pointer-events: auto;
   font-family: 'Inter', sans-serif;
   font-size: 12px;
   font-weight: 700;
