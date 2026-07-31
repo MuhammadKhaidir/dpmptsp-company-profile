@@ -276,16 +276,8 @@
   margin: 0;
 }
 
-/* FIX: sebelumnya `display: contents`. Elemen dengan display:contents TIDAK
-   menghasilkan box sama sekali, jadi `opacity` & `transform` (dipakai buat
-   animasi reveal teks pas halaman kebuka di FlipBookScroll.js) nggak akan
-   pernah kelihatan efeknya walau valuenya di-update tiap frame. Dengan
-   display:flex, .fb-reveal jadi kotak asli yang bisa di-animate, sementara
-   flex-direction:column tetap mempertahankan susunan vertikal field di
-   dalamnya persis seperti sebelumnya (kicker+heading / pageNum+heading+body
-   / heading+tagline). */
-.fb-reveal {
-  display: flex;
+.fb-reveal { 
+  display: contents;
   flex-direction: column;
   opacity: var(--fb-reveal-o, 1);
   transform: translateY(var(--fb-reveal-y, 0px));
