@@ -1007,29 +1007,8 @@ class FlipBookScroll {
   }
 
   releaseLock(direction) {
-    // FIX: sebelumnya recomputeBounds() dipanggil DI SINI, padahal body
-    // masih position:fixed (masih locked) dari lockBodyScroll(). Selagi
-    // body position:fixed, elemen fixed itu offsetParent-nya jadi null,
-    // sehingga getDocumentTop() (dipakai recomputeBounds) salah ukur --
-    // hasilnya this.pinStart/this.pinEnd yang dihitung jauh lebih kecil
-    // dari posisi container yang sebenarnya di halaman (selisihnya sebesar
-    // posisi lock waktu itu). Akibatnya target scroll di bawah ini ikut
-    // salah, window.scrollTo() lompat ke posisi yang keliru (bisa jadi
-    // malah balik ke DALAM container, bukan ke luar), sehingga logika
-    // checkReentry() jadi kacau begitu discroll ke atas lagi setelah
-    // sampai ujung bawah -- inilah yang bikin animasi buku "hilang".
-    // Sekarang body dilepas dari posisi fixed-nya DULU, baru
-    // recomputeBounds() dipanggil (jadi ngukur posisi asli/normal),
-    // baru target dihitung & discroll ke sana.
-    document.body.style.position = '';
-    document.body.style.top = '';
-    document.body.style.left = '';
-    document.body.style.right = '';
-    document.body.style.width = '';
-    document.body.style.paddingRight = '';
-
-    this.locked = false;
     this.recomputeBounds();
+    this.locked = false;
     const target = direction > 0
       ? this.pinEnd + 2
       : Math.max(0, this.pinStart - 2);
@@ -1079,13 +1058,25 @@ class FlipBookScroll {
     this.lastScrollY = y;
 
     let initialProgress;
+    let lockAtStart = false;
+    let lockAtEnd = false;
 
     if (prev === null) {
       initialProgress = clamp01((y - this.pinStart) / this.totalDistance);
     } else if (y < prev) {
       // User sedang SCROLL KE ATAS masuk ke area buku
       if (prev >= this.pinEnd - 10) {
-        initialProgress = 1; // Mulai dari buku terakhir (100%)
+        // FIX: dulu initialProgress = 1, itu artinya buku terakhir ada di
+        // local = 1 (posisi PALING UJUNG exit -- opacity 0, udah geser
+        // keluar layar, alias "invisible"). Makanya begitu masuk lagi dari
+        // bawah, buku sempet "hilang" dulu (nge-render kosong) sebelum
+        // animasi baliknya kelihatan. Sekarang ditaruh tepat di
+        // local = EXIT_START, yaitu posisi terakhir buku itu masih 100%
+        // kelihatan utuh (belum mulai geser/transparan keluar), jadi pas
+        // discroll ke atas dari bawah, buku terakhir langsung nongol utuh
+        // duluan, baru pas discroll ke atas lagi kebalik animasinya.
+        initialProgress = (this.books.length - 1 + EXIT_START) / this.books.length;
+        lockAtEnd = true;
       } else {
         initialProgress = clamp01((y - this.pinStart) / this.totalDistance);
       }
@@ -1093,12 +1084,13 @@ class FlipBookScroll {
       // User sedang SCROLL KE BAWAH masuk ke area buku
       if (prev <= this.pinStart + 10) {
         initialProgress = 0; // Mulai dari buku pertama (0%)
+        lockAtStart = true;
       } else {
         initialProgress = clamp01((y - this.pinStart) / this.totalDistance);
       }
     }
 
-    const lockY = initialProgress === 1 ? this.pinEnd : (initialProgress === 0 ? this.pinStart : y);
+    const lockY = lockAtEnd ? this.pinEnd : (lockAtStart ? this.pinStart : y);
     this.engageLock(initialProgress, lockY);
   }
 
