@@ -196,7 +196,7 @@
             this.modalFieldsWrap.innerHTML = '';
             this.fieldRefs = {};
             this.addField('title', 'Judul Buku', 'text');
-            this.addField('pdf', 'Berkas PDF (opsional)', 'file');
+            this.addField('pdf', 'Berkas PDF (opsional) Max 4MB', 'file');
             this.addField('password', 'Kata Sandi', 'password');
 
             this.modalErrorEl.hidden = true;
@@ -206,7 +206,7 @@
         openDeleteModal(book) {
             this.modalState = { mode: 'delete', book };
             this.modalTitleEl.textContent = 'Hapus Buku';
-            this.modalSubEl.textContent = 'Yakin mau hapus buku "' + (book.title || '') + '"? Tindakan ini gak bisa dibatalkan.';
+            this.modalSubEl.textContent = 'Yakin mau hapus buku "' + (book.title || '') + '"? Tindakan ini tidak bisa dibatalkan.';
             this.modalSubmitBtn.textContent = 'Hapus';
 
             this.modalFieldsWrap.innerHTML = '';

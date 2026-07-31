@@ -1204,7 +1204,7 @@ class FlipBookScroll {
     // "Hapus Buku Ini" otomatis nonaktif kalau cuma sisa 1 buku.
     this.deleteBookBtn.disabled = this.books.length <= 1;
     this.deleteBookBtn.title = this.books.length <= 1
-      ? 'Minimal harus ada 1 buku, gak bisa dihapus semua.'
+      ? 'Minimal harus ada 1 buku, tidak bisa dihapus semua.'
       : '';
 
     const activeBook = this.flipBooks[activeIndex];
