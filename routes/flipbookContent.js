@@ -1,34 +1,31 @@
-// routes/arcCarouselContent.js
+// routes/flipbookContent.js
 //
-// Router Express untuk fitur Tambah/Hapus Buku di ArcCarousel. Endpoint
-// dipertahankan sama persis kayak sebelumnya (GET /api/arc-carousel/content,
-// POST /api/arc-carousel/book/add, POST /api/arc-carousel/book/delete)
-// -- biar frontend (public/js/Arccarousel.js) gak perlu diubah sama sekali.
-//
-// Pola sama persis kayak routes/flipbookContent.js & routes/qrBg.js:
-// password + rate limit lockout lewat Redis (helper guardPassword),
-// upload PDF lewat Vercel Blob, metadata lewat Upstash Redis (via
-// data/arcCarouselStore.js).
+// Router Express untuk fitur EDIT KONTEN FlipBook per halaman (ganti
+// tulisan, ganti/tambah gambar per halaman) dan TAMBAH HALAMAN BARU.
+// Mengikuti pola yang SAMA PERSIS dengan routes/qrBg.js: password lewat
+// env var + rate limit lockout lewat Redis, upload gambar lewat
+// Vercel Blob, data teks lewat Upstash Redis (via data/flipbookStore.js).
 
 const express = require('express');
 const multer = require('multer');
 const crypto = require('crypto');
 
-const store = require('../data/arcCarouselStore');
+const store = require('../data/flipbookStore');
 const { getJSON, setJSON, delKey } = require('../lib/redisClient');
 
 const router = express.Router();
 
-// Sama kayak routes/qrBg.js & routes/flipbookContent.js: Vercel Functions
-// punya limit ukuran body request sekitar 4.5MB, jadi diturunin ke 4MB.
+const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
+// Sama kayak routes/qrBg.js: Vercel Functions punya limit ukuran body
+// request sekitar 4.5MB, jadi diturunin ke 4MB.
 const MAX_FILE_SIZE = 4 * 1024 * 1024;
 
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: MAX_FILE_SIZE },
     fileFilter: (req, file, cb) => {
-        if (file.mimetype !== 'application/pdf') {
-            cb(new Error('Berkas harus berformat PDF.'));
+        if (!ALLOWED_MIME.has(file.mimetype)) {
+            cb(new Error('Format berkas tidak didukung. Gunakan PNG, JPG, WEBP, atau GIF.'));
             return;
         }
         cb(null, true);
@@ -36,7 +33,7 @@ const upload = multer({
 });
 
 /* ------------------------------------------------------------------ */
-/* Rate limit -- pola SAMA PERSIS dengan routes/qrBg.js & flipbookContent.js */
+/* Rate limit -- pola SAMA PERSIS dengan routes/qrBg.js                */
 /* ------------------------------------------------------------------ */
 const MAX_ATTEMPTS = 5;
 const LOCKOUT_SECONDS = 5 * 60;
@@ -45,7 +42,7 @@ function getClientIp(req) {
     return req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
 }
 function lockoutKey(req) {
-    return `arc-carousel-lockout:${getClientIp(req)}`;
+    return `flipbook-lockout:${getClientIp(req)}`;
 }
 
 async function checkLockout(req, res) {
@@ -77,9 +74,10 @@ async function clearFailedAttempts(req) {
 }
 
 function verifyPassword(inputPassword) {
-    // Password global -- sama persis kayak fitur QR bg, biar satu kata
-    // sandi berlaku buat semua fitur edit di website ini.
-    const real = process.env.QR_EDIT_PASSWORD;
+    // Boleh reuse QR_EDIT_PASSWORD kalau FLIPBOOK_EDIT_PASSWORD belum
+    // diatur -- biar gak wajib bikin password baru kalau mau pakai yang
+    // sama dengan fitur QR bg.
+    const real = process.env.FLIPBOOK_EDIT_PASSWORD || process.env.QR_EDIT_PASSWORD;
     if (!real) return { ok: false, reason: 'not-configured' };
     if (!inputPassword) return { ok: false, reason: 'wrong' };
 
@@ -101,7 +99,7 @@ async function guardPassword(req, res) {
         if (verdict.reason === 'not-configured') {
             res.status(500).json({
                 success: false,
-                message: 'Fitur ini belum dikonfigurasi. Silakan atur QR_EDIT_PASSWORD pada Environment Variables server terlebih dahulu.'
+                message: 'Fitur edit flipbook belum dikonfigurasi. Silakan atur FLIPBOOK_EDIT_PASSWORD pada Environment Variables server terlebih dahulu.'
             });
             return false;
         }
@@ -113,20 +111,24 @@ async function guardPassword(req, res) {
     return true;
 }
 
-// GET /api/arc-carousel/content -- publik, gak perlu password.
+// Publik -- siapa aja boleh baca konten buku, gak perlu password.
 router.get('/content', async (req, res) => {
     try {
         const books = await store.getBooks();
         res.json({ success: true, books });
     } catch (err) {
-        console.error('[arcCarouselContent] Gagal ambil daftar buku:', err);
-        res.status(500).json({ success: false, message: 'Gagal mengambil daftar buku dari server.' });
+        console.error('[flipbookContent] Gagal ambil konten:', err);
+        res.status(500).json({ success: false, message: 'Gagal mengambil data dari server.' });
     }
 });
 
-// POST /api/arc-carousel/book/add  (multipart/form-data: title, password, pdf?)
-router.post('/book/add', (req, res) => {
-    upload.single('pdf')(req, res, async (uploadErr) => {
+// Edit satu halaman: tulisan + (opsional) gambar baru.
+// Body (multipart/form-data): bookIndex, leafType ('cover'|'content'|'back'),
+// contentIndex (wajib kalau leafType='content'), password,
+// lalu field teks sesuai jenis halaman (kicker/heading/body/tagline/page),
+// dan file opsional di field 'image'.
+router.post('/page', (req, res) => {
+    upload.single('image')(req, res, async (uploadErr) => {
         try {
             if (uploadErr) {
                 return res.status(400).json({ success: false, message: uploadErr.message || 'Proses pengunggahan gagal.' });
@@ -134,44 +136,56 @@ router.post('/book/add', (req, res) => {
 
             if (!(await guardPassword(req, res))) return;
 
-            const title = (req.body.title || '').trim();
-            if (!title) {
-                return res.status(400).json({ success: false, message: 'Judul buku wajib diisi.' });
+            const bookIndex = parseInt(req.body.bookIndex, 10);
+            const leafType = req.body.leafType;
+            const contentIndex = req.body.contentIndex !== undefined ? parseInt(req.body.contentIndex, 10) : undefined;
+
+            if (Number.isNaN(bookIndex) || !['cover', 'content', 'back'].includes(leafType)) {
+                return res.status(400).json({ success: false, message: 'Data halaman yang dikirim tidak lengkap.' });
+            }
+            if (leafType === 'content' && Number.isNaN(contentIndex)) {
+                return res.status(400).json({ success: false, message: 'Nomor halaman yang dituju tidak dikenali.' });
             }
 
-            const file = req.file ? { buffer: req.file.buffer, mimeType: req.file.mimetype } : null;
-            const book = await store.addBook({ title, file });
+            const fields = {};
+            ['kicker', 'heading', 'body', 'tagline', 'page'].forEach((key) => {
+                if (req.body[key] !== undefined) fields[key] = req.body[key];
+            });
 
-            res.json({ success: true, book });
+            let image = null;
+            if (req.file) {
+                const ext = (req.file.mimetype.split('/')[1] || 'png').replace('jpeg', 'jpg');
+                image = { buffer: req.file.buffer, mimeType: req.file.mimetype, ext };
+            }
+
+            const book = await store.updatePage(bookIndex, leafType, contentIndex, fields, image);
+            res.json({ success: true, message: 'Halaman berhasil diperbarui.', book });
         } catch (fatalErr) {
-            console.error('[arcCarouselContent] Error tak terduga saat tambah buku:', fatalErr);
+            console.error('[flipbookContent] Error tak terduga (edit halaman):', fatalErr);
             if (!res.headersSent) {
-                res.status(fatalErr.statusCode || 500).json({ success: false, message: fatalErr.message || 'Terjadi kesalahan pada server saat menyimpan buku.' });
+                res.status(fatalErr.statusCode || 500).json({ success: false, message: fatalErr.message || 'Terjadi kesalahan pada server saat menyimpan perubahan.' });
             }
         }
     });
 });
 
-// POST /api/arc-carousel/book/delete  (multipart/form-data: id, password)
-router.post('/book/delete', upload.none(), async (req, res) => {
+// Tambah halaman isi baru di akhir buku tertentu.
+// Body (multipart/form-data, gak ada file): bookIndex, password.
+router.post('/page/add', upload.none(), async (req, res) => {
     try {
         if (!(await guardPassword(req, res))) return;
 
-        const { id } = req.body;
-        if (!id) {
-            return res.status(400).json({ success: false, message: 'ID buku tidak ditemukan.' });
+        const bookIndex = parseInt(req.body.bookIndex, 10);
+        if (Number.isNaN(bookIndex)) {
+            return res.status(400).json({ success: false, message: 'Buku yang dituju tidak dikenali.' });
         }
 
-        const removed = await store.deleteBook(id);
-        if (!removed) {
-            return res.status(404).json({ success: false, message: 'Buku tidak ditemukan.' });
-        }
-
-        res.json({ success: true, id });
+        const book = await store.addPage(bookIndex);
+        res.json({ success: true, message: 'Halaman baru berhasil ditambahkan.', book });
     } catch (fatalErr) {
-        console.error('[arcCarouselContent] Error tak terduga saat hapus buku:', fatalErr);
+        console.error('[flipbookContent] Error tak terduga (tambah halaman):', fatalErr);
         if (!res.headersSent) {
-            res.status(fatalErr.statusCode || 500).json({ success: false, message: fatalErr.message || 'Terjadi kesalahan pada server saat menghapus buku.' });
+            res.status(fatalErr.statusCode || 500).json({ success: false, message: fatalErr.message || 'Terjadi kesalahan pada server saat menambah halaman.' });
         }
     }
 });
