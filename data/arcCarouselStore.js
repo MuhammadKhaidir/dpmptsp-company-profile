@@ -1,66 +1,76 @@
 // data/arcCarouselStore.js
-// Penyimpanan sederhana berbasis file JSON untuk daftar buku di ArcCarousel.
-// Polanya sama kayak store lain di project ini: baca-tulis ke file JSON
-// di folder data/, gak pakai database eksternal.
 //
-// PENTING kalau dideploy ke Vercel: serverless function di Vercel punya
-// filesystem read-only (kecuali /tmp, dan itu pun gak persisten antar
-// request/deploy). Artinya nulis ke file JSON kayak gini CUMA jalan
-// kalau dijalanin di server biasa (VPS/localhost), BUKAN di Vercel.
-// Kalau mau tetep di Vercel, ganti store ini ke database beneran
-// (mis. Vercel KV / Postgres / MongoDB Atlas).
+// Penyimpanan daftar buku ArcCarousel untuk lingkungan SERVERLESS (Vercel).
+// Mengikuti pola yang SAMA PERSIS dengan data/qrBgStore.js:
+// - Berkas PDF -> Vercel Blob (object storage, bukan disk).
+// - Metadata (daftar buku)  -> Upstash Redis.
+//
+// Kenapa gak pakai fs.writeFileSync ke folder data/ lagi: filesystem-nya
+// read-only di Vercel, jadi versi itu gak akan pernah persisten di
+// production -- persis alasan yang sama kayak qrBgStore.
 
-const fs = require('fs');
-const path = require('path');
+const { put, del } = require('@vercel/blob');
+const { getJSON, setJSON } = require('../lib/redisClient');
 
-const STORE_FILE = path.join(__dirname, 'arcCarouselBooks.json');
+const BOOKS_KEY = 'arc-carousel:books';
 
-function ensureStoreFile() {
-    if (!fs.existsSync(STORE_FILE)) {
-        fs.writeFileSync(STORE_FILE, JSON.stringify({ books: [] }, null, 2), 'utf8');
+async function getBooks() {
+    const books = await getJSON(BOOKS_KEY);
+    return Array.isArray(books) ? books : [];
+}
+
+async function saveBooks(books) {
+    await setJSON(BOOKS_KEY, books);
+}
+
+// params: { title, file: { buffer, mimeType } | null }
+async function addBook({ title, file }) {
+    const books = await getBooks();
+
+    let pdfUrl = '';
+    let pathname = '';
+
+    if (file) {
+        const blob = await put(`arc-carousel/books/${Date.now()}.pdf`, file.buffer, {
+            access: 'public',
+            contentType: 'application/pdf',
+            addRandomSuffix: true
+        });
+        pdfUrl = blob.url;
+        pathname = blob.pathname;
     }
-}
 
-function readStore() {
-    ensureStoreFile();
-    try {
-        const raw = fs.readFileSync(STORE_FILE, 'utf8');
-        const parsed = JSON.parse(raw);
-        if (!parsed || !Array.isArray(parsed.books)) return { books: [] };
-        return parsed;
-    } catch (err) {
-        console.error('[arcCarouselStore] Gagal baca store, reset ke kosong:', err);
-        return { books: [] };
-    }
-}
-
-function writeStore(data) {
-    fs.writeFileSync(STORE_FILE, JSON.stringify(data, null, 2), 'utf8');
-}
-
-function getBooks() {
-    return readStore().books;
-}
-
-function addBook({ title, pdfUrl }) {
-    const data = readStore();
     const newBook = {
         id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
         title,
-        pdfUrl: pdfUrl || ''
+        pdfUrl,
+        pathname,
+        createdAt: Date.now()
     };
-    data.books.push(newBook);
-    writeStore(data);
+
+    books.push(newBook);
+    await saveBooks(books);
     return newBook;
 }
 
-function deleteBook(id) {
-    const data = readStore();
-    const idx = data.books.findIndex((b) => b.id === id);
+async function deleteBook(id) {
+    const books = await getBooks();
+    const idx = books.findIndex((b) => b.id === id);
     if (idx === -1) return null;
-    const [removed] = data.books.splice(idx, 1);
-    writeStore(data);
+
+    const [removed] = books.splice(idx, 1);
+    await saveBooks(books);
+
+    // Hapus blob PDF-nya SETELAH metadata berhasil diupdate -- pola sama
+    // kayak qrBgStore: kalau ini gagal di tengah jalan, daftar bukunya
+    // minimal udah bener duluan.
+    if (removed.pathname) {
+        del(removed.pathname).catch((err) => {
+            console.error('[arcCarouselStore] Gagal hapus blob PDF lama:', err);
+        });
+    }
+
     return removed;
 }
 
-module.exports = { getBooks, addBook, deleteBook, STORE_FILE };
+module.exports = { getBooks, addBook, deleteBook };
