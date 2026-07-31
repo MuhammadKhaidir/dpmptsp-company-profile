@@ -276,14 +276,19 @@
   margin: 0;
 }
 
-.fb-reveal { 
-  display: contents;
+/* FIX: sebelumnya `display: contents`. Elemen dengan display:contents TIDAK
+   menghasilkan box sama sekali, jadi `opacity` & `transform` (dipakai buat
+   animasi reveal teks pas halaman kebuka di FlipBookScroll.js) nggak akan
+   pernah kelihatan efeknya walau valuenya di-update tiap frame. Dengan
+   display:flex, .fb-reveal jadi kotak asli yang bisa di-animate, sementara
+   flex-direction:column tetap mempertahankan susunan vertikal field di
+   dalamnya persis seperti sebelumnya (kicker+heading / pageNum+heading+body
+   / heading+tagline). */
+.fb-reveal {
+  display: flex;
   flex-direction: column;
   opacity: var(--fb-reveal-o, 1);
   transform: translateY(var(--fb-reveal-y, 0px));
-  /* Sebelumnya display:contents — itu bikin opacity & transform di atas   ini buat ngatur kanan kiri kotak biar gak muncul, setting ke content biar ilang itu kanan kiri
-     nggak ngefek sama sekali (elemen display:contents nggak generate box),
-     jadi animasi reveal teks pas halaman kebuka nggak pernah jalan. */
 }
 
 .fb-page {
@@ -369,11 +374,12 @@
 }
 
 /* ============================================================
-   FITUR EDIT PER HALAMAN
-   Klik pensil kecil di pojok halaman buat edit tulisan/gambar,
-   tombol "+ Tambah Halaman" buat nambah halaman baru di buku yang
-   lagi aktif. Terhubung ke routes/flipbookContent.js +
-   data/flipbookStore.js di backend (Vercel Blob + Upstash Redis).
+   FITUR EDIT PER HALAMAN + HAPUS HALAMAN/BUKU
+   Klik pensil kecil di pojok kanan halaman buat edit tulisan/gambar,
+   klik tempat sampah di pojok kiri halaman buat hapus halaman itu,
+   tombol "+ Tambah Halaman" & "Hapus Buku Ini" buat kelola satu buku
+   penuh. Terhubung ke routes/flipbookContent.js + data/flipbookStore.js
+   di backend (Vercel Blob + Upstash Redis).
    ============================================================ */
 
 /* Gambar per-halaman (opsional) -- diselipkan sebagai layer paling
@@ -424,16 +430,69 @@
   transform: scale(1.08);
 }
 
-.fb-add-page-btn {
+/* FIX: sebelumnya class ini dipakai di FlipBookScroll.js (buildDeleteButton)
+   tapi belum punya style SAMA SEKALI. Tanpa position:absolute, tombol ini
+   jatuh ke normal flow di dalam .fb-face-text (yang display:flex;
+   flex-direction:column), jadi nongol sebagai tombol browser polos di
+   BAWAH body text -- mendorong layout dan gampang ketutup/susah diklik
+   dengan benar. Sekarang dipasang di pojok KIRI (kebalikan dari
+   .fb-edit-btn yang di kanan), pakai warna "danger" biar beda dari tombol
+   edit, dan pointer-events:auto biar tetap bisa diklik walau leluhurnya
+   (.fb-book) pointer-events:none. */
+.fb-delete-btn {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(179, 38, 30, 0.3);
+  background: linear-gradient(135deg, #ffe2df, #f0a099 65%, #b3261e);
+  color: #3a0e0a;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto; /* override .fb-book { pointer-events: none } */
+  opacity: 0.6;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(20, 16, 10, 0.3);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.fb-delete-btn:hover,
+.fb-delete-btn:focus-visible {
+  opacity: 1;
+  transform: scale(1.08);
+}
+
+/* FIX: wrapper ini (this.bookActionsWrap di FlipBookScroll.js) sebelumnya
+   nggak punya CSS sama sekali. Posisi absolute yang dulunya nempel
+   langsung di .fb-add-page-btn sekarang dipindah ke wrapper-nya, supaya
+   .fb-add-page-btn DAN .fb-delete-book-btn bisa disandingkan rapi lewat
+   flexbox -- sebelumnya (tanpa fix ini) dua tombol itu numpuk persis di
+   titik yang sama karena masing-masing mencoba position:absolute sendiri
+   ke koordinat yang identik. */
+.fb-book-actions {
   position: absolute;
   bottom: 14%;
   left: 50%;
   transform: translateX(-50%);
   z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
   pointer-events: auto;
-  border: 1px solid rgba(203, 164, 84, 0.55);
-  background: rgba(250, 249, 245, 0.92);
-  color: #14100a;
+}
+
+.fb-add-page-btn,
+.fb-delete-book-btn {
+  position: static;
+  pointer-events: auto;
   font-family: 'Inter', sans-serif;
   font-size: 12px;
   font-weight: 700;
@@ -442,12 +501,45 @@
   border-radius: 999px;
   cursor: pointer;
   box-shadow: 0 6px 18px rgba(20, 16, 10, 0.18);
-  transition: background 0.2s ease, transform 0.2s ease;
+  transition: background 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+  white-space: nowrap;
+}
+
+.fb-add-page-btn {
+  border: 1px solid rgba(203, 164, 84, 0.55);
+  background: rgba(250, 249, 245, 0.92);
+  color: #14100a;
 }
 
 .fb-add-page-btn:hover {
   background: #fff;
-  transform: translateX(-50%) scale(1.04);
+  transform: scale(1.04);
+}
+
+/* FIX: class ini dipakai JS (this.deleteBookBtn) tapi sebelumnya nggak
+   pernah didefinisikan -- jadi tombolnya tampil sebagai tombol browser
+   default (abu-abu polos), nggak keliatan sebagai aksi "danger" dan
+   posisinya numpuk sama tombol tambah halaman (lihat .fb-book-actions
+   di atas). */
+.fb-delete-book-btn {
+  border: 1px solid rgba(179, 38, 30, 0.4);
+  background: rgba(250, 249, 245, 0.92);
+  color: #b3261e;
+}
+
+.fb-delete-book-btn:hover:not(:disabled) {
+  background: #fff2f1;
+  transform: scale(1.04);
+}
+
+/* FIX: JS men-set this.deleteBookBtn.disabled = true kalau cuma sisa 1
+   buku (lihat render() di FlipBookScroll.js) -- tanpa style ini tombolnya
+   tetap keliatan aktif/bisa diklik walau sebenarnya di-disable. */
+.fb-delete-book-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .fb-loading {
@@ -503,11 +595,35 @@
   margin: 0 0 16px;
 }
 
+/* FIX: dipakai buat subtitle konfirmasi "Halaman/Buku ini akan dihapus
+   permanen..." (this.editSubEl di openDeletePageModal / openDeleteBookModal),
+   sebelumnya nggak ada style -- cuma tampil sebagai <p> polos browser
+   default tanpa jarak yang pas ke judul & tombol di bawahnya. Sengaja
+   TIDAK diberi `display` eksplisit di sini supaya attribute `hidden`
+   bawaan browser (dipakai buat sembunyiin subtitle pas mode edit biasa)
+   tetap berfungsi normal. */
+.fb-edit-sub {
+  font-size: 13px;
+  line-height: 1.55;
+  color: rgba(20, 16, 10, 0.65);
+  margin: -6px 0 16px;
+}
+
 .fb-edit-fields {
   display: flex;
   flex-direction: column;
   gap: 12px;
   margin-bottom: 14px;
+}
+
+/* FIX: `display: flex` di atas nge-override attribute `hidden` bawaan
+   browser (JS men-set editFieldsWrap.hidden = true pas mode tambah
+   halaman / hapus halaman / hapus buku, lihat openAddPageModal dkk di
+   FlipBookScroll.js) -- tanpa baris ini, wrapper-nya tetap render sebagai
+   flex container kosong (masih makan margin-bottom 14px) walau sudah
+   ditandai hidden. */
+.fb-edit-fields[hidden] {
+  display: none;
 }
 
 .fb-edit-field-label {
@@ -544,6 +660,13 @@ textarea.fb-edit-field-input {
   align-items: center;
   gap: 12px;
   margin-bottom: 14px;
+}
+
+/* FIX: sama seperti .fb-edit-fields[hidden] di atas -- `display: flex`
+   nge-override attribute `hidden` bawaan browser (JS men-set
+   editImageRow.hidden = true di mode tambah/hapus). */
+.fb-edit-image-row[hidden] {
+  display: none;
 }
 
 .fb-edit-image-preview {
@@ -623,9 +746,23 @@ textarea.fb-edit-field-input {
   cursor: default;
 }
 
+/* FIX: class ini di-toggle lewat classList.add/remove('fb-edit-save-danger')
+   di openDeletePageModal & openDeleteBookModal (FlipBookScroll.js) buat
+   nandain tombol "Hapus" sebagai aksi destructive, tapi class-nya belum
+   pernah didefinisikan -- jadi tombol "Hapus" tampil identik dengan tombol
+   "Simpan"/"Tambah" biasa (gold), bikin user gampang kepencet tanpa sadar
+   itu aksi hapus permanen. */
+.fb-edit-save-danger {
+  background: linear-gradient(135deg, #ffe2df, #f0a099 60%, #b3261e);
+  color: #3a0e0a;
+}
+
 @media (max-width: 720px) {
-  .fb-add-page-btn {
+  .fb-book-actions {
     bottom: 5%;
+  }
+  .fb-add-page-btn,
+  .fb-delete-book-btn {
     font-size: 11px;
     padding: 7px 14px;
   }
