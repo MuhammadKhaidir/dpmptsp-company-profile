@@ -190,4 +190,47 @@ router.post('/page/add', upload.none(), async (req, res) => {
     }
 });
 
+// Hapus satu halaman isi dari sebuah buku.
+// Body (multipart/form-data, gak ada file): bookIndex, contentIndex, password.
+router.post('/page/delete', upload.none(), async (req, res) => {
+    try {
+        if (!(await guardPassword(req, res))) return;
+
+        const bookIndex = parseInt(req.body.bookIndex, 10);
+        const contentIndex = parseInt(req.body.contentIndex, 10);
+        if (Number.isNaN(bookIndex) || Number.isNaN(contentIndex)) {
+            return res.status(400).json({ success: false, message: 'Halaman yang dituju tidak dikenali.' });
+        }
+
+        const book = await store.deletePage(bookIndex, contentIndex);
+        res.json({ success: true, message: 'Halaman berhasil dihapus.', book });
+    } catch (fatalErr) {
+        console.error('[flipbookContent] Error tak terduga (hapus halaman):', fatalErr);
+        if (!res.headersSent) {
+            res.status(fatalErr.statusCode || 500).json({ success: false, message: fatalErr.message || 'Terjadi kesalahan pada server saat menghapus halaman.' });
+        }
+    }
+});
+
+// Hapus satu buku secara keseluruhan.
+// Body (multipart/form-data, gak ada file): bookIndex, password.
+router.post('/book/delete', upload.none(), async (req, res) => {
+    try {
+        if (!(await guardPassword(req, res))) return;
+
+        const bookIndex = parseInt(req.body.bookIndex, 10);
+        if (Number.isNaN(bookIndex)) {
+            return res.status(400).json({ success: false, message: 'Buku yang dituju tidak dikenali.' });
+        }
+
+        const books = await store.deleteBook(bookIndex);
+        res.json({ success: true, message: 'Buku berhasil dihapus.', books });
+    } catch (fatalErr) {
+        console.error('[flipbookContent] Error tak terduga (hapus buku):', fatalErr);
+        if (!res.headersSent) {
+            res.status(fatalErr.statusCode || 500).json({ success: false, message: fatalErr.message || 'Terjadi kesalahan pada server saat menghapus buku.' });
+        }
+    }
+});
+
 module.exports = router;

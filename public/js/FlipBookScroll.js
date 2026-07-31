@@ -16,7 +16,9 @@ const TEXT_REVEAL_RISE = 18;
 const FLIPBOOK_API = {
   content: '/api/flipbook/content',
   editPage: '/api/flipbook/page',
-  addPage: '/api/flipbook/page/add'
+  addPage: '/api/flipbook/page/add',
+  deletePage: '/api/flipbook/page/delete',
+  deleteBook: '/api/flipbook/book/delete'
 };
 
 const DEFAULT_BOOKS = [
@@ -91,6 +93,25 @@ function buildEditButton(onEdit) {
   return btn;
 }
 
+// FITUR HAPUS HALAMAN: tombol tempat sampah kecil, pola & alasan sama
+// persis kayak buildEditButton di atas -- cuma dipasang di pojok kiri
+// (edit di kanan), dan CUMA muncul di halaman ISI (lihat buildTextFace),
+// gak muncul di sampul depan/belakang karena itu bukan hal yang bisa
+// "dihapus" satuan (dihapus bareng seluruh buku lewat tombol "Hapus
+// Buku Ini").
+function buildDeleteButton(onDelete) {
+  const btn = el('button', 'fb-delete-btn');
+  btn.type = 'button';
+  btn.setAttribute('aria-label', 'Hapus halaman ini');
+  btn.textContent = '🗑';
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (onDelete) onDelete();
+  });
+  return btn;
+}
+
 function buildCoverFace(data, onEdit) {
   const face = el('div', 'fb-page-face fb-face-cover');
   const img = el('img', 'fb-face-image');
@@ -112,7 +133,7 @@ function buildCoverFace(data, onEdit) {
   };
 }
 
-function buildTextFace(data, onEdit) {
+function buildTextFace(data, onEdit, onDelete) {
   const face = el('div', 'fb-page-face fb-face-text');
   const img = el('img', 'fb-face-image');
   img.hidden = !(data.image && data.image.url);
@@ -127,6 +148,7 @@ function buildTextFace(data, onEdit) {
   face.appendChild(img);
   face.appendChild(reveal);
   if (onEdit) face.appendChild(buildEditButton(onEdit));
+  if (onDelete) face.appendChild(buildDeleteButton(onDelete));
   return {
     el: face,
     reveal,
@@ -160,11 +182,11 @@ function buildBlankFace() {
   return { el: el('div', 'fb-page-face fb-face-blank'), reveal: null, image: null, fields: {} };
 }
 
-function buildFace(entry, onEdit) {
+function buildFace(entry, onEdit, onDelete) {
   if (entry.kind === 'cover') return buildCoverFace(entry, onEdit);
   if (entry.kind === 'back') return buildBackFace(entry, onEdit);
   if (entry.kind === 'blank') return buildBlankFace();
-  return buildTextFace(entry, onEdit);
+  return buildTextFace(entry, onEdit, onDelete);
 }
 
 function openScaleBump(spreadT) {
@@ -214,9 +236,17 @@ class FlipBook {
       const leafType = p === 0 ? 'cover' : 'content';
       const contentIndex = p === 0 ? null : p - 1;
 
-      const frontBuilt = buildFace(leafData, () => {
-        if (this.callbacks.onEdit) this.callbacks.onEdit(leafType, contentIndex);
-      });
+      const frontBuilt = buildFace(
+        leafData,
+        () => {
+          if (this.callbacks.onEdit) this.callbacks.onEdit(leafType, contentIndex);
+        },
+        leafType === 'content'
+          ? () => {
+              if (this.callbacks.onDeletePage) this.callbacks.onDeletePage(contentIndex);
+            }
+          : null
+      );
       const front = frontBuilt.el;
       front.classList.add('fb-page-front');
       this.editableFronts[p] = { leafType, contentIndex, built: frontBuilt };
@@ -404,7 +434,7 @@ class FlipBookScroll {
     this.pinEnd = 0;
     this.totalDistance = 1;
 
-    // FITUR EDIT: state modal edit / tambah halaman.
+    // FITUR EDIT: state modal edit / tambah halaman / hapus.
     this.editModalOpen = false;
     this.editState = null;
     this.editFieldRefs = {};
@@ -435,24 +465,43 @@ class FlipBookScroll {
     this.books.forEach(() => this.dotsWrap.appendChild(el('span', 'fb-dot')));
     this.sticky.appendChild(this.dotsWrap);
 
-    // FITUR EDIT: tombol tambah halaman buat buku yang lagi aktif kelihatan.
+    // FITUR EDIT + HAPUS: wrapper buat tombol "+ Tambah Halaman" &
+    // "Hapus Buku Ini" biar bisa disandingkan di posisi yang sama
+    // (dulu cuma ada satu tombol tambah halaman doang di sini).
+    this.bookActionsWrap = el('div', 'fb-book-actions');
+    this.sticky.appendChild(this.bookActionsWrap);
+
     this.addPageBtn = el('button', 'fb-add-page-btn');
     this.addPageBtn.type = 'button';
     this.addPageBtn.textContent = '+ Tambah Halaman';
     this.addPageBtn.addEventListener('click', () => this.openAddPageModal(this.activeIndex));
-    this.sticky.appendChild(this.addPageBtn);
+    this.bookActionsWrap.appendChild(this.addPageBtn);
 
-    this.flipBooks = this.books.map((book, i) => new FlipBook(this.stage, book, i, {
-      onEdit: (leafType, contentIndex) => this.openEditModal(i, leafType, contentIndex)
-    }));
+    this.deleteBookBtn = el('button', 'fb-delete-book-btn');
+    this.deleteBookBtn.type = 'button';
+    this.deleteBookBtn.textContent = 'Hapus Buku Ini';
+    this.deleteBookBtn.addEventListener('click', () => this.openDeleteBookModal(this.activeIndex));
+    this.bookActionsWrap.appendChild(this.deleteBookBtn);
+
+    this.flipBooks = this.books.map((book, i) => this.makeFlipBook(book, i));
 
     this.buildEditOverlay();
   }
 
-  // FITUR EDIT: modal edit / tambah halaman -- dibangun SEKALI, dipasang
-  // langsung ke <body> (bukan di dalam .fb-stage) biar posisinya gak
-  // kena reflow/transform dari animasi buku, sama kayak alasan cat
-  // mascot dipindah ke position:fixed nempel di <body>.
+  // FITUR HAPUS: dipusatkan di sini (dipakai pas build() awal, maupun
+  // pas rebuildBook()/rebuildAll() sesudah tambah/hapus halaman/buku),
+  // biar callback onEdit/onDeletePage-nya konsisten di semua jalur.
+  makeFlipBook(book, index) {
+    return new FlipBook(this.stage, book, index, {
+      onEdit: (leafType, contentIndex) => this.openEditModal(index, leafType, contentIndex),
+      onDeletePage: (contentIndex) => this.openDeletePageModal(index, contentIndex)
+    });
+  }
+
+  // FITUR EDIT: modal edit / tambah halaman / hapus -- dibangun SEKALI,
+  // dipasang langsung ke <body> (bukan di dalam .fb-stage) biar
+  // posisinya gak kena reflow/transform dari animasi buku, sama kayak
+  // alasan cat mascot dipindah ke position:fixed nempel di <body>.
   buildEditOverlay() {
     const overlay = el('div', 'fb-edit-overlay');
     overlay.hidden = true;
@@ -468,6 +517,10 @@ class FlipBookScroll {
 
     const title = text('h4', 'fb-edit-title', 'Edit Halaman');
     modal.appendChild(title);
+
+    const sub = el('p', 'fb-edit-sub');
+    sub.hidden = true;
+    modal.appendChild(sub);
 
     const fieldsWrap = el('div', 'fb-edit-fields');
     modal.appendChild(fieldsWrap);
@@ -510,6 +563,7 @@ class FlipBookScroll {
     this.editOverlay = overlay;
     this.editModal = modal;
     this.editTitleEl = title;
+    this.editSubEl = sub;
     this.editFieldsWrap = fieldsWrap;
     this.editImageRow = imageRow;
     this.editImagePreview = imagePreview;
@@ -546,7 +600,9 @@ class FlipBookScroll {
     this.editState = { mode: 'edit', bookIndex, leafType, contentIndex };
 
     this.editTitleEl.textContent = 'Edit Halaman';
+    this.editSubEl.hidden = true;
     this.editSaveBtn.textContent = 'Simpan';
+    this.editSaveBtn.classList.remove('fb-edit-save-danger');
     this.editFieldsWrap.hidden = false;
     this.editFieldsWrap.innerHTML = '';
     this.editFieldRefs = {};
@@ -597,7 +653,68 @@ class FlipBookScroll {
     this.editState = { mode: 'add', bookIndex };
 
     this.editTitleEl.textContent = 'Tambah Halaman Baru';
+    this.editSubEl.hidden = true;
     this.editSaveBtn.textContent = 'Tambah';
+    this.editSaveBtn.classList.remove('fb-edit-save-danger');
+    this.editFieldsWrap.hidden = true;
+    this.editFieldsWrap.innerHTML = '';
+    this.editFieldRefs = {};
+
+    this.editImageRow.hidden = true;
+    this.editImageInput.value = '';
+    this.editImagePreview.hidden = true;
+    this.editImagePreview.removeAttribute('src');
+
+    this.editErrorEl.hidden = true;
+    this.editPasswordInput.value = '';
+
+    this.editModalOpen = true;
+    this.editOverlay.hidden = false;
+  }
+
+  // FITUR HAPUS: buka modal konfirmasi buat hapus SATU halaman isi.
+  openDeletePageModal(bookIndex, contentIndex) {
+    const book = this.books[bookIndex];
+    const leaf = book && book.content && book.content[contentIndex];
+    if (!leaf) return;
+
+    this.editState = { mode: 'deletePage', bookIndex, contentIndex };
+
+    this.editTitleEl.textContent = 'Hapus Halaman Ini?';
+    this.editSubEl.hidden = false;
+    this.editSubEl.textContent = 'Halaman "' + (leaf.heading || ('Hal. ' + leaf.page)) + '" akan dihapus permanen dari buku ini.';
+    this.editSaveBtn.textContent = 'Hapus';
+    this.editSaveBtn.classList.add('fb-edit-save-danger');
+    this.editFieldsWrap.hidden = true;
+    this.editFieldsWrap.innerHTML = '';
+    this.editFieldRefs = {};
+
+    this.editImageRow.hidden = true;
+    this.editImageInput.value = '';
+    this.editImagePreview.hidden = true;
+    this.editImagePreview.removeAttribute('src');
+
+    this.editErrorEl.hidden = true;
+    this.editPasswordInput.value = '';
+
+    this.editModalOpen = true;
+    this.editOverlay.hidden = false;
+  }
+
+  // FITUR HAPUS: buka modal konfirmasi buat hapus SATU BUKU utuh. Gak
+  // dipanggil sama sekali kalau cuma sisa 1 buku (lihat render() -- tombol
+  // Hapus Buku Ini otomatis ke-disable), tapi tetap dijaga di sini juga.
+  openDeleteBookModal(bookIndex) {
+    const book = this.books[bookIndex];
+    if (!book || this.books.length <= 1) return;
+
+    this.editState = { mode: 'deleteBook', bookIndex };
+
+    this.editTitleEl.textContent = 'Hapus Buku Ini?';
+    this.editSubEl.hidden = false;
+    this.editSubEl.textContent = 'Buku "' + (book.title || '') + '" beserta SEMUA halaman & gambar di dalamnya akan dihapus permanen. Tindakan ini gak bisa dibatalin.';
+    this.editSaveBtn.textContent = 'Hapus';
+    this.editSaveBtn.classList.add('fb-edit-save-danger');
     this.editFieldsWrap.hidden = true;
     this.editFieldsWrap.innerHTML = '';
     this.editFieldRefs = {};
@@ -639,6 +756,10 @@ class FlipBookScroll {
     try {
       if (this.editState.mode === 'add') {
         await this.submitAddPage(this.editState.bookIndex, password);
+      } else if (this.editState.mode === 'deletePage') {
+        await this.submitDeletePage(this.editState.bookIndex, this.editState.contentIndex, password);
+      } else if (this.editState.mode === 'deleteBook') {
+        await this.submitDeleteBook(this.editState.bookIndex, password);
       } else {
         await this.submitPageEdit(this.editState, password);
       }
@@ -699,6 +820,55 @@ class FlipBookScroll {
     }
   }
 
+  // FITUR HAPUS: hapus satu halaman isi. Jumlah halaman di buku itu
+  // berubah -> sama kayak addPage, buku itu di-rebuild total (buku lain
+  // gak disentuh).
+  async submitDeletePage(bookIndex, contentIndex, password) {
+    const fd = new FormData();
+    fd.append('bookIndex', String(bookIndex));
+    fd.append('contentIndex', String(contentIndex));
+    fd.append('password', password);
+
+    try {
+      const res = await fetch(FLIPBOOK_API.deletePage, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!data.success) {
+        this.showEditError(data.message || 'Gagal menghapus halaman.');
+        return;
+      }
+      this.rebuildBook(bookIndex, data.book);
+      this.closeEditModal();
+    } catch (err) {
+      console.error('[FlipBookScroll] Gagal menghapus halaman:', err);
+      this.showEditError('Gagal terhubung ke server. Coba lagi.');
+    }
+  }
+
+  // FITUR HAPUS: hapus satu buku UTUH. Jumlah buku (bukan cuma jumlah
+  // halaman di 1 buku) yang berubah -> seluruh instance FlipBook perlu
+  // dibongkar & dibangun ulang dari array buku terbaru (lihat
+  // rebuildAll()), soalnya index semua buku SESUDAH buku yang dihapus
+  // ikut geser.
+  async submitDeleteBook(bookIndex, password) {
+    const fd = new FormData();
+    fd.append('bookIndex', String(bookIndex));
+    fd.append('password', password);
+
+    try {
+      const res = await fetch(FLIPBOOK_API.deleteBook, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!data.success) {
+        this.showEditError(data.message || 'Gagal menghapus buku.');
+        return;
+      }
+      this.rebuildAll(data.books);
+      this.closeEditModal();
+    } catch (err) {
+      console.error('[FlipBookScroll] Gagal menghapus buku:', err);
+      this.showEditError('Gagal terhubung ke server. Coba lagi.');
+    }
+  }
+
   // FITUR EDIT: jumlah halaman berubah -> bongkar DOM buku itu aja, buku
   // lain gak disentuh, terus render ulang.
   rebuildBook(bookIndex, newBookData) {
@@ -707,10 +877,30 @@ class FlipBookScroll {
       old.root.parentNode.removeChild(old.root);
     }
     this.books[bookIndex] = newBookData;
-    const rebuilt = new FlipBook(this.stage, newBookData, bookIndex, {
-      onEdit: (leafType, contentIndex) => this.openEditModal(bookIndex, leafType, contentIndex)
+    this.flipBooks[bookIndex] = this.makeFlipBook(newBookData, bookIndex);
+    this.render();
+  }
+
+  // FITUR HAPUS: jumlah BUKU berubah -> bongkar SEMUA instance FlipBook
+  // yang ada, bangun ulang total dari array buku terbaru (index-nya
+  // udah pasti bener soalnya langsung dari response server, bukan hasil
+  // splice manual di sisi client).
+  rebuildAll(newBooksData) {
+    this.flipBooks.forEach((fb) => {
+      if (fb && fb.root && fb.root.parentNode) fb.root.parentNode.removeChild(fb.root);
     });
-    this.flipBooks[bookIndex] = rebuilt;
+
+    this.books = newBooksData;
+    this.container.style.height = `${this.books.length * this.segmentVh}vh`;
+
+    this.dotsWrap.innerHTML = '';
+    this.books.forEach(() => this.dotsWrap.appendChild(el('span', 'fb-dot')));
+
+    this.flipBooks = this.books.map((book, i) => this.makeFlipBook(book, i));
+
+    this.activeIndex = -1;
+    this.recomputeBounds();
+    this.progress = clamp01(this.progress);
     this.render();
   }
 
@@ -943,6 +1133,13 @@ class FlipBookScroll {
         dot.classList.toggle('on', i === activeIndex);
       });
     }
+
+    // FITUR HAPUS: gak boleh hapus buku terakhir yang tersisa -- tombol
+    // "Hapus Buku Ini" otomatis nonaktif kalau cuma sisa 1 buku.
+    this.deleteBookBtn.disabled = this.books.length <= 1;
+    this.deleteBookBtn.title = this.books.length <= 1
+      ? 'Minimal harus ada 1 buku, gak bisa dihapus semua.'
+      : '';
 
     const activeBook = this.flipBooks[activeIndex];
     const revealBase = activeBook ? clamp01(activeBook.lastOpacity) : 1;

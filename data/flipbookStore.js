@@ -161,8 +161,77 @@ async function addPage(bookIndex) {
     return book;
 }
 
+// Hapus satu halaman isi dari sebuah buku. Boleh sampai 0 halaman isi
+// tersisa (struktur bukunya tetap valid -- sampul depan akan langsung
+// nampilin sampul belakang di baliknya, gak error).
+async function deletePage(bookIndex, contentIndex) {
+    const books = await getBooks();
+    const book = findBook(books, bookIndex);
+
+    const idx = Number(contentIndex);
+    if (!Number.isInteger(idx) || !book.content[idx]) {
+        const err = new Error('Halaman tidak ditemukan.');
+        err.statusCode = 404;
+        throw err;
+    }
+
+    const [removedLeaf] = book.content.splice(idx, 1);
+
+    // Nomor ulang label "Hal. XX" biar tetap urut rapi setelah salah satu
+    // halaman di tengah dihapus (misal Hal 01,02,03 -> hapus 02 -> jadi
+    // Hal 01,02 lagi, bukan 01,03 yang bolong).
+    book.content.forEach((leaf, i) => {
+        leaf.page = String(i + 1).padStart(2, '0');
+    });
+
+    await saveBooks(books);
+
+    if (removedLeaf.image && removedLeaf.image.pathname) {
+        del(removedLeaf.image.pathname).catch((err) => {
+            console.error('[flipbookStore] Gagal hapus blob gambar halaman:', err);
+        });
+    }
+
+    return book;
+}
+
+// Hapus satu buku secara keseluruhan (sampul depan, semua halaman isi,
+// sampul belakang, sekalian semua gambar Blob yang nempel di
+// dalamnya). Gak boleh hapus buku TERAKHIR yang tersisa -- minimal
+// harus selalu ada 1 buku.
+async function deleteBook(bookIndex) {
+    const books = await getBooks();
+    const book = findBook(books, bookIndex);
+
+    if (books.length <= 1) {
+        const err = new Error('Gak bisa hapus buku terakhir yang tersisa -- minimal harus ada 1 buku.');
+        err.statusCode = 400;
+        throw err;
+    }
+
+    books.splice(bookIndex, 1);
+    await saveBooks(books);
+
+    const pathnames = [];
+    if (book.cover && book.cover.image && book.cover.image.pathname) pathnames.push(book.cover.image.pathname);
+    if (book.backCover && book.backCover.image && book.backCover.image.pathname) pathnames.push(book.backCover.image.pathname);
+    (book.content || []).forEach((leaf) => {
+        if (leaf.image && leaf.image.pathname) pathnames.push(leaf.image.pathname);
+    });
+
+    if (pathnames.length) {
+        del(pathnames).catch((err) => {
+            console.error('[flipbookStore] Gagal hapus blob gambar buku:', err);
+        });
+    }
+
+    return books;
+}
+
 module.exports = {
     getBooks,
     updatePage,
-    addPage
+    addPage,
+    deletePage,
+    deleteBook
 };
