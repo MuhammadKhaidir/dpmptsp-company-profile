@@ -1007,8 +1007,29 @@ class FlipBookScroll {
   }
 
   releaseLock(direction) {
-    this.recomputeBounds();
+    // FIX: sebelumnya recomputeBounds() dipanggil DI SINI, padahal body
+    // masih position:fixed (masih locked) dari lockBodyScroll(). Selagi
+    // body position:fixed, elemen fixed itu offsetParent-nya jadi null,
+    // sehingga getDocumentTop() (dipakai recomputeBounds) salah ukur --
+    // hasilnya this.pinStart/this.pinEnd yang dihitung jauh lebih kecil
+    // dari posisi container yang sebenarnya di halaman (selisihnya sebesar
+    // posisi lock waktu itu). Akibatnya target scroll di bawah ini ikut
+    // salah, window.scrollTo() lompat ke posisi yang keliru (bisa jadi
+    // malah balik ke DALAM container, bukan ke luar), sehingga logika
+    // checkReentry() jadi kacau begitu discroll ke atas lagi setelah
+    // sampai ujung bawah -- inilah yang bikin animasi buku "hilang".
+    // Sekarang body dilepas dari posisi fixed-nya DULU, baru
+    // recomputeBounds() dipanggil (jadi ngukur posisi asli/normal),
+    // baru target dihitung & discroll ke sana.
+    document.body.style.position = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
+    document.body.style.right = '';
+    document.body.style.width = '';
+    document.body.style.paddingRight = '';
+
     this.locked = false;
+    this.recomputeBounds();
     const target = direction > 0
       ? this.pinEnd + 2
       : Math.max(0, this.pinStart - 2);
