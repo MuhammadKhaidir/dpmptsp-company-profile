@@ -169,14 +169,22 @@ select.a-input { appearance: none; }
     .panel { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     .dtable { min-width: 560px; }
 
-    /* grid analitik admin (2fr 1fr, inline di index.html) -> 1 kolom */
-    div[style*="grid-template-columns:2fr 1fr"] { grid-template-columns: 1fr !important; }
+    /* grid analitik admin (2fr 1fr, inline di index.html) -> 1 kolom.
+       Discope ke .d-main biar gak mungkin nyasar ke elemen lain di
+       halaman selain dashboard admin. */
+    .d-main div[style*="grid-template-columns:2fr 1fr"] { grid-template-columns: 1fr !important; }
 }
 
 @media (max-width: 480px) {
     .auth-card { padding: 26px 20px; }
     .m-box { padding: 22px 18px; }
     /* grid form registrasi & grid Kategori/Tanggal Kirim di detail
-       pengaduan (1fr 1fr, inline di index.html) -> 1 kolom */
-    [style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
+       pengaduan (1fr 1fr, inline di index.html) -> 1 kolom.
+       Discope ke .auth-card / .inner detail (yang punya max-width:820px)
+       biar gak ada resiko nyenggol elemen lain manapun di halaman
+       (misalnya section buku/flipbook). */
+    .auth-card form[style*="grid-template-columns:1fr 1fr"],
+    .inner[style*="max-width:820px"] [style*="grid-template-columns:1fr 1fr"] {
+        grid-template-columns: 1fr !important;
+    }
 }
