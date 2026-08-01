@@ -64,6 +64,12 @@
     margin: 0 auto;
 }
 
+/* FIX TAMPILAN: caption dulu tingginya ngikutin jumlah baris teks
+   (1 baris vs 2 baris beda tinggi), jadi sampul di bawahnya suka gak
+   sejajar antar kartu dalam satu baris grid -- keliatan berantakan.
+   Sekarang dikasih min-height setara 2 baris (line-height 1.32 x 2),
+   jadi semua caption "ngambil" tinggi yang sama biarpun judulnya
+   pendek, dan barisan sampul di bawahnya jadi rapi sejajar. */
 .arc-card-caption {
     margin: 0;
     font-family: 'Fraunces', serif;
@@ -76,6 +82,7 @@
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    min-height: 2.64em;
 }
 
 /* Sampul buku -- polos (gak ada teks/icon di atasnya lagi, biar sama
@@ -90,8 +97,8 @@
     background-repeat: no-repeat, no-repeat;
     background-size: 220% 220%, 100% 100%;
     background-image:
-        linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.06) 45%, transparent 60%),
-        radial-gradient(120% 140% at 30% 0%, #1c1c1f 0%, #0b0b0d 55%, #060607 100%);
+        linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.08) 45%, transparent 60%),
+        radial-gradient(120% 140% at 30% 0%, #7a3040 0%, #451822 55%, #240c12 100%);
     animation: arcCoverSheen 9s ease-in-out infinite;
     box-shadow: 0 20px 45px -10px rgba(20, 16, 10, 0.5), 0 6px 14px rgba(20, 16, 10, 0.28);
     transition: transform 0.35s cubic-bezier(.33,1,.4,1), box-shadow 0.35s ease;
@@ -118,6 +125,42 @@
     inset: 0;
     background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(0, 0, 0, 0.42) 100%);
     pointer-events: none;
+}
+
+/* FIX TAMPILAN: sampul dulu nyaris item polos buat SEMUA kartu
+   (radial-gradient abu-gelap #1c1c1f/#0b0b0d/#060607), makanya
+   keliatan flat, kusam, dan gak semenarik referensi gambar. Sekarang
+   tiap kartu gantian dapet warna "kulit buku" yang lebih kaya (wine,
+   hijau tua, navy, plum, coklat amber, teal tua) pakai :nth-child,
+   niru kesan rak buku asli yang warnanya macem-macem -- bukan satu
+   warna item doang. Layer sheen (linear-gradient) di depannya
+   dibiarin identik, cuma layer radial-gradient di belakangnya yang
+   diganti tiap varian. Kartu ke-1/7/13/dst pakai warna default
+   (wine) di atas, sisanya kena salah satu override di bawah ini. */
+.arc-card:nth-child(6n+2) .arc-card-cover {
+    background-image:
+        linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.08) 45%, transparent 60%),
+        radial-gradient(120% 140% at 30% 0%, #2f6b52 0%, #163a2c 55%, #0a1f17 100%);
+}
+.arc-card:nth-child(6n+3) .arc-card-cover {
+    background-image:
+        linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.08) 45%, transparent 60%),
+        radial-gradient(120% 140% at 30% 0%, #2c3f68 0%, #16213c 55%, #0a1120 100%);
+}
+.arc-card:nth-child(6n+4) .arc-card-cover {
+    background-image:
+        linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.08) 45%, transparent 60%),
+        radial-gradient(120% 140% at 30% 0%, #6b3378 0%, #3a1a45 55%, #1e0e24 100%);
+}
+.arc-card:nth-child(6n+5) .arc-card-cover {
+    background-image:
+        linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.08) 45%, transparent 60%),
+        radial-gradient(120% 140% at 30% 0%, #7a5326 0%, #452e15 55%, #23170a 100%);
+}
+.arc-card:nth-child(6n+6) .arc-card-cover {
+    background-image:
+        linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.08) 45%, transparent 60%),
+        radial-gradient(120% 140% at 30% 0%, #256b6b 0%, #133a3a 55%, #0a1f1f 100%);
 }
 
 /* FITUR HOVER: sampul kebangkat dikit + shadow nge-deep + glow gold
