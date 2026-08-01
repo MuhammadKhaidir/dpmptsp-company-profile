@@ -7,6 +7,10 @@
 
 html {
     scroll-behavior: smooth;
+    /* FIX: overflow-x:hidden sebelumnya cuma ada di body. Nambahin di html
+       juga sebagai jaring pengaman tambahan biar horizontal scroll bener2
+       gak muncul di HP, konsisten di semua browser. */
+    overflow-x: hidden;
 }
 
 :root {
