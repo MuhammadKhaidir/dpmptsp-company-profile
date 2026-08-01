@@ -1,7 +1,10 @@
 .flipbook-scroll-wrap {
   position: relative;
   width: 100%;
-  overflow: clip; /* Mencegah scrollbar horizontal tanpa memotong ruang 3D di dalam */
+  /* FIX 1: Ubah clip dari semua sisi menjadi hanya sumbu X (horizontal).
+     Sumbu Y dibiarkan visible agar tidak memblokir navigasi anchor ke map. */
+  overflow-x: clip; 
+  overflow-y: visible;
 }
 
 .flipbook-scroll-sticky {
@@ -22,6 +25,11 @@
      "kepotong" di batas section. Section ini jadi transparent aja biar
      #site-bg di belakangnya nembus. */
   background: transparent;
+  
+  /* FIX 2: Memaksa hardware acceleration agar browser tidak menghilangkan 
+     buku saat di-scroll kembali ke atas dari posisi bawah. */
+  transform: translateZ(0);
+  will-change: transform;
 }
 
 .fb-stage {
