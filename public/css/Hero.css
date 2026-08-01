@@ -438,21 +438,9 @@
     .hero { min-height: 100svh; padding-bottom: 40px; }
     .hero-title-parallax { max-width: 90vw; top: 40%; }
     .hero-device-parallax { right: 50%; transform: translateX(50%); bottom: 4%; }
-    /* FIX: base rule .hero-device punya min-width:320px yang gak
-       pernah di-override di sini sebelumnya, jadi walau width-nya
-       udah dihitung ulang jadi min(220px,52vw), min-width 320px tetap
-       menang dan device dipaksa selebar 320px bahkan di HP kecil.
-       Kasih floor yang lebih masuk akal buat mobile. */
-    .hero-device { width: min(220px, 52vw); min-width: 180px; }
+    .hero-device { width: min(220px, 52vw); }
     .hero-logo-parallax { top: 118px; left: 50%; transform: translateX(-50%); }
     .hero-logo-parallax, .hero-device-parallax { transition: none; }
-    /* FIX: .hero-logo-badge aslinya clamp(272px, 8vw, 308px) — di semua
-       lebar layar realistis (bahkan tablet/HP), 8vw jauh di bawah
-       272px, jadi clamp-nya "nyangkut" di angka minimum 272px terus,
-       gak pernah ngecil. Di HP 375px lebar, logo 272px itu ~70% lebar
-       layar, numpuk sama title & nav di bawah/sekitarnya. Override di
-       sini biar dia beneran ikut ngecil sesuai lebar layar. */
-    .hero-logo-badge { width: clamp(130px, 26vw, 220px); height: clamp(130px, 26vw, 220px); margin-top: -20px; }
 }
 
 @media (max-width: 640px) {
@@ -460,15 +448,7 @@
     .nav-pill { padding: 9px 16px; font-size: 11.5px; }
     .hero-title-parallax { left: 50%; transform: translateX(-50%); text-align: center; top: auto; bottom: 232px; }
     .hero-title { font-size: clamp(46px, 15vw, 80px); }
-    /* FIX: .hero-subtitle aslinya clamp(40px, 1.5vw, 22px) — nilai
-       min (40px) lebih GEDE dari max (22px). Clamp kalo min>max
-       hasilnya selalu jatuh ke nilai min, jadi font-size ini SELALU
-       40px berapa pun lebar layar. Di desktop kebetulan masih muat,
-       tapi "KOTA PALEMBANG" pake letter-spacing .18-.28em di 40px itu
-       lebar banget dan gak muat di layar HP. Override khusus di sini
-       (desktop/tablet sengaja gak disentuh biar tampilan yang udah
-       oke gak berubah). */
-    .hero-subtitle { font-size: clamp(15px, 4.5vw, 20px); letter-spacing: .18em; }
+    .hero-subtitle { letter-spacing: .18em; }
     .hero-logo-parallax { top: 96px; }
     .hero-device-parallax { bottom: -6%; }
 }
