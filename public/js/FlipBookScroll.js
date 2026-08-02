@@ -194,9 +194,17 @@ function openScaleBump(spreadT) {
 }
 
 class FlipBook {
-  constructor(stage, book, index, callbacks) {
+  constructor(stage, book, index, callbacks, isLast) {
     this.index = index;
     this.callbacks = callbacks || {};
+
+    // FIX: buku TERAKHIR gak boleh "ngilang" (geser keluar + fade opacity
+    // ke 0) kayak buku-buku lain begitu selesai discroll. Flag ini
+    // dikirim dari FlipBookScroll.makeFlipBook (dihitung dari posisi buku
+    // di array this.books) dan dipakai di update() buat skip animasi
+    // exit-nya sama sekali -- jadi buku terakhir cuma "berhenti" di
+    // keadaan tertutup, bukan menghilang.
+    this.isLast = !!isLast;
 
     this.enterSide = index % 2 === 0 ? -1 : 1;
     this.exitSide = -this.enterSide;
@@ -350,11 +358,26 @@ class FlipBook {
       opacity = t;
       openLocal = 0;
     } else if (local >= EXIT_START) {
-      const t = easeInCubic(clamp01((local - EXIT_START) / (1 - EXIT_START)));
-      xOffset = lerp(0, this.exitSide * this.travelPx, t);
-      rot = lerp(0, this.exitSide * -SIDE_ROT, t);
-      scale = lerp(1, 0.7, t);
-      opacity = 1 - t;
+      if (this.isLast) {
+        // FIX: buku terakhir -- begitu selesai dibaca (openLocal udah
+        // nyampe 1, alias tertutup lagi), JANGAN lanjut animasi keluar
+        // (geser ke samping + mengecil + fade opacity ke 0) kayak buku
+        // lain. Biarin dia diem di tengah, tetap 100% kelihatan, dalam
+        // keadaan tertutup -- nanti begitu lock discroll dilepas
+        // (releaseLock di FlipBookScroll), dia "kebawa" scroll halaman
+        // biasa lewat posisi sticky-nya yang lepas, bukan menghilang
+        // duluan sebelum sempat kelihatan.
+        xOffset = 0;
+        rot = 0;
+        scale = 1;
+        opacity = 1;
+      } else {
+        const t = easeInCubic(clamp01((local - EXIT_START) / (1 - EXIT_START)));
+        xOffset = lerp(0, this.exitSide * this.travelPx, t);
+        rot = lerp(0, this.exitSide * -SIDE_ROT, t);
+        scale = lerp(1, 0.7, t);
+        opacity = 1 - t;
+      }
       openLocal = 1;
     } else {
       xOffset = 0;
@@ -380,7 +403,16 @@ class FlipBook {
       `translate(-50%, -50%) translateX(${xOffset}px) translateX(${shiftPx}px) rotateY(${rot}deg) scale(${scale})`;
     this.root.style.opacity = String(opacity);
 
-    if (opacity <= 0.001 || local <= 0 || local >= 1) {
+    // FIX: buku terakhir gak boleh ke-hide walau local udah nyampe 1 --
+    // setelah lock dilepas & user lanjut scroll ke bawah biasa, `local`
+    // buku ini bakal nyangkut/nempel di 1 terus, dan kalau tetap kena
+    // hide di sini dia bakal "kedip hilang" pas lock-nya lepas. Buku-buku
+    // lain tetap di-hide di local>=1 kayak biasa (di titik itu mereka
+    // emang udah 100% invisible/off-screen -- ngilangin elemennya dari
+    // render itu optimisasi biasa, bukan bagian dari animasi).
+    const shouldHide = opacity <= 0.001 || local <= 0 || (local >= 1 && !this.isLast);
+
+    if (shouldHide) {
       this.root.style.visibility = 'hidden';
       this.root.style.display = 'none';
       this.root.style.zIndex = '0';
@@ -524,7 +556,7 @@ class FlipBookScroll {
       onEdit: (leafType, contentIndex) => this.openEditModal(index, leafType, contentIndex),
       onDeletePage: (contentIndex) => this.openDeletePageModal(index, contentIndex),
       onBookClick: () => this.toggleBookActions(index)
-    });
+    }, index === this.books.length - 1);
   }
 
   // FITUR: TOMBOL AKSI BUKU (TAMBAH/HAPUS) CUMA MUNCUL PAS BUKU DIKLIK
@@ -1093,16 +1125,15 @@ class FlipBookScroll {
       } else if (y < prev) {
         // User sedang SCROLL KE ATAS masuk ke area buku
         if (prev >= this.pinEnd - 10) {
-          // FIX: dulu initialProgress = 1, itu artinya buku terakhir ada di
-          // local = 1 (posisi PALING UJUNG exit -- opacity 0, udah geser
-          // keluar layar, alias "invisible"). Makanya begitu masuk lagi dari
-          // bawah, buku sempet "hilang" dulu (nge-render kosong) sebelum
-          // animasi baliknya kelihatan. Sekarang ditaruh tepat di
-          // local = EXIT_START, yaitu posisi terakhir buku itu masih 100%
-          // kelihatan utuh (belum mulai geser/transparan keluar), jadi pas
-          // discroll ke atas dari bawah, buku terakhir langsung nongol utuh
-          // duluan, baru pas discroll ke atas lagi kebalik animasinya.
-          initialProgress = (this.books.length - 1 + EXIT_START) / this.books.length;
+          // FIX: buku terakhir sekarang gak pernah animasi keluar/fade
+          // (lihat FlipBook.update(), this.isLast) -- dari local = EXIT_START
+          // sampai local = 1 dia statis, tertutup, tetap 100% kelihatan.
+          // Jadi progress = 1 (local = 1 persis buat buku terakhir) sekarang
+          // AMAN dipakai sebagai titik kunci pas reentry dari bawah: gak
+          // ada lagi resiko buku "sempet hilang dulu" kayak dulu, soalnya
+          // local = 1 buat buku terakhir sekarang kelihatannya identik
+          // sama local = EXIT_START (statis & full opacity, gak ke-hide).
+          initialProgress = 1;
           lockAtEnd = true;
         } else {
           initialProgress = clamp01((y - this.pinStart) / this.totalDistance);
@@ -1138,10 +1169,11 @@ class FlipBookScroll {
     // lompatannya, biar buku tetap muncul.
     if (prev !== null) {
       if (y < prev && prev > this.pinEnd && y < this.pinStart) {
-        // Lompat sambil scroll ke ATAS -> kunci di ujung akhir (pinEnd),
-        // buku terakhir muncul utuh dulu (sama kayak reentry normal).
-        const initialProgress = (this.books.length - 1 + EXIT_START) / this.books.length;
-        this.engageLock(initialProgress, this.pinEnd);
+        // Lompat sambil scroll ke ATAS -> kunci di progress=1 (ujung akhir),
+        // buku terakhir muncul utuh & tertutup dulu (sama kayak reentry
+        // normal -- lihat catatan FIX di atas soal kenapa progress=1 aman
+        // dipakai sekarang buat buku terakhir).
+        this.engageLock(1, this.pinEnd);
       } else if (y > prev && prev < this.pinStart && y > this.pinEnd) {
         // Lompat sambil scroll ke BAWAH -> kunci di ujung awal (pinStart),
         // buku pertama muncul dari awal.
