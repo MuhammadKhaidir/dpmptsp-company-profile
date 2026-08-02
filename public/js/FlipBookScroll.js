@@ -194,17 +194,9 @@ function openScaleBump(spreadT) {
 }
 
 class FlipBook {
-  constructor(stage, book, index, callbacks, isLast) {
+  constructor(stage, book, index, callbacks) {
     this.index = index;
     this.callbacks = callbacks || {};
-
-    // FIX: buku TERAKHIR gak boleh "ngilang" (geser keluar + fade opacity
-    // ke 0) kayak buku-buku lain begitu selesai discroll. Flag ini
-    // dikirim dari FlipBookScroll.makeFlipBook (dihitung dari posisi buku
-    // di array this.books) dan dipakai di update() buat skip animasi
-    // exit-nya sama sekali -- jadi buku terakhir cuma "berhenti" di
-    // keadaan tertutup, bukan menghilang.
-    this.isLast = !!isLast;
 
     this.enterSide = index % 2 === 0 ? -1 : 1;
     this.exitSide = -this.enterSide;
@@ -358,26 +350,11 @@ class FlipBook {
       opacity = t;
       openLocal = 0;
     } else if (local >= EXIT_START) {
-      if (this.isLast) {
-        // FIX: buku terakhir -- begitu selesai dibaca (openLocal udah
-        // nyampe 1, alias tertutup lagi), JANGAN lanjut animasi keluar
-        // (geser ke samping + mengecil + fade opacity ke 0) kayak buku
-        // lain. Biarin dia diem di tengah, tetap 100% kelihatan, dalam
-        // keadaan tertutup -- nanti begitu lock discroll dilepas
-        // (releaseLock di FlipBookScroll), dia "kebawa" scroll halaman
-        // biasa lewat posisi sticky-nya yang lepas, bukan menghilang
-        // duluan sebelum sempat kelihatan.
-        xOffset = 0;
-        rot = 0;
-        scale = 1;
-        opacity = 1;
-      } else {
-        const t = easeInCubic(clamp01((local - EXIT_START) / (1 - EXIT_START)));
-        xOffset = lerp(0, this.exitSide * this.travelPx, t);
-        rot = lerp(0, this.exitSide * -SIDE_ROT, t);
-        scale = lerp(1, 0.7, t);
-        opacity = 1 - t;
-      }
+      const t = easeInCubic(clamp01((local - EXIT_START) / (1 - EXIT_START)));
+      xOffset = lerp(0, this.exitSide * this.travelPx, t);
+      rot = lerp(0, this.exitSide * -SIDE_ROT, t);
+      scale = lerp(1, 0.7, t);
+      opacity = 1 - t;
       openLocal = 1;
     } else {
       xOffset = 0;
@@ -403,16 +380,7 @@ class FlipBook {
       `translate(-50%, -50%) translateX(${xOffset}px) translateX(${shiftPx}px) rotateY(${rot}deg) scale(${scale})`;
     this.root.style.opacity = String(opacity);
 
-    // FIX: buku terakhir gak boleh ke-hide walau local udah nyampe 1 --
-    // setelah lock dilepas & user lanjut scroll ke bawah biasa, `local`
-    // buku ini bakal nyangkut/nempel di 1 terus, dan kalau tetap kena
-    // hide di sini dia bakal "kedip hilang" pas lock-nya lepas. Buku-buku
-    // lain tetap di-hide di local>=1 kayak biasa (di titik itu mereka
-    // emang udah 100% invisible/off-screen -- ngilangin elemennya dari
-    // render itu optimisasi biasa, bukan bagian dari animasi).
-    const shouldHide = opacity <= 0.001 || local <= 0 || (local >= 1 && !this.isLast);
-
-    if (shouldHide) {
+    if (opacity <= 0.001 || local <= 0 || local >= 1) {
       this.root.style.visibility = 'hidden';
       this.root.style.display = 'none';
       this.root.style.zIndex = '0';
@@ -477,14 +445,6 @@ class FlipBookScroll {
     this.pinStart = 0;
     this.pinEnd = 0;
     this.totalDistance = 1;
-
-    // FIX SCROLL: state buat nyuspend sementara reentry-lock pas ada
-    // navigasi lewat anchor link (mis. klik nav "Maps"/"Dokumen" dsb).
-    // Lihat onAnchorNavClick(), armSuppressRelease(), dan checkReentry().
-    this.suppressReentry = false;
-    this._suppressTimer = null;
-    this._suppressLastY = null;
-    this._suppressStart = 0;
 
     // FITUR: state buka/tutup panel tombol "Tambah Halaman"/"Hapus Buku
     // Ini" -- defaultnya TERTUTUP total, baru kebuka kalau badan buku
@@ -556,7 +516,7 @@ class FlipBookScroll {
       onEdit: (leafType, contentIndex) => this.openEditModal(index, leafType, contentIndex),
       onDeletePage: (contentIndex) => this.openDeletePageModal(index, contentIndex),
       onBookClick: () => this.toggleBookActions(index)
-    }, index === this.books.length - 1);
+    });
   }
 
   // FITUR: TOMBOL AKSI BUKU (TAMBAH/HAPUS) CUMA MUNCUL PAS BUKU DIKLIK
@@ -996,8 +956,6 @@ class FlipBookScroll {
     this.onScroll = this.onScroll.bind(this);
     this.onResize = this.onResize.bind(this);
     this.onDocumentClick = this.onDocumentClick.bind(this);
-    // FIX SCROLL: lihat onAnchorNavClick() di bawah.
-    this.onAnchorNavClick = this.onAnchorNavClick.bind(this);
 
     window.addEventListener('wheel', this.onWheel, { passive: false });
     window.addEventListener('touchstart', this.onTouchStart, { passive: true });
@@ -1008,10 +966,6 @@ class FlipBookScroll {
     // FITUR: klik di luar buku & di luar panel tombol aksi -> otomatis
     // nutup panel "Tambah Halaman"/"Hapus Buku Ini" kalau lagi kebuka.
     document.addEventListener('click', this.onDocumentClick);
-    // FIX SCROLL: dipasang di fase capture (true) biar kedeteksi paling
-    // awal, sebelum browser mulai animasi smooth-scroll bawaan dari klik
-    // link anchor (mis. nav "Maps"/"Dokumen").
-    document.addEventListener('click', this.onAnchorNavClick, true);
 
     if ('IntersectionObserver' in window) {
       this.observer = new IntersectionObserver(
@@ -1092,94 +1046,52 @@ class FlipBookScroll {
 
   checkReentry() {
     if (this.locked) return;
+    const y = window.scrollY;
 
-    // FIX SCROLL: "Maps" nav macet di area flipbook.
-    // Navigasi lewat anchor link (klik nav, mis. href="#map-section")
-    // memicu smooth-scroll BAWAAN BROWSER yang tujuannya bisa aja di
-    // BAWAH/LEWAT area buku ini. Kalau di tengah animasi itu posisi
-    // scroll sempat singgah di dalam [pinStart, pinEnd], logic di bawah
-    // bakal langsung "menangkap" & mengunci body (position:fixed) --
-    // itu otomatis MEMBATALKAN animasi smooth-scroll bawaan browser,
-    // jadi scroll-nya "macet" di buku dan gak pernah nyampe ke tujuan
-    // aslinya. Selama suppressReentry aktif (dipasang oleh
-    // onAnchorNavClick, dilepas oleh armSuppressRelease begitu scroll
-    // benar-benar berhenti), reentry-lock ini dilewati dulu.
-    if (this.suppressReentry) {
-      this.lastScrollY = window.scrollY;
+    // Jika posisi scroll di luar rentang container buku, hiraukan
+    if (y < this.pinStart || y > this.pinEnd) {
+      this.lastScrollY = y;
       return;
     }
 
-    const y = window.scrollY;
     const prev = this.lastScrollY;
     this.lastScrollY = y;
 
-    const insideRange = y >= this.pinStart && y <= this.pinEnd;
+    let initialProgress;
+    let lockAtStart = false;
+    let lockAtEnd = false;
 
-    if (insideRange) {
-      let initialProgress;
-      let lockAtStart = false;
-      let lockAtEnd = false;
-
-      if (prev === null) {
-        initialProgress = clamp01((y - this.pinStart) / this.totalDistance);
-      } else if (y < prev) {
-        // User sedang SCROLL KE ATAS masuk ke area buku
-        if (prev >= this.pinEnd - 10) {
-          // FIX: buku terakhir sekarang gak pernah animasi keluar/fade
-          // (lihat FlipBook.update(), this.isLast) -- dari local = EXIT_START
-          // sampai local = 1 dia statis, tertutup, tetap 100% kelihatan.
-          // Jadi progress = 1 (local = 1 persis buat buku terakhir) sekarang
-          // AMAN dipakai sebagai titik kunci pas reentry dari bawah: gak
-          // ada lagi resiko buku "sempet hilang dulu" kayak dulu, soalnya
-          // local = 1 buat buku terakhir sekarang kelihatannya identik
-          // sama local = EXIT_START (statis & full opacity, gak ke-hide).
-          initialProgress = 1;
-          lockAtEnd = true;
-        } else {
-          initialProgress = clamp01((y - this.pinStart) / this.totalDistance);
-        }
+    if (prev === null) {
+      initialProgress = clamp01((y - this.pinStart) / this.totalDistance);
+    } else if (y < prev) {
+      // User sedang SCROLL KE ATAS masuk ke area buku
+      if (prev >= this.pinEnd - 10) {
+        // FIX: dulu initialProgress = 1, itu artinya buku terakhir ada di
+        // local = 1 (posisi PALING UJUNG exit -- opacity 0, udah geser
+        // keluar layar, alias "invisible"). Makanya begitu masuk lagi dari
+        // bawah, buku sempet "hilang" dulu (nge-render kosong) sebelum
+        // animasi baliknya kelihatan. Sekarang ditaruh tepat di
+        // local = EXIT_START, yaitu posisi terakhir buku itu masih 100%
+        // kelihatan utuh (belum mulai geser/transparan keluar), jadi pas
+        // discroll ke atas dari bawah, buku terakhir langsung nongol utuh
+        // duluan, baru pas discroll ke atas lagi kebalik animasinya.
+        initialProgress = (this.books.length - 1 + EXIT_START) / this.books.length;
+        lockAtEnd = true;
       } else {
-        // User sedang SCROLL KE BAWAH masuk ke area buku
-        if (prev <= this.pinStart + 10) {
-          initialProgress = 0; // Mulai dari buku pertama (0%)
-          lockAtStart = true;
-        } else {
-          initialProgress = clamp01((y - this.pinStart) / this.totalDistance);
-        }
+        initialProgress = clamp01((y - this.pinStart) / this.totalDistance);
       }
-
-      const lockY = lockAtEnd ? this.pinEnd : (lockAtStart ? this.pinStart : y);
-      this.engageLock(initialProgress, lockY);
-      return;
-    }
-
-    // FIX SCROLL: flipbook "hilang" saat scroll balik ke atas dari
-    // paling bawah.
-    // Kalau lompatan antar-event scroll cukup jauh (scrollbar di-drag
-    // cepat, fling/momentum kencang, tombol "scroll to top", dll),
-    // posisi SEKARANG (y) bisa aja udah ada DI LUAR rentang pin padahal
-    // posisi SEBELUMNYA (prev) ada di SISI YANG BERLAWANAN -- artinya
-    // seluruh area buku ini "dilompati" dalam satu event scroll, tanpa
-    // sempat ketangkep sama pengecekan insideRange di atas. Akibatnya
-    // lock gak pernah nyala, dan buku gak pernah dirender ulang
-    // (this.progress nyangkut di nilai terakhir -- biasanya ~1, alias
-    // semua buku transparan/tersembunyi -- sampai user scroll ke bawah
-    // lagi dan reentry dari pinStart mereset semuanya). Di sini kita cek
-    // eksplisit kasus lompat itu, dan kunci di ujung yang sesuai arah
-    // lompatannya, biar buku tetap muncul.
-    if (prev !== null) {
-      if (y < prev && prev > this.pinEnd && y < this.pinStart) {
-        // Lompat sambil scroll ke ATAS -> kunci di progress=1 (ujung akhir),
-        // buku terakhir muncul utuh & tertutup dulu (sama kayak reentry
-        // normal -- lihat catatan FIX di atas soal kenapa progress=1 aman
-        // dipakai sekarang buat buku terakhir).
-        this.engageLock(1, this.pinEnd);
-      } else if (y > prev && prev < this.pinStart && y > this.pinEnd) {
-        // Lompat sambil scroll ke BAWAH -> kunci di ujung awal (pinStart),
-        // buku pertama muncul dari awal.
-        this.engageLock(0, this.pinStart);
+    } else {
+      // User sedang SCROLL KE BAWAH masuk ke area buku
+      if (prev <= this.pinStart + 10) {
+        initialProgress = 0; // Mulai dari buku pertama (0%)
+        lockAtStart = true;
+      } else {
+        initialProgress = clamp01((y - this.pinStart) / this.totalDistance);
       }
     }
+
+    const lockY = lockAtEnd ? this.pinEnd : (lockAtStart ? this.pinStart : y);
+    this.engageLock(initialProgress, lockY);
   }
 
   onWheel(e) {
@@ -1261,53 +1173,6 @@ class FlipBookScroll {
     const insideEditOverlay = e.target.closest && e.target.closest('.fb-edit-overlay');
     if (insideBook || insideActions || insideEditOverlay) return;
     this.closeBookActions();
-  }
-
-  // FIX SCROLL: "Maps" nav macet di area flipbook.
-  // Klik anchor nav (href="#...") memicu smooth-scroll bawaan browser
-  // yang tujuannya bisa aja di bawah/lewat area buku ini (contoh: dari
-  // Hero ke #map-section, harus lewat #flipbook-section dulu). Reentry-
-  // lock disuspend PERSIS dari saat link diklik (lihat checkReentry())
-  // supaya animasi scroll bawaan browser itu gak pernah "ketangkep" &
-  // dibatalin di tengah jalan. Dipasang di fase capture di addEvents()
-  // biar kedeteksi sebelum browser mulai animasi.
-  onAnchorNavClick(e) {
-    const link = e.target.closest && e.target.closest('a[href^="#"]');
-    if (!link) return;
-    this.suppressReentry = true;
-    this.armSuppressRelease();
-  }
-
-  // FIX SCROLL: melepas suppressReentry begitu posisi scroll beneran
-  // berhenti bergerak (dicek tiap 120ms), lalu langsung evaluasi ulang
-  // sekali lewat checkReentry() -- jadi kalau tujuan akhir navigasinya
-  // kebetulan tetap di dalam area buku (mis. nav "Dokumen" yang menuju
-  // pas ke awal section flipbook), buku tetap kekunci & kelihatan
-  // seperti biasa tanpa perlu scroll tambahan. Dikasih batas waktu
-  // maksimum 2 detik juga, biar gak nyangkut permanen kalau karena
-  // sesuatu hal posisi scroll gak pernah "diam".
-  armSuppressRelease() {
-    if (this._suppressTimer) clearTimeout(this._suppressTimer);
-    this._suppressLastY = window.scrollY;
-    this._suppressStart = performance.now();
-
-    const poll = () => {
-      const settled = window.scrollY === this._suppressLastY;
-      const timedOut = performance.now() - this._suppressStart > 2000;
-
-      if (settled || timedOut) {
-        this.suppressReentry = false;
-        this._suppressTimer = null;
-        this.recomputeBounds();
-        this.checkReentry();
-        return;
-      }
-
-      this._suppressLastY = window.scrollY;
-      this._suppressTimer = setTimeout(poll, 120);
-    };
-
-    this._suppressTimer = setTimeout(poll, 120);
   }
 
   applyDelta(deltaY) {
@@ -1473,8 +1338,6 @@ class FlipBookScroll {
     window.removeEventListener('scroll', this.onScroll);
     window.removeEventListener('resize', this.onResize);
     document.removeEventListener('click', this.onDocumentClick);
-    document.removeEventListener('click', this.onAnchorNavClick, true);
-    if (this._suppressTimer) clearTimeout(this._suppressTimer);
     if (this.observer) this.observer.disconnect();
     if (this.locked) this.unlockBodyScroll(this.savedScrollY);
     if (this.editOverlay && this.editOverlay.parentNode) {

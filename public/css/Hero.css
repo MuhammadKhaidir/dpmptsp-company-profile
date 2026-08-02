@@ -18,33 +18,6 @@
     --hero-ease: cubic-bezier(.16,.84,.32,1);
 }
 
-/* ==========================================================================
-   GLOBAL BACKGROUND — satu background dipakai bareng di SEMUA section
-   ==========================================================================
-   Sebelumnya .hero-grain & #canvas-3d-holder nempel di dalam .hero doang,
-   jadi begitu di-scroll lewat 100svh pertama, background itu (grain +
-   partikel 3D + warna dasar) keputus/ilang — section-section di bawahnya
-   (Profil/Visi/Misi, QR, Flipbook) jadi keliatan "kepisah" dari hero,
-   nyambungnya gak mulus.
-
-   Fix-nya: dua layer itu sekarang ditaruh di dalam #site-bg — wrapper
-   position:fixed yang nutupin seluruh viewport, ditaruh sebagai child
-   PALING PERTAMA di <body> (lihat index.html), jadi dia nempel di
-   belakang SEMUA section sepanjang halaman di-scroll, bukan cuma di
-   belakang .hero doang.
-
-   .hero-grain & #canvas-3d-holder di bawah ini GAK perlu diubah CSS-nya
-   (masih position:absolute; inset:0 kayak biasa), soalnya sekarang
-   containing block-nya adalah #site-bg (position:fixed), gantiin .hero.
-   js/VideoRevealEffect.js juga gak perlu diutak-atik karena dia nyari
-   kedua elemen itu lewat getElementById — lokasinya di DOM gak ngaruh.
-
-   .hero-bg-parallax (glow "brush" pojok kiri-atas) SENGAJA dibiarkan
-   tetap di dalam .hero, karena dia ikut koreografi load-in
-   `[data-hero-in="brush"]` yang selector-nya `.hero.is-loaded
-   [data-hero-in]` — kalau dipindah keluar dari .hero, animasi fade-in-nya
-   berhenti jalan.
-   ========================================================================== */
 #site-bg {
     position: fixed;
     inset: 0;
@@ -52,14 +25,6 @@
     overflow: hidden;
     pointer-events: none;
 
-    /* Background premium warna krem/gold — base gradient + vignette atas-bawah
-       + grid halus + spotlight gold ambient + grain + vignette bulat, DITAMBAH
-       beberapa "kilau" gold kecil yang disebar + glow lembut di 2 pojok biar
-       gak polos/kosong di area yang jauh dari spotlight tengah.
-       Dipakai dulu di .flipbook-scroll-sticky (css/FlipBookScroll.css);
-       sekarang dijadiin background bareng buat SELURUH halaman biar satu,
-       gak kuning kayak sebelumnya. .flipbook-scroll-sticky sendiri sekarang
-       transparent (lihat css/FlipBookScroll.css) biar gak dobel. */
     background-color: #e2d9c8;
     background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, no-repeat, repeat, repeat, no-repeat, no-repeat;
     background-size: 3px 3px, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 140% 140%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
@@ -438,19 +403,66 @@
     .hero { min-height: 100svh; padding-bottom: 40px; }
     .hero-title-parallax { max-width: 90vw; top: 40%; }
     .hero-device-parallax { right: 50%; transform: translateX(50%); bottom: 4%; }
-    .hero-device { width: min(220px, 52vw); }
+    /* FIX: sebelumnya ada min-width:320px bawaan dari rule desktop yang
+       gak ke-override di sini, jadi device tetep dipaksa selebar 320px+
+       walau width udah di-set lebih kecil. min-width:0 di sini biar
+       width:min(...) di bawah ini beneran ngefek & device ikut ngecil. */
+    .hero-device { width: min(240px, 42vw); min-width: 0; }
     .hero-logo-parallax { top: 118px; left: 50%; transform: translateX(-50%); }
+    /* FIX: clamp() asli (272px, 8vw, 308px) — 8vw hampir gak pernah lebih
+       gede dari 272px di layar manapun, jadi logo-nya "nyangkut" gede
+       terus. Di-override manual di sini biar proporsional buat tablet. */
+    .hero-logo-badge { width: clamp(150px, 26vw, 220px); height: clamp(150px, 26vw, 220px); margin-top: -20px; }
     .hero-logo-parallax, .hero-device-parallax { transition: none; }
 }
 
+/* ---- HP (mobile): layout absolute/parallax-nya diganti flow biasa yang
+   di-stack vertikal (nav → logo → judul → device, ngikutin urutan HTML-
+   nya), biar gak ada elemen yang numpuk/nabrak di layar sempit & pendek.
+   Angka top/bottom fixed-px yang lama gampang nabrak kalo tinggi layar
+   HP beda-beda, makanya diganti flexbox yang otomatis nyusun sendiri. ---- */
 @media (max-width: 640px) {
-    .hero-nav { top: 16px; right: 16px; left: 16px; justify-content: center; }
+    .hero {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        min-height: 100svh;
+        padding: 32px 20px 40px;
+        text-align: center;
+    }
+
+    .hero-nav {
+        position: static;
+        width: 100%;
+        justify-content: center;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
     .nav-pill { padding: 9px 16px; font-size: 11.5px; }
-    .hero-title-parallax { left: 50%; transform: translateX(-50%); text-align: center; top: auto; bottom: 232px; }
+
+    .hero-logo-parallax { position: static; transform: none; }
+    /* FIX: clamp lama (272-308px) kegedean banget di HP, ganti proporsi
+       yang beneran ngecil ngikutin lebar layar (34vw). */
+    .hero-logo-badge {
+        width: clamp(96px, 34vw, 150px);
+        height: clamp(96px, 34vw, 150px);
+        margin-top: 0;
+    }
+
+    .hero-title-parallax { position: static; transform: none; max-width: 92vw; }
     .hero-title { font-size: clamp(46px, 15vw, 80px); }
-    .hero-subtitle { letter-spacing: .18em; }
-    .hero-logo-parallax { top: 96px; }
-    .hero-device-parallax { bottom: -6%; }
+    /* FIX: clamp lama (40px, 1.5vw, 22px) — MIN-nya (40px) lebih gede dari
+       MAX-nya (22px), jadi hasilnya selalu mentok 40px di semua ukuran
+       layar (font-size gak pernah beneran ngecil). Diganti clamp yang
+       proporsinya bener. */
+    .hero-subtitle { font-size: clamp(14px, 4.4vw, 19px); letter-spacing: .16em; margin-left: 0; margin-top: 8px; }
+
+    .hero-device-parallax { position: static; transform: none; }
+    /* FIX: sama kayak breakpoint 980px, min-width:320px bawaan bikin
+       device gak bisa ngecil dari 320px meski width udah di-set kecil. */
+    .hero-device { width: min(190px, 58vw); min-width: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -90,3 +90,83 @@ body {
     0%, 100% { opacity: 1; }
     50% { opacity: .45; }
 }
+
+/* ==========================================================================
+   INFO SECTION HEAD — eyebrow label + section title (dipakai di semua
+   .info-section: qr-section, flipbook-section, map-section, scrub-content, dll)
+   ========================================================================== */
+
+.info-section-head {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 10px;
+    max-width: 640px;
+    margin: 0 auto 46px;
+}
+
+.info-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: .24em;
+    text-transform: uppercase;
+    color: #8a6a22;
+    transition: letter-spacing .4s var(--ease), color .4s var(--ease);
+}
+
+.info-eyebrow::before,
+.info-eyebrow::after {
+    content: '';
+    display: block;
+    width: 16px;
+    height: 1px;
+    background: #cba454;
+    transition: width .4s var(--ease), background .4s var(--ease);
+}
+
+.info-eyebrow:hover {
+    letter-spacing: .34em;
+    color: #6b4f16;
+}
+
+.info-eyebrow:hover::before,
+.info-eyebrow:hover::after {
+    width: 28px;
+    background: #8a6a22;
+}
+
+.info-title {
+    font-family: 'Fraunces', serif;
+    font-size: clamp(26px, 4vw, 42px);
+    font-weight: 800;
+    letter-spacing: -.02em;
+    line-height: 1.18;
+    text-align: center;
+    color: #3c2c0c;
+    background: linear-gradient(100deg, #3c2c0c 0%, #6b4f16 42%, #cba454 52%, #3c2c0c 100%);
+    background-size: 240% 100%;
+    background-position: 0% 50%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    text-shadow: 0 1px 0 rgba(255,255,255,.35);
+    cursor: default;
+    transition: background-position .7s var(--ease), transform .35s var(--ease), letter-spacing .35s var(--ease);
+}
+
+.info-title:hover {
+    background-position: 100% 50%;
+    transform: translateY(-2px);
+    letter-spacing: 0em;
+}
+
+/* Turunin "Profil Interaktif" & "Company Profile" — khusus flipbook-section,
+   section lain yang pake .info-section-head gak ikut kegeser */
+#flipbook-section .info-section-head {
+    margin-top: 400px;
+}
