@@ -10,7 +10,17 @@
 .flipbook-scroll-sticky {
   position: sticky;
   top: 0;
-  height: 100vh;
+  /* FIX BARU: sebelumnya height:100vh. Di browser HP (Chrome/Safari
+     mobile), unit `vh` dihitung TERMASUK area address bar yang bisa
+     collapse/muncul lagi pas discroll -- jadi tinggi box ini "meleset"
+     dari tinggi viewport yang BENERAN keliatan. Karena elemen ini
+     position:sticky, box yang keliru itu bikin buku keliatan
+     lompat/kepotong pas address bar collapse-expand waktu discroll.
+     css/Hero.css udah migrasi ke `100svh` (small viewport height --
+     versi vh yang stabil, diukur dari viewport paling kecil pas
+     address bar full muncul) buat masalah persis ini; disamain di sini
+     juga biar section flipbook stabil, gak lompat-lompat lagi di HP. */
+  height: 100svh;
   width: 100%;
   overflow: visible; /* Menghilangkan pemotongan kotak di batas kanan & kiri */
   display: flex;
@@ -581,7 +591,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 40vh;
+  /* FIX konsistensi: sama seperti .flipbook-scroll-sticky, min-height
+     berbasis vh sedikit-banyak kena isu unit vh di HP. Untuk state
+     loading ini dampaknya kecil (cuma placeholder sementara), tapi
+     disamain ke svh biar konsisten satu file & gak ninggalin unit vh
+     yang goyah di mobile. */
+  min-height: 40svh;
   font-family: 'Inter', sans-serif;
   font-size: 14px;
   color: rgba(20, 16, 10, 0.5);

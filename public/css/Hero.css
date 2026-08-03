@@ -1,4 +1,3 @@
-
 :root {
     --hero-yellow: #f4c518;
     --hero-yellow-deep: #e0b400;
@@ -186,7 +185,16 @@
     max-width: 60vw;
 }
 .hero-title {
-    font-family: 'Fraunces', ;
+    /* FIX: sebelumnya `font-family: 'Fraunces', ;` -- ada koma nyangkut
+       TANPA font fallback sesudahnya. Secara CSS, value kayak gini
+       dianggap INVALID, dan kalau satu deklarasi invalid, browser skip
+       total deklarasi itu (bukan "pakai Fraunces doang", tapi Fraunces-
+       nya gak pernah kepake SAMA SEKALI dari awal, jatuh ke font default
+       browser). Ini kejadian di semua ukuran layar, bukan cuma HP --
+       makanya judul besar "DPMPTSP" gak pernah kelihatan pakai font
+       Fraunces yang niatnya premium/serif itu. Ditambahin fallback
+       'serif' biar valid & Fraunces beneran ke-load. */
+    font-family: 'Fraunces', serif;
     font-weight: 900;
     font-size: clamp(58px, 10.4vw, 168px);
     line-height: .92;
@@ -453,9 +461,34 @@
     /* FIX: sama kayak breakpoint 980px, min-width:320px bawaan bikin
        device gak bisa ngecil dari 320px meski width udah di-set kecil. */
     .hero-device { width: min(190px, 58vw); min-width: 0; }
+
+    /* FIX BARU: d-pad & tombol bulat (.device-dpad, .device-buttons) di
+       device mockup sebelumnya FIXED PX (76px/84px/32px) di SEMUA ukuran
+       layar -- gak ikut nyusut sama sekali walau .hero-device sendiri
+       udah dipaksa ngecil sampai ~190px lewat rule di atas. Lebar area
+       yang tersedia buat dua kelompok kontrol itu (device width dikurangi
+       padding 8% kiri-kanan di .device-controls) bisa lebih SEMPIT dari
+       total lebar d-pad + tombol gabungan (76+84=160px) -- jadi mereka
+       SALING NABRAK/OVERLAP. Inilah salah satu sumber utama device
+       mockup keliatan "berantakan" di HP. Semua ukuran & posisi
+       diskalakan turun ~55% (proporsional ke penyusutan device-nya
+       sendiri, dari basis 84px→46px dst) biar layout diamond d-pad/
+       tombol tetap rapi tapi gak lagi nabrak. */
+    .device-dpad { width: 42px; height: 42px; }
+    .device-dpad .v { width: 14px; margin-left: -7px; }
+    .device-dpad .h { height: 14px; margin-top: -7px; }
+    .device-buttons { width: 46px; height: 46px; }
+    .device-buttons b { width: 18px; height: 18px; }
+    .device-buttons b.b1 { top: 12px; }
+    .device-buttons b.b2 { right: 12px; }
+    .device-buttons b.b3 { right: 12px; top: 24px; }
+    .device-buttons b.b4 { right: 24px; top: 12px; }
+    .device-vents { height: 6px; gap: 3px; }
+    .device-badge { width: 12px; height: 12px; left: 7px; }
+    .device-label { font-size: 8px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .hero-logo-float, .hero-device-float { animation: none; }
     .hero [data-hero-in] { transition: opacity .3s ease; transform: none !important; filter: none !important; }
-} 
+}
