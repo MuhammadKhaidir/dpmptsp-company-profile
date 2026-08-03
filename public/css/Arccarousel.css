@@ -264,7 +264,7 @@
     display: none !important;
 }
 
-@media (max-width: 720px) {
+@media (max-width: 320px) {
     .arc-carousel {
         --arc-card-w: clamp(130px, 30vw, 180px);
         --arc-gap-x: clamp(14px, 4vw, 24px);
