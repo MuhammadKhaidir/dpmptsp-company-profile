@@ -974,7 +974,16 @@ class FlipBookScroll {
             this.inView = entry.isIntersecting;
           });
         },
-        { rootMargin: '25% 0px 25% 0px' }
+        // FIX MOBILE: sebelumnya '25% 0px 25% 0px'. Kegedean jarak jauh
+        // sebelum section beneran nongol, this.inView masih false, jadi
+        // onScroll() nge-skip checkReentry() (lihat guard `if (!this.inView)
+        // return`) walaupun scroll udah deket banget sama pinStart/pinEnd.
+        // Di HP, momentum scroll bisa nempuh ratusan px dalam SATU event
+        // 'scroll' yang telat nembak -- kalau baru "siaga" pas udah mepet
+        // 25%, keburu kelewat. Dilebarin ke 60% biar checkReentry() udah
+        // mulai mantau dari lebih jauh, ngasih lebih banyak kesempatan buat
+        // nangkep batas sebelum keburu ke-skip.
+        { rootMargin: '60% 0px 60% 0px' }
       );
       this.observer.observe(this.container);
     }
@@ -1044,6 +1053,38 @@ class FlipBookScroll {
     this.lastScrollY = targetY;
   }
 
+  // FIX MOBILE: dipakai KHUSUS pas checkReentry() mau ngunci dari posisi
+  // scroll MENTAH (window.scrollY) yang bisa jadi udah "loncat" jauh gara-
+  // gara momentum/inertia scroll HP -- event 'scroll' baru sempet ketangkep
+  // pas posisi udah nyasar ke tengah-tengah animasi buka/tutup salah satu
+  // halaman. Tanpa snapping ini, buku bisa nongol dalam kondisi "aneh":
+  // separuh kebuka, miring ke samping, kepotong -- padahal user sama sekali
+  // gak sempet liat proses geraknya (di-skip gara-gara scroll kenceng).
+  // snapProgress() motong ke titik "bersih" terdekat (buku full ketutup di
+  // satu halaman, BUKAN nanggung di tengah flip), jadi frame pertama yang
+  // di-render pas lock nyala selalu rapi.
+  snapProgress(raw) {
+    const nBooks = this.books.length;
+    const globalFloat = clamp01(raw) * nBooks;
+    const bookIndex = Math.min(nBooks - 1, Math.floor(globalFloat));
+    const local = globalFloat - bookIndex;
+
+    let snappedLocal;
+    if (local <= ENTER_END) {
+      snappedLocal = ENTER_END; // anggap buku udah "masuk penuh", jangan render pas lagi meluncur masuk
+    } else if (local >= EXIT_START) {
+      snappedLocal = EXIT_START; // anggap masih "kebaca penuh", jangan render pas lagi meluncur keluar
+    } else {
+      const book = this.flipBooks[bookIndex];
+      const n = book ? book.pageCount : 1;
+      const openLocal = (local - ENTER_END) / (EXIT_START - ENTER_END);
+      const snappedOpenLocal = Math.round(openLocal * n) / n; // ke halaman terdekat, bukan nanggung di tengah flip
+      snappedLocal = ENTER_END + snappedOpenLocal * (EXIT_START - ENTER_END);
+    }
+
+    return clamp01((bookIndex + snappedLocal) / nBooks);
+  }
+
   checkReentry() {
     if (this.locked) return;
     const y = window.scrollY;
@@ -1091,7 +1132,7 @@ class FlipBookScroll {
     }
 
     const lockY = lockAtEnd ? this.pinEnd : (lockAtStart ? this.pinStart : y);
-    this.engageLock(initialProgress, lockY);
+    this.engageLock(this.snapProgress(initialProgress), lockY);
   }
 
   onWheel(e) {
@@ -1108,7 +1149,22 @@ class FlipBookScroll {
 
   onTouchMove(e) {
     if (this.editModalOpen) return;
-    if (!this.locked || !e.touches || e.touches.length > 1) return;
+    if (!e.touches || e.touches.length > 1) return;
+
+    // FIX MOBILE: sebelumnya kalau belum `locked`, fungsi ini langsung
+    // `return` -- artinya SELAMA proses drag jari di HP, satu-satunya cara
+    // checkReentry() kepanggil adalah lewat event 'scroll', yang di HP suka
+    // jarang/telat nembak pas momentum lagi kenceng. Akibatnya scroll bisa
+    // "kebablasan" ninggalin section buku sebelum lock sempet nyala (buku
+    // ke-skip / keliatan lompat). Sekarang tiap touchmove (jauh lebih rapat
+    // frame-nya daripada 'scroll' pas drag aktif) ikut manggil checkReentry()
+    // duluan, biar batas section ketangkep lebih cepat selagi jari masih
+    // nempel di layar -- bukan nunggu browser "ngasih tau" belakangan.
+    if (!this.locked) {
+      if (this.inView) this.checkReentry();
+      return;
+    }
+
     const y = e.touches[0].clientY;
     const delta = this.touchY - y;
     this.touchY = y;

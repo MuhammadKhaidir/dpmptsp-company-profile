@@ -1,8 +1,3 @@
-/* ==========================================================================
-   HERO — "Terminal Layanan Swalayan" landing scene
-   Bright yellow / brush-stroke / gold emblem / glass nav / retro device
-   Dipakai bareng: js/VideoRevealEffect.js, js/HeroTiltEffect.js
-   ========================================================================== */
 
 :root {
     --hero-yellow: #f4c518;
@@ -416,11 +411,6 @@
     .hero-logo-parallax, .hero-device-parallax { transition: none; }
 }
 
-/* ---- HP (mobile): layout absolute/parallax-nya diganti flow biasa yang
-   di-stack vertikal (nav → logo → judul → device, ngikutin urutan HTML-
-   nya), biar gak ada elemen yang numpuk/nabrak di layar sempit & pendek.
-   Angka top/bottom fixed-px yang lama gampang nabrak kalo tinggi layar
-   HP beda-beda, makanya diganti flexbox yang otomatis nyusun sendiri. ---- */
 @media (max-width: 640px) {
     .hero {
         display: flex;
@@ -468,4 +458,4 @@
 @media (prefers-reduced-motion: reduce) {
     .hero-logo-float, .hero-device-float { animation: none; }
     .hero [data-hero-in] { transition: opacity .3s ease; transform: none !important; filter: none !important; }
-}
+} 

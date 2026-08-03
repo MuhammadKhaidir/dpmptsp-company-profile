@@ -29,12 +29,28 @@
     max-width: 960px;
     width: 100%;
     margin: 0 auto;
-    margin-bottom: -700px;
     /* FIX: grid buku ini kepotong/nabrak section QR di bawahnya --
        dikasih jarak aman lewat PADDING (bukan margin), soalnya padding
        gak ikut "collapse" biarpun section sesudahnya (QR) punya margin
-       negatif kayak .qr-scene { margin-top: -40px }. */
-    padding-bottom: clamp(780px, 7vw, 96px);
+       negatif kayak .qr-scene { margin-top: -40px }.
+       DUA BUG kepakai bareng di sini sebelumnya:
+       1) "margin-bottom: -700px;" itu sisa cara lama (margin) yang
+          SEHARUSNYA udah kegantiin sama padding di bawah ini, tapi
+          barisnya kelewat kehapus. -700px itu gede banget dibanding
+          tinggi layar HP (~700-800px), jadi si .scrub-content (parent
+          flex yang nge-center konten ini) ngitung tinggi total jadi
+          kacau -> pas di-center vertikal, grid-nya kepental ke atas dan
+          nyisain area kosong gede di bawah kayak di screenshot. Baris
+          ini dihapus total.
+       2) "clamp(780px, 7vw, 96px)" -- MIN (780px) lebih gede dari MAX
+          (96px), jadi ke-lock di 780px TERUS di semua ukuran layar
+          (persis kasus yang sama kayak bug clamp di Hero.css). Ini
+          sendirian aja udah nambahin ~780px ruang kosong kebawah, di
+          HP yang tingginya cuma ~700-800px itu udah hampir 1 layar
+          penuh kosong. Diurutin ulang jadi MIN 96px - MAX 780px, jadi
+          hasil real-nya ngikutin 7vw (biasanya ~30-130px di kebanyakan
+          layar), gak lagi kekunci gede. */
+    padding-bottom: clamp(96px, 7vw, 780px);
 }
 
 /* .arc-track dulu "panggung 3D" yang diputer JS tiap frame -- sekarang
