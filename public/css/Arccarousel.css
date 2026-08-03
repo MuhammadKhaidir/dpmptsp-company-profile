@@ -3,30 +3,39 @@
    niru referensi gambar (grid rapi, sampul buku polos berdiri
    tegak, gold spine + gold rivet pojok, shadow lembut). Buku
    SENGAJA gak bisa "dibuka" lagi (fitur flip lama dihapus total) --
-   judul sekarang di-overlay LANGSUNG di sampul (bukan lagi caption
-   ngambang di atasnya -- lihat update di bawah), link PDF jadi
-   tombol yang SELALU kelihatan di BAWAH sampul.
+   judul di-overlay LANGSUNG di sampul (bukan caption ngambang di
+   atasnya), link PDF jadi tombol yang SELALU kelihatan di BAWAH
+   sampul.
 
-   UPDATE JUDUL DI SAMPUL: judul yang tadinya caption terpisah yang
-   ngambang DI ATAS sampul sekarang di-overlay LANGSUNG di bagian
-   atas .arc-card-cover (lihat .arc-card-caption + .arc-card di
-   bawah) -- niru cover buku asli yang judulnya emang dicetak/
-   di-emboss di kulit sampulnya, bukan nempel sebagai label
-   terpisah. Ini murni perubahan posisi + warna lewat CSS
-   (position:absolute + z-index), HTML/JS render-nya gak perlu
-   diubah sama sekali.
+   REVISI RAPI-IN LAYOUT (paling baru): sebelumnya .arc-track pakai
+   CSS Grid dengan kolom dipaksa 4 (`repeat(4, minmax(0,1fr))`) TAPI
+   rumus max-width-nya salah hitung (cuma nambah 1x gap padahal 4
+   kolom butuh 3x gap antar kolom) -- itu bikin kartu kepepet gak
+   sesuai ukuran yang diniatin. Grid biasa juga bikin baris terakhir
+   yang gak penuh (kejadian terus karena ada fitur tambah/hapus
+   buku, jumlahnya jarang pas kelipatan rapi) nempel ke KIRI, gak
+   ke-center -- keliatan miring/gak simetris.
+
+   Makanya SEKARANG diganti ke Flexbox (`flex-wrap: wrap` +
+   `justify-content: center` di .arc-track, tiap .arc-card punya
+   lebar tetap lewat `flex: 0 0 var(--arc-card-w)`). Flexbox yang
+   wrap otomatis nge-center SETIAP baris, termasuk baris terakhir
+   yang gak penuh -- jadi berapapun jumlah bukunya, tetep keliatan
+   rapi & simetris tanpa perlu itung manual jumlah kolom lagi.
+   Konsekuensinya: jumlah buku per baris jadi dinamis ngikut lebar
+   layar (biasanya 2-3 di layar biasa, bisa 4 kalau .arc-carousel
+   dilebarin) -- BUKAN dipaksa selalu 4, tapi ukuran tiap sampul
+   jadi proporsional & gak gepeng.
 
    BG SENGAJA GAK DISENTUH SAMA SEKALI di file ini -- gak ada satu
    pun `background` ditambahin ke .arc-carousel/.arc-track, biar
    #site-bg tetap yang keliatan di belakang, sama kayak section lain.
 
-   FITUR TAMBAH & HAPUS BUKU: grid ini sekarang di-render dari data
-   dinamis (lihat js/Arccarousel.js + routes/arcCarouselContent.js),
-   jumlah kartu bisa berubah-ubah kapan aja. Aturan spacing di
-   .arc-carousel di bawah ini DIPERTAHANKAN persis sesuai hasil
-   tuning manual sebelumnya -- CUMA ditambah max-height+scroll di
-   .arc-track (lihat bagian FITUR TAMBAH & HAPUS BUKU di bawah) biar
-   tetap aman kalau jumlah bukunya nanti nambah banyak.
+   FITUR TAMBAH & HAPUS BUKU: grid ini di-render dari data dinamis
+   (lihat js/Arccarousel.js + routes/arcCarouselContent.js), jumlah
+   kartu bisa berubah-ubah kapan aja -- justru ini alasan utama
+   kenapa penataan berbasis Flexbox+wrap lebih cocok dibanding Grid
+   kolom-tetap (lihat penjelasan di atas).
    ============================================================ */
 
 .arc-carousel {
@@ -40,74 +49,77 @@
     width: 100%;
     margin: 0 auto;
 
-    padding-bottom: clamp(96px, 7vw, 780px);
+    /* FIX: sebelumnya clamp(96px, 7vw, 780px) -- angka 780px itu
+       jomplang banget dibanding elemen lain di file ini (kemungkinan
+       kelebihan nol pas ngetik), bikin jarak ke section sesudahnya
+       kegedean gak wajar. Diturunin ke skala yang konsisten sama
+       gap-gap lain di section ini. */
+    padding-bottom: clamp(60px, 6vw, 120px);
 }
 
-/* .arc-track dulu "panggung 3D" yang diputer JS tiap frame -- sekarang
-   cuma CSS Grid biasa. Kolom DIPAKSA 2 tetap (bukan auto-fit lagi) --
-   biar jumlah baris konsisten 4 baris (bukan 2) buat jumlah kartu yang
-   sama, dan biar ngecilin --arc-card-w gak ikut nambahin jumlah kolom.
-   max-width + margin:auto di sini yang bikin blok 2-kolomnya center,
-   gak melar ngisi seluruh lebar .arc-carousel. */
-   
+/* .arc-track dulu "panggung 3D" yang diputer JS tiap frame, lalu
+   sempet jadi CSS Grid kolom-tetap -- SEKARANG Flexbox yang wrap.
+   justify-content:center di sini yang bikin SETIAP baris (termasuk
+   baris terakhir yang gak penuh) selalu ke-center, gak nyantol ke
+   kiri kayak kalau pakai Grid biasa. max-width dihitung PAS buat 4
+   kartu + 3 celah gap (rumus yang bener: n kartu butuh (n-1) gap),
+   biar di layar lebar dia gak melar nampung lebih dari 4/baris. */
 .arc-track {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    display: flex;
+    flex-wrap: wrap;
     justify-content: center;
-    align-items: start;
+    align-items: flex-start;
     gap: var(--arc-gap-y) var(--arc-gap-x);
     padding: 8px 0;
-    max-width: calc(var(--arc-card-w) * 4 + var(--arc-gap-x));
+    max-width: calc(var(--arc-card-w) * 4 + var(--arc-gap-x) * 3);
     margin: 0 auto;
 }
 
-/* .arc-card sekarang dikasih position:relative -- SATU-SATUNYA
-   alasan: biar .arc-card-caption (judul) bisa position:absolute
-   dan nempel presis di koordinat atas sampul (lihat penjelasan
-   panjang di komentar .arc-card-caption di bawah). Gak ngubah
-   layout flex-nya sama sekali, cuma nambah 1 baris ini. */
+/* Lebar kartu sekarang FIXED lewat flex-basis (bukan lagi ngisi sel
+   grid) -- flex-grow & flex-shrink sengaja 0 biar sampul buku gak
+   pernah kegencet/melar, dia cuma akan WRAP ke baris baru kalau gak
+   muat, gak pernah nyusut proporsinya. gap:0 di sini karena jarak
+   vertikal antar judul/sampul/tombol sekarang diatur manual lewat
+   margin (lihat .arc-card-caption & .arc-card-cover), bukan lewat
+   flex gap lagi -- biar hitungan overlap judul-ke-sampul presisi. */
 .arc-card {
     position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 16px;
-    width: 100%;
+    gap: 0;
+    flex: 0 0 var(--arc-card-w);
+    width: var(--arc-card-w);
     max-width: var(--arc-card-w);
-    margin: 0 auto;
 }
 
-/* FIX TAMPILAN (v2 -- judul pindah ke atas sampul): sebelumnya di
-   sini caption cuma dikasih min-height biar tinggi captionnya
-   konsisten pas dia masih jadi elemen ke-1 di flex-flow .arc-card
-   (biar sampul di semua kartu sebaris tetep sejajar). Sekarang
-   caption ini DIKELUARIN dari flex-flow (position:absolute) dan
-   ditumpuk di ATAS .arc-card-cover, jadi soal "sejajar antar kartu"
-   udah otomatis beres (dia gak lagi ikut ngedorong tinggi kartu).
-   min-height 2 baris di sini sekarang gunanya beda: biar garis
-   pembatas emas tipis di bawah judul (border-bottom) selalu jatuh
-   di ketinggian yang sama di setiap sampul, biarpun judulnya cuma
-   1 baris atau penuh 2 baris.
+/* FIX UTAMA (v2): dulu judul di-posisikan `position:absolute; top:
+   persen-dari-tinggi-.arc-card`. Masalahnya, tinggi .arc-card itu
+   sampul + tombol PDF DIJADIKAN SATU, jadi "16%" itu sebenernya
+   persen dari (sampul+tombol), bukan persen dari sampul doang --
+   begitu tinggi kartu beda dikit antar kartu, posisi judul di atas
+   sampul ikut geser gak konsisten. Itu salah satu sumber "keliatan
+   asimetris".
 
-   Posisi (top/left/right) di-hitung dari .arc-card (lihat
-   position:relative yang ditambahin di rule .arc-card di atas),
-   BUKAN dari .arc-card-cover -- soalnya .arc-card-cover pakai
-   overflow:hidden buat elemen dekoratif lain (spine dsb), jadi
-   caption sengaja ditaro selevel sama .arc-card biar gak ke-crop.
-   Karena posisinya dihitung relatif ke .arc-card dan .arc-card-cover
-   kebetulan pas jadi anak flex PERTAMA (caption udah gak ikut
-   flow), top:0 di .arc-card = top sampul juga -- jadi biarpun HTML
-   lo masih naro elemen caption ini duluan sebelum sampul di markup,
-   hasilnya tetep nempel presis di atas sampul, gak perlu ubah
-   urutan HTML/JS sama sekali. */
+   SEKARANG dipakai cara yang jauh lebih presisi: --arc-caption-h
+   dihitung SEKALI (2 baris teks + padding atas-bawah), lalu dipakai
+   BARENG buat `min-height` (tinggi kotak judul) dan `margin-bottom`
+   negatif (buat narik sampul naik nempel PAS di bawah judul). Karena
+   dua-duanya baca dari variabel yang SAMA, sampul dijamin selalu
+   nempel di titik yang sama persis relatif ke judul -- gak peduli
+   device, gak peduli tinggi tombol PDF di bawahnya, gak perlu tebak
+   persen lagi. z-index:2 biar judul kegambar DI ATAS sampul (karena
+   sekarang saling tindih lewat margin negatif, bukan lewat
+   position:absolute). */
 .arc-card-caption {
-    position: absolute;
-    top: clamp(38px, 16%, 60px);
-    left: clamp(14px, 11%, 30px);
-    right: clamp(14px, 11%, 30px);
-    z-index: 4;
-    margin: 0;
-    padding: 0 2px 10px;
+    --arc-caption-h: calc(2.64em + 28px);
+
+    box-sizing: border-box;
+    position: relative;
+    z-index: 2;
+    min-height: var(--arc-caption-h);
+    margin: 0 clamp(12px, 9%, 26px) calc(-1 * var(--arc-caption-h));
+    padding: 16px 4px 12px;
     pointer-events: none;
 
     font-family: 'Fraunces', serif;
@@ -124,18 +136,23 @@
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-    min-height: 2.64em;
 
     transition: transform 0.35s cubic-bezier(.33, 1, .4, 1);
 }
 
 /* Sampul buku -- polos (gak ada teks/icon di atasnya lagi, biar sama
    kayak referensi gambar), gold frame tipis + sheen halus niru material
-   sampul FlipBook, TAPI gak ada animasi flip/klik lagi. */
+   sampul FlipBook, TAPI gak ada animasi flip/klik lagi. z-index:1 +
+   margin-bottom:16px ditambahin biar rapi nempatin diri di bawah
+   .arc-card-caption (lihat penjelasan di atas) sekaligus ngasih jarak
+   ke tombol PDF di bawahnya (dulu jarak ini dari flex-gap, sekarang
+   manual karena gap parent di-nolin). */
 .arc-card-cover {
     position: relative;
+    z-index: 1;
     width: 100%;
     aspect-ratio: 5 / 7;
+    margin-bottom: 16px;
     border-radius: 8px 14px 14px 8px;
     overflow: hidden;
     background-repeat: no-repeat, no-repeat;
@@ -163,12 +180,12 @@
     transition: border-color .3s ease;
 }
 /* Overlay gradasi biar materialnya kerasa "kulit" bukan flat --
-   sekarang ditambah "vignette" gelap di bagian PALING ATAS sampul
-   (0%-26%) khusus buat nge-boost kontras judul yang sekarang
-   nangkring di situ (lihat .arc-card-caption), soalnya teks krem/
-   emas kudu tetep gampang dibaca di atas warna sampul apapun (wine,
-   ijo, navy, ungu, amber, teal). Gradasi terang-ke-gelap yang lama
-   di bagian bawah (buat kesan kulit) tetep dipertahanin persis. */
+   ditambah vignette gelap tipis khusus di bagian PALING ATAS sampul
+   (0%-26%), soalnya sekarang judul (krem/emas) nangkring persis di
+   area itu -- perlu kontras ekstra biar tetep gampang dibaca di atas
+   warna sampul apapun (wine, ijo, navy, ungu, amber, teal). Gradasi
+   terang-ke-gelap yang lama di bagian bawah (kesan kulit) tetep
+   dipertahanin persis. */
 .arc-card-cover::after {
     content: '';
     position: absolute;
@@ -221,7 +238,9 @@
 
 /* FITUR HOVER: sampul kebangkat dikit + shadow nge-deep + glow gold
    tipis muncul di list emasnya -- buku TETAP gak bisa diklik/dibuka,
-   ini murni animasi hover buat kesan "hidup" doang. */
+   ini murni animasi hover buat kesan "hidup" doang. Judul ikut
+   "kebangkat" bareng sampul (translateY doang, gak ikut scale, biar
+   teksnya tetep tajam & gak blur), biar keliatan nempel jadi satu. */
 .arc-card:hover .arc-card-cover {
     transform: translateY(-10px) scale(1.025);
     box-shadow: 0 32px 65px -10px rgba(20, 16, 10, 0.62), 0 0 28px rgba(203, 164, 84, 0.3);
@@ -229,10 +248,6 @@
 .arc-card:hover .arc-card-cover::before {
     border-color: rgba(203, 164, 84, 0.62);
 }
-/* Judul ikut "kebangkat" bareng sampul pas hover, biar keliatan
-   nempel jadi satu sama sampulnya (bukan diem doang sementara
-   sampul di bawahnya naik). Cuma translateY yang disamain, gak
-   ikut scale kayak sampul biar teksnya tetep tajam & gak blur. */
 .arc-card:hover .arc-card-caption {
     transform: translateY(-10px);
 }
@@ -319,12 +334,18 @@
     }
 }
 
-/* Layar sangat sempit -- 2 kolom kerasa kesempitan (apalagi kalau
-   .arc-carousel ini lagi berdampingan sama satu lagi via .pv-grid),
-   turun jadi 1 kolom aja biar sampulnya gak keremes. */
+/* Layar sangat sempit -- di lebar segini paksa 1 kartu per baris biar
+   sampulnya gak keremes (walaupun secara hitungan lebar 2 kartu kecil
+   masih "muat", tetep kerasa sempit apalagi kalau .arc-carousel ini
+   lagi berdampingan sama satu lagi via .pv-grid). flex-basis:100%
+   dipakai (ganti dari ubah grid-template-columns yang lama), sesuai
+   sama .arc-track yang sekarang Flexbox. */
 @media (max-width: 420px) {
+    .arc-card {
+        flex-basis: 100%;
+        max-width: var(--arc-card-w);
+    }
     .arc-track {
-        grid-template-columns: 1fr;
         max-width: var(--arc-card-w);
     }
 }
@@ -344,16 +365,21 @@
 
 /* ============================================================
    FITUR TAMBAH & HAPUS BUKU
-   Grid buku sekarang di-render dari data DINAMIS (fetch dari
-   /api/arc-carousel/content), bukan dari HTML statis lagi -- lihat
+   Grid buku di-render dari data DINAMIS (fetch dari
+   /api/arc-carousel/content), bukan dari HTML statis -- lihat
    js/Arccarousel.js. Tombol "+ Tambah Buku" nempel di bawah grid,
    tiap kartu punya tombol "×" kecil buat hapus. Keduanya lewat modal
    password (pola sama kayak fitur edit FlipBook/QR).
    ============================================================ */
 
+/* FIX: dulu pakai `grid-column: 1 / -1` (properti khusus CSS Grid)
+   buat bikin pesan loading/kosong ini melebar penuh 1 baris. Karena
+   .arc-track sekarang Flexbox (bukan Grid lagi), properti itu gak
+   ngefek apa-apa -- diganti `flex-basis: 100%` biar tetep melebar
+   penuh kayak niat awalnya. */
 .arc-loading,
 .arc-empty {
-    grid-column: 1 / -1;
+    flex-basis: 100%;
     text-align: center;
     font-family: 'Inter', sans-serif;
     font-size: 13px;
