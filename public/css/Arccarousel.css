@@ -3,8 +3,18 @@
    niru referensi gambar (grid rapi, sampul buku polos berdiri
    tegak, gold spine + gold rivet pojok, shadow lembut). Buku
    SENGAJA gak bisa "dibuka" lagi (fitur flip lama dihapus total) --
-   judul sekarang jadi caption di ATAS sampul, link PDF jadi tombol
-   yang SELALU kelihatan di BAWAH sampul.
+   judul sekarang di-overlay LANGSUNG di sampul (bukan lagi caption
+   ngambang di atasnya -- lihat update di bawah), link PDF jadi
+   tombol yang SELALU kelihatan di BAWAH sampul.
+
+   UPDATE JUDUL DI SAMPUL: judul yang tadinya caption terpisah yang
+   ngambang DI ATAS sampul sekarang di-overlay LANGSUNG di bagian
+   atas .arc-card-cover (lihat .arc-card-caption + .arc-card di
+   bawah) -- niru cover buku asli yang judulnya emang dicetak/
+   di-emboss di kulit sampulnya, bukan nempel sebagai label
+   terpisah. Ini murni perubahan posisi + warna lewat CSS
+   (position:absolute + z-index), HTML/JS render-nya gak perlu
+   diubah sama sekali.
 
    BG SENGAJA GAK DISENTUH SAMA SEKALI di file ini -- gak ada satu
    pun `background` ditambahin ke .arc-carousel/.arc-track, biar
@@ -29,27 +39,7 @@
     max-width: 960px;
     width: 100%;
     margin: 0 auto;
-    /* FIX: grid buku ini kepotong/nabrak section QR di bawahnya --
-       dikasih jarak aman lewat PADDING (bukan margin), soalnya padding
-       gak ikut "collapse" biarpun section sesudahnya (QR) punya margin
-       negatif kayak .qr-scene { margin-top: -40px }.
-       DUA BUG kepakai bareng di sini sebelumnya:
-       1) "margin-bottom: -700px;" itu sisa cara lama (margin) yang
-          SEHARUSNYA udah kegantiin sama padding di bawah ini, tapi
-          barisnya kelewat kehapus. -700px itu gede banget dibanding
-          tinggi layar HP (~700-800px), jadi si .scrub-content (parent
-          flex yang nge-center konten ini) ngitung tinggi total jadi
-          kacau -> pas di-center vertikal, grid-nya kepental ke atas dan
-          nyisain area kosong gede di bawah kayak di screenshot. Baris
-          ini dihapus total.
-       2) "clamp(780px, 7vw, 96px)" -- MIN (780px) lebih gede dari MAX
-          (96px), jadi ke-lock di 780px TERUS di semua ukuran layar
-          (persis kasus yang sama kayak bug clamp di Hero.css). Ini
-          sendirian aja udah nambahin ~780px ruang kosong kebawah, di
-          HP yang tingginya cuma ~700-800px itu udah hampir 1 layar
-          penuh kosong. Diurutin ulang jadi MIN 96px - MAX 780px, jadi
-          hasil real-nya ngikutin 7vw (biasanya ~30-130px di kebanyakan
-          layar), gak lagi kekunci gede. */
+
     padding-bottom: clamp(96px, 7vw, 780px);
 }
 
@@ -59,6 +49,7 @@
    sama, dan biar ngecilin --arc-card-w gak ikut nambahin jumlah kolom.
    max-width + margin:auto di sini yang bikin blok 2-kolomnya center,
    gak melar ngisi seluruh lebar .arc-carousel. */
+   
 .arc-track {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -70,7 +61,13 @@
     margin: 0 auto;
 }
 
+/* .arc-card sekarang dikasih position:relative -- SATU-SATUNYA
+   alasan: biar .arc-card-caption (judul) bisa position:absolute
+   dan nempel presis di koordinat atas sampul (lihat penjelasan
+   panjang di komentar .arc-card-caption di bawah). Gak ngubah
+   layout flex-nya sama sekali, cuma nambah 1 baris ini. */
 .arc-card {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -80,25 +77,56 @@
     margin: 0 auto;
 }
 
-/* FIX TAMPILAN: caption dulu tingginya ngikutin jumlah baris teks
-   (1 baris vs 2 baris beda tinggi), jadi sampul di bawahnya suka gak
-   sejajar antar kartu dalam satu baris grid -- keliatan berantakan.
-   Sekarang dikasih min-height setara 2 baris (line-height 1.32 x 2),
-   jadi semua caption "ngambil" tinggi yang sama biarpun judulnya
-   pendek, dan barisan sampul di bawahnya jadi rapi sejajar. */
+/* FIX TAMPILAN (v2 -- judul pindah ke atas sampul): sebelumnya di
+   sini caption cuma dikasih min-height biar tinggi captionnya
+   konsisten pas dia masih jadi elemen ke-1 di flex-flow .arc-card
+   (biar sampul di semua kartu sebaris tetep sejajar). Sekarang
+   caption ini DIKELUARIN dari flex-flow (position:absolute) dan
+   ditumpuk di ATAS .arc-card-cover, jadi soal "sejajar antar kartu"
+   udah otomatis beres (dia gak lagi ikut ngedorong tinggi kartu).
+   min-height 2 baris di sini sekarang gunanya beda: biar garis
+   pembatas emas tipis di bawah judul (border-bottom) selalu jatuh
+   di ketinggian yang sama di setiap sampul, biarpun judulnya cuma
+   1 baris atau penuh 2 baris.
+
+   Posisi (top/left/right) di-hitung dari .arc-card (lihat
+   position:relative yang ditambahin di rule .arc-card di atas),
+   BUKAN dari .arc-card-cover -- soalnya .arc-card-cover pakai
+   overflow:hidden buat elemen dekoratif lain (spine dsb), jadi
+   caption sengaja ditaro selevel sama .arc-card biar gak ke-crop.
+   Karena posisinya dihitung relatif ke .arc-card dan .arc-card-cover
+   kebetulan pas jadi anak flex PERTAMA (caption udah gak ikut
+   flow), top:0 di .arc-card = top sampul juga -- jadi biarpun HTML
+   lo masih naro elemen caption ini duluan sebelum sampul di markup,
+   hasilnya tetep nempel presis di atas sampul, gak perlu ubah
+   urutan HTML/JS sama sekali. */
 .arc-card-caption {
+    position: absolute;
+    top: clamp(38px, 16%, 60px);
+    left: clamp(14px, 11%, 30px);
+    right: clamp(14px, 11%, 30px);
+    z-index: 4;
     margin: 0;
+    padding: 0 2px 10px;
+    pointer-events: none;
+
     font-family: 'Fraunces', serif;
     font-size: clamp(13px, 1.35vw, 16px);
     font-weight: 700;
     line-height: 1.32;
-    color: #14100a;
+    letter-spacing: 0.03em;
     text-align: center;
+    color: #f4ead0;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55), 0 4px 14px rgba(0, 0, 0, 0.4);
+    border-bottom: 1px solid rgba(203, 164, 84, 0.45);
+
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
     min-height: 2.64em;
+
+    transition: transform 0.35s cubic-bezier(.33, 1, .4, 1);
 }
 
 /* Sampul buku -- polos (gak ada teks/icon di atasnya lagi, biar sama
@@ -134,12 +162,24 @@
     pointer-events: none;
     transition: border-color .3s ease;
 }
-/* Overlay gradasi lembut biar materialnya kerasa "kulit" bukan flat */
+/* Overlay gradasi biar materialnya kerasa "kulit" bukan flat --
+   sekarang ditambah "vignette" gelap di bagian PALING ATAS sampul
+   (0%-26%) khusus buat nge-boost kontras judul yang sekarang
+   nangkring di situ (lihat .arc-card-caption), soalnya teks krem/
+   emas kudu tetep gampang dibaca di atas warna sampul apapun (wine,
+   ijo, navy, ungu, amber, teal). Gradasi terang-ke-gelap yang lama
+   di bagian bawah (buat kesan kulit) tetep dipertahanin persis. */
 .arc-card-cover::after {
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(0, 0, 0, 0.42) 100%);
+    background: linear-gradient(
+        180deg,
+        rgba(0, 0, 0, 0.5) 0%,
+        rgba(0, 0, 0, 0.08) 26%,
+        rgba(255, 255, 255, 0.05) 46%,
+        rgba(0, 0, 0, 0.42) 100%
+    );
     pointer-events: none;
 }
 
@@ -188,6 +228,13 @@
 }
 .arc-card:hover .arc-card-cover::before {
     border-color: rgba(203, 164, 84, 0.62);
+}
+/* Judul ikut "kebangkat" bareng sampul pas hover, biar keliatan
+   nempel jadi satu sama sampulnya (bukan diem doang sementara
+   sampul di bawahnya naik). Cuma translateY yang disamain, gak
+   ikut scale kayak sampul biar teksnya tetep tajam & gak blur. */
+.arc-card:hover .arc-card-caption {
+    transform: translateY(-10px);
 }
 
 /* Spiral/coil binding di kiri -- pola cincin kecil berulang (radial-gradient
@@ -288,6 +335,9 @@
         transition: box-shadow .3s ease;
     }
     .arc-card:hover .arc-card-cover {
+        transform: none;
+    }
+    .arc-card:hover .arc-card-caption {
         transform: none;
     }
 }
