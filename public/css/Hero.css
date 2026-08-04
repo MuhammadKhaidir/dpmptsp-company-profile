@@ -12,6 +12,31 @@
     --hero-ease: cubic-bezier(.16,.84,.32,1);
 }
 
+/* FIX BARU: "background misterius" muncul di kanan layar pas di-zoom out
+   di HP (dilaporkan lewat screenshot) -- ini gejala KLASIK: ada elemen
+   DI SUATU TEMPAT di halaman (bisa di section manapun) yang bikin lebar
+   dokumen (html/body) jadi LEBIH LEBAR dari 100vw. Begitu itu kejadian,
+   section manapun yang pakai width:100% (termasuk .flipbook-scroll-wrap)
+   ikut kebawa jadi lebih lebar dari yang keliatan, dan elemen yang
+   posisinya pakai persen (misal .fb-book { left:50% }) jadi "ngengsel"
+   di titik yang BUKAN tengah layar asli -- itu sumber buku keliatan
+   mepet kiri dengan ruang kosong di kanan.
+
+   Ini fix DEFENSIF di level DOKUMEN (bukan per-section): manapun elemen
+   yang jadi biang keroknya (perlu base.css/MapSection.css/dll buat
+   nemuin PERSISNYA), html & body dipaksa gak akan pernah bisa
+   melebar/di-scroll/di-zoom ke arah horizontal ke luar dari 100vw --
+   overflow-x:clip dipilih (bukan hidden) karena clip TIDAK memicu bug
+   "auto-promotion" (di mana overflow-y ikut kepaksa jadi scrollable
+   walau harusnya visible) yang bisa kejadian kalau pasangannya hidden.
+   overflow-y SENGAJA gak disentuh sama sekali di sini, jadi scroll
+   vertikal biasa (termasuk scroll-jacking flipbook) tetap normal. Ini
+   gak ngerubah layout section manapun, cuma nutup "jendela" yang
+   bikin ruang kosong tadi bisa keliatan/di-zoom ke sana. */
+html, body {
+    overflow-x: clip;
+}
+
 #site-bg {
     position: fixed;
     inset: 0;
@@ -185,15 +210,6 @@
     max-width: 60vw;
 }
 .hero-title {
-    /* FIX: sebelumnya `font-family: 'Fraunces', ;` -- ada koma nyangkut
-       TANPA font fallback sesudahnya. Secara CSS, value kayak gini
-       dianggap INVALID, dan kalau satu deklarasi invalid, browser skip
-       total deklarasi itu (bukan "pakai Fraunces doang", tapi Fraunces-
-       nya gak pernah kepake SAMA SEKALI dari awal, jatuh ke font default
-       browser). Ini kejadian di semua ukuran layar, bukan cuma HP --
-       makanya judul besar "DPMPTSP" gak pernah kelihatan pakai font
-       Fraunces yang niatnya premium/serif itu. Ditambahin fallback
-       'serif' biar valid & Fraunces beneran ke-load. */
     font-family: 'Fraunces', serif;
     font-weight: 900;
     font-size: clamp(58px, 10.4vw, 168px);
@@ -406,15 +422,8 @@
     .hero { min-height: 100svh; padding-bottom: 40px; }
     .hero-title-parallax { max-width: 90vw; top: 40%; }
     .hero-device-parallax { right: 50%; transform: translateX(50%); bottom: 4%; }
-    /* FIX: sebelumnya ada min-width:320px bawaan dari rule desktop yang
-       gak ke-override di sini, jadi device tetep dipaksa selebar 320px+
-       walau width udah di-set lebih kecil. min-width:0 di sini biar
-       width:min(...) di bawah ini beneran ngefek & device ikut ngecil. */
     .hero-device { width: min(240px, 42vw); min-width: 0; }
     .hero-logo-parallax { top: 118px; left: 50%; transform: translateX(-50%); }
-    /* FIX: clamp() asli (272px, 8vw, 308px) — 8vw hampir gak pernah lebih
-       gede dari 272px di layar manapun, jadi logo-nya "nyangkut" gede
-       terus. Di-override manual di sini biar proporsional buat tablet. */
     .hero-logo-badge { width: clamp(150px, 26vw, 220px); height: clamp(150px, 26vw, 220px); margin-top: -20px; }
     .hero-logo-parallax, .hero-device-parallax { transition: none; }
 }
@@ -441,8 +450,6 @@
     .nav-pill { padding: 9px 16px; font-size: 11.5px; }
 
     .hero-logo-parallax { position: static; transform: none; }
-    /* FIX: clamp lama (272-308px) kegedean banget di HP, ganti proporsi
-       yang beneran ngecil ngikutin lebar layar (34vw). */
     .hero-logo-badge {
         width: clamp(96px, 34vw, 150px);
         height: clamp(96px, 34vw, 150px);
@@ -451,29 +458,11 @@
 
     .hero-title-parallax { position: static; transform: none; max-width: 92vw; }
     .hero-title { font-size: clamp(46px, 15vw, 80px); }
-    /* FIX: clamp lama (40px, 1.5vw, 22px) — MIN-nya (40px) lebih gede dari
-       MAX-nya (22px), jadi hasilnya selalu mentok 40px di semua ukuran
-       layar (font-size gak pernah beneran ngecil). Diganti clamp yang
-       proporsinya bener. */
     .hero-subtitle { font-size: clamp(14px, 4.4vw, 19px); letter-spacing: .16em; margin-left: 0; margin-top: 8px; }
 
     .hero-device-parallax { position: static; transform: none; }
-    /* FIX: sama kayak breakpoint 980px, min-width:320px bawaan bikin
-       device gak bisa ngecil dari 320px meski width udah di-set kecil. */
     .hero-device { width: min(190px, 58vw); min-width: 0; }
 
-    /* FIX BARU: d-pad & tombol bulat (.device-dpad, .device-buttons) di
-       device mockup sebelumnya FIXED PX (76px/84px/32px) di SEMUA ukuran
-       layar -- gak ikut nyusut sama sekali walau .hero-device sendiri
-       udah dipaksa ngecil sampai ~190px lewat rule di atas. Lebar area
-       yang tersedia buat dua kelompok kontrol itu (device width dikurangi
-       padding 8% kiri-kanan di .device-controls) bisa lebih SEMPIT dari
-       total lebar d-pad + tombol gabungan (76+84=160px) -- jadi mereka
-       SALING NABRAK/OVERLAP. Inilah salah satu sumber utama device
-       mockup keliatan "berantakan" di HP. Semua ukuran & posisi
-       diskalakan turun ~55% (proporsional ke penyusutan device-nya
-       sendiri, dari basis 84px→46px dst) biar layout diamond d-pad/
-       tombol tetap rapi tapi gak lagi nabrak. */
     .device-dpad { width: 42px; height: 42px; }
     .device-dpad .v { width: 14px; margin-left: -7px; }
     .device-dpad .h { height: 14px; margin-top: -7px; }
