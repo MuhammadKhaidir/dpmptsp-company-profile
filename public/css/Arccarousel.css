@@ -467,15 +467,6 @@
    internal, biar gak terus-terusan manjang ngedorong/nabrak section
    sesudahnya kalau bukunya udah banyak. Gampang dihapus/diubah kalau
    ternyata gak diperlukan -- tinggal buang blok .arc-track ini. */
-.arc-track {
-    max-height: 60vh;
-    overflow-y: auto;
-    overflow-x: hidden;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(203, 164, 84, 0.5) transparent;
-}
-.arc-track::-webkit-scrollbar { width: 6px; }
-.arc-track::-webkit-scrollbar-thumb { background: rgba(203, 164, 84, 0.5); border-radius: 999px; }
 
 /* Ukuran & posisi tombol hapus sekarang proporsional ke --arc-card-w
    (dulu fixed 24px & 12px) -- biar gak keliatan segede jempol nempel
