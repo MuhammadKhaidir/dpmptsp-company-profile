@@ -210,7 +210,7 @@ html, body {
     max-width: 60vw;
 }
 .hero-title {
-    font-family: 'Fraunces', 'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif;
+    font-family: 'Fraunces', ;
     font-weight: 900;
     font-size: clamp(58px, 10.4vw, 168px);
     line-height: .92;
