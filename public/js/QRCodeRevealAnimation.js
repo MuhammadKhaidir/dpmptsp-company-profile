@@ -14,24 +14,15 @@
     };
 
     // ================================================================
-    // BARU: Link dokumen terkait per kotak QR (bisa diisi URL website
-    // ATAU file PDF -- keduanya otomatis kebuka di tab baru begitu
-    // di-klik, browser yang nentuin cara nampilinnya: PDF dibuka lewat
-    // PDF viewer bawaan browser, website dibuka seperti tab biasa).
-    //
-    // Diatur manual di sini (bukan lewat modal password), jadi tinggal
-    // ganti value `url` di bawah sesuai kebutuhan.
-    //
-    // Kalau `url` dikosongkan (''), kotak itu otomatis balik ke
-    // perilaku LAMA: klik "Lihat Dokumen Terkait" bakal scroll ke
-    // halaman flip book yang sesuai (lewat goToFlipBook), bukan buka
-    // link eksternal.
+    // BARU: metadata "dokumen terkait" per slot, di-load dari backend
+    // (data/qrDocStore.js lewat routes/qrDoc.js) -- BUKAN hardcode lagi.
+    // Diisi/diubah lewat menu "Perbarui Tampilan Kode QR" (password sama
+    // kayak fitur ganti gambar/judul/BG). Bentuknya:
+    //   { mode: 'link' | 'pdf' | null, url: string | null, updatedAt }
+    // Kalau mode-nya null / belum pernah diisi, tombol "Lihat Dokumen
+    // Terkait" otomatis fallback ke perilaku lama (scroll ke flip book).
     // ================================================================
-    var SLOT_DOCS = {
-        left: { url: '' },
-        center: { url: '' },
-        right: { url: '' }
-    };
+    var customDocMeta = {};
 
     function play(boxes) {
         boxes.forEach(function (box) {
@@ -119,27 +110,24 @@
     }
 
     // ================================================================
-    // BARU: helper buat nentuin ke mana tombol "Lihat Dokumen Terkait"
-    // harus ngarah -- baca dari SLOT_DOCS di atas.
+    // BARU: baca info dokumen terkait dari customDocMeta (hasil load
+    // /api/qr-doc/meta), dipakai buat nentuin icon/label tombol di modal
+    // pilihan, dan ke mana tombol itu ngarah pas diklik.
     // ================================================================
-    function isPdfLink(url) {
-        return /\.pdf(\?.*)?(#.*)?$/i.test(url);
-    }
-
     function getRelatedDocInfo(slot) {
-        var doc = SLOT_DOCS[slot];
-        var url = (doc && doc.url) ? doc.url.trim() : '';
+        var doc = customDocMeta[slot];
+        var url = (doc && doc.url) ? doc.url : '';
 
         if (!url) {
-            return { url: '', isPdf: false, icon: 'fa-book-open', label: 'Lihat Dokumen Terkait' };
+            return { url: '', mode: null, icon: 'fa-book-open', label: 'Lihat Dokumen Terkait' };
         }
 
-        var pdf = isPdfLink(url);
+        var isPdf = doc.mode === 'pdf';
         return {
             url: url,
-            isPdf: pdf,
-            icon: pdf ? 'fa-file-pdf' : 'fa-arrow-up-right-from-square',
-            label: pdf ? 'Lihat Dokumen PDF' : 'Kunjungi Tautan Terkait'
+            mode: doc.mode,
+            icon: isPdf ? 'fa-file-pdf' : 'fa-arrow-up-right-from-square',
+            label: isPdf ? 'Lihat Dokumen PDF' : 'Kunjungi Tautan Terkait'
         };
     }
 
@@ -155,12 +143,27 @@
             return;
         }
 
-        // Fallback: slot ini belum diisi link -> perilaku lama.
+        // Belum ada dokumen terkait yang diatur buat slot ini -> fallback
+        // ke perilaku lama.
         goToFlipBook(bookIndex);
     }
 
+    function loadCustomQrDocs() {
+        fetch('/api/qr-doc/meta')
+            .then(function (res) { return res.ok ? res.json() : null; })
+            .then(function (data) {
+                if (!data || !data.success || !data.meta) return;
+                customDocMeta = data.meta;
+            })
+            .catch(function () {
+                // Backend fitur dokumen-terkait belum kepasang/offline --
+                // diamkan aja, tombol otomatis fallback ke flip book.
+            });
+    }
+
     /* ================================================================
-       Modal pilihan (klik box) + modal ganti gambar, latar & judul QR
+       Modal pilihan (klik box) + modal ganti gambar, latar, judul QR,
+       dan dokumen terkait
        ----------------------------------------------------------------
        #qr-modal-root dibuat otomatis lewat JS (gak perlu nambah apapun
        di index.html), dipakai ulang buat kedua modal (isinya diganti
@@ -238,8 +241,8 @@
     }
 
     /* ================================================================
-       BARU: Gambar LATAR BELAKANG (elemen .qr-hover-bg-left/center/right
-       yang muncul redup di belakang kotak saat di-hover). Ini gambar yang
+       Gambar LATAR BELAKANG (elemen .qr-hover-bg-left/center/right yang
+       muncul redup di belakang kotak saat di-hover). Ini gambar yang
        BEDA dari gambar kode QR itu sendiri, disimpan lewat endpoint
        terpisah (/api/qr-bg/...) yang didukung data/qrBgStore.js +
        routes/qrBg.js -- keduanya independen dari sistem gambar QR yang
@@ -345,7 +348,7 @@
             '<div class="qr-modal-overlay" data-qr-close>' +
                 '<div class="qr-modal-box" role="dialog" aria-modal="true">' +
                     '<h3 class="qr-modal-title">Perbarui Kode QR — ' + escapeHtml(label) + '</h3>' +
-                    '<p class="qr-modal-sub">Masukkan kata sandi, lalu ubah judul, gambar kode QR, dan/atau gambar latar belakang untuk melanjutkan. Bagian yang dikosongkan tidak akan diubah.</p>' +
+                    '<p class="qr-modal-sub">Masukkan kata sandi, lalu ubah judul, gambar kode QR, gambar latar belakang, dan/atau dokumen terkait untuk melanjutkan. Bagian yang dikosongkan tidak akan diubah.</p>' +
                     '<form class="qr-edit-form" data-qr-edit-form>' +
                         '<label class="qr-edit-label">Kata Sandi' +
                             '<input type="password" class="qr-edit-input" name="password" required autocomplete="off">' +
@@ -358,6 +361,16 @@
                         '</label>' +
                         '<label class="qr-edit-label">Berkas Gambar Latar Belakang (Tampil redup di belakang kotak saat di-hover — Maksimal 5MB, kosongkan jika tidak ingin mengganti)' +
                             '<input type="file" class="qr-edit-input" name="bgImage" accept="image/png,image/jpeg,image/webp,image/gif">' +
+                        '</label>' +
+                        '<label class="qr-edit-label">Dokumen Terkait — Tautan Website (opsional, kosongkan jika tidak ingin mengganti)' +
+                            '<input type="url" class="qr-edit-input" name="docUrl" placeholder="https://...">' +
+                        '</label>' +
+                        '<label class="qr-edit-label">Dokumen Terkait — Berkas PDF (opsional, akan menggantikan tautan website di atas jika diisi — Maksimal 4MB)' +
+                            '<input type="file" class="qr-edit-input" name="docFile" accept="application/pdf">' +
+                        '</label>' +
+                        '<label class="qr-edit-label" style="flex-direction:row; align-items:center; gap:8px; text-transform:none; letter-spacing:normal; font-weight:600; font-size:12.5px; color:rgba(17,17,17,.62);">' +
+                            '<input type="checkbox" name="clearDoc" style="width:auto;">' +
+                            'Hapus dokumen terkait yang tersimpan (kembali ke tampilan flip book)' +
                         '</label>' +
                         '<p class="qr-edit-error" data-qr-edit-error style="display:none;"></p>' +
                         '<div class="qr-edit-actions">' +
@@ -386,6 +399,11 @@
             var bgInput = form.querySelector('[name="bgImage"]');
             var imageFile = imageInput && imageInput.files[0];
             var bgFile = bgInput && bgInput.files[0];
+
+            var docUrlVal = form.querySelector('[name="docUrl"]').value.trim();
+            var docFileInput = form.querySelector('[name="docFile"]');
+            var docFile = docFileInput && docFileInput.files[0];
+            var clearDocVal = form.querySelector('[name="clearDoc"]').checked;
 
             submitBtn.disabled = true;
             submitBtn.innerHTML = 'Sedang Menyimpan...';
@@ -440,6 +458,64 @@
                                     throw new Error(result2.data.message || 'Gagal memperbarui gambar latar.');
                                 }
                                 applyCustomBgImage(slot, result2.data.entry);
+                            });
+                    }
+                })
+                .then(function () {
+                    // Tahap 3 (opsional): dokumen terkait -- endpoint TERPISAH
+                    // lagi (/api/qr-doc/:slot), pakai kata sandi yang sama.
+                    // Prioritas kalau lebih dari satu field diisi bareng:
+                    // hapus > upload PDF > tautan website.
+                    if (clearDocVal) {
+                        var clearFormData = new FormData();
+                        clearFormData.append('password', passwordVal);
+                        clearFormData.append('mode', 'clear');
+
+                        return fetch('/api/qr-doc/' + slot, { method: 'POST', body: clearFormData })
+                            .then(function (res3) {
+                                return res3.json().then(function (data3) { return { ok: res3.ok, data: data3 }; });
+                            })
+                            .then(function (result3) {
+                                if (!result3.ok || !result3.data.success) {
+                                    throw new Error(result3.data.message || 'Gagal menghapus dokumen terkait.');
+                                }
+                                customDocMeta[slot] = { mode: null, url: null, updatedAt: null };
+                            });
+                    }
+
+                    if (docFile) {
+                        var docFormData = new FormData();
+                        docFormData.append('password', passwordVal);
+                        docFormData.append('mode', 'pdf');
+                        docFormData.append('document', docFile);
+
+                        return fetch('/api/qr-doc/' + slot, { method: 'POST', body: docFormData })
+                            .then(function (res3) {
+                                return res3.json().then(function (data3) { return { ok: res3.ok, data: data3 }; });
+                            })
+                            .then(function (result3) {
+                                if (!result3.ok || !result3.data.success) {
+                                    throw new Error(result3.data.message || 'Gagal memperbarui dokumen PDF.');
+                                }
+                                customDocMeta[slot] = result3.data.entry || { mode: null, url: null, updatedAt: null };
+                            });
+                    }
+
+                    if (docUrlVal) {
+                        var linkFormData = new FormData();
+                        linkFormData.append('password', passwordVal);
+                        linkFormData.append('mode', 'link');
+                        linkFormData.append('url', docUrlVal);
+
+                        return fetch('/api/qr-doc/' + slot, { method: 'POST', body: linkFormData })
+                            .then(function (res3) {
+                                return res3.json().then(function (data3) { return { ok: res3.ok, data: data3 }; });
+                            })
+                            .then(function (result3) {
+                                if (!result3.ok || !result3.data.success) {
+                                    throw new Error(result3.data.message || 'Gagal memperbarui tautan dokumen.');
+                                }
+                                customDocMeta[slot] = result3.data.entry || { mode: null, url: null, updatedAt: null };
                             });
                     }
                 })
@@ -737,5 +813,6 @@ function exitCat() {
         setupCat(panel);
         loadCustomQrImages();
         loadCustomQrBgImages();
+        loadCustomQrDocs();
     });
 })();
