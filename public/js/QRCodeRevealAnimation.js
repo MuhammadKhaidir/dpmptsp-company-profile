@@ -13,6 +13,26 @@
         right: 'Profil Investasi Kota Palembang'
     };
 
+    // ================================================================
+    // BARU: Link dokumen terkait per kotak QR (bisa diisi URL website
+    // ATAU file PDF -- keduanya otomatis kebuka di tab baru begitu
+    // di-klik, browser yang nentuin cara nampilinnya: PDF dibuka lewat
+    // PDF viewer bawaan browser, website dibuka seperti tab biasa).
+    //
+    // Diatur manual di sini (bukan lewat modal password), jadi tinggal
+    // ganti value `url` di bawah sesuai kebutuhan.
+    //
+    // Kalau `url` dikosongkan (''), kotak itu otomatis balik ke
+    // perilaku LAMA: klik "Lihat Dokumen Terkait" bakal scroll ke
+    // halaman flip book yang sesuai (lewat goToFlipBook), bukan buka
+    // link eksternal.
+    // ================================================================
+    var SLOT_DOCS = {
+        left: { url: '' },
+        center: { url: '' },
+        right: { url: '' }
+    };
+
     function play(boxes) {
         boxes.forEach(function (box) {
             var scanLine = box.querySelector('.qr-scan-line');
@@ -96,6 +116,47 @@
         }
         var fb = document.getElementById('flipbook-section');
         if (fb) fb.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    // ================================================================
+    // BARU: helper buat nentuin ke mana tombol "Lihat Dokumen Terkait"
+    // harus ngarah -- baca dari SLOT_DOCS di atas.
+    // ================================================================
+    function isPdfLink(url) {
+        return /\.pdf(\?.*)?(#.*)?$/i.test(url);
+    }
+
+    function getRelatedDocInfo(slot) {
+        var doc = SLOT_DOCS[slot];
+        var url = (doc && doc.url) ? doc.url.trim() : '';
+
+        if (!url) {
+            return { url: '', isPdf: false, icon: 'fa-book-open', label: 'Lihat Dokumen Terkait' };
+        }
+
+        var pdf = isPdfLink(url);
+        return {
+            url: url,
+            isPdf: pdf,
+            icon: pdf ? 'fa-file-pdf' : 'fa-arrow-up-right-from-square',
+            label: pdf ? 'Lihat Dokumen PDF' : 'Kunjungi Tautan Terkait'
+        };
+    }
+
+    function openRelatedDocument(slot, bookIndex) {
+        var info = getRelatedDocInfo(slot);
+
+        if (info.url) {
+            // Otomatis kebuka di tab baru -- kalau linknya PDF, browser
+            // bakal nampilin lewat PDF viewer bawaan; kalau website,
+            // dibuka kayak tab biasa. noopener/noreferrer buat keamanan
+            // standar pas buka tab baru dari link eksternal.
+            window.open(info.url, '_blank', 'noopener,noreferrer');
+            return;
+        }
+
+        // Fallback: slot ini belum diisi link -> perilaku lama.
+        goToFlipBook(bookIndex);
     }
 
     /* ================================================================
@@ -249,6 +310,7 @@
     function openChoiceModal(slot, bookIndex) {
         var root = ensureQrModalRoot();
         var label = SLOT_LABELS[slot] || 'Kode QR Ini';
+        var docInfo = getRelatedDocInfo(slot);
 
         root.innerHTML =
             '<div class="qr-modal-overlay" data-qr-close>' +
@@ -256,7 +318,7 @@
                     '<h3 class="qr-modal-title">' + escapeHtml(label) + '</h3>' +
                     '<p class="qr-modal-sub">Silakan pilih tindakan yang ingin dilakukan terhadap kode QR ini.</p>' +
                     '<button type="button" class="qr-modal-btn qr-modal-btn-primary" data-action="book">' +
-                        '<i class="fa-solid fa-book-open"></i> Lihat Dokumen Terkait' +
+                        '<i class="fa-solid ' + docInfo.icon + '"></i> ' + escapeHtml(docInfo.label) +
                     '</button>' +
                     '<button type="button" class="qr-modal-btn qr-modal-btn-ghost" data-action="edit">' +
                         '<i class="fa-solid fa-image"></i> Perbarui Tampilan Kode QR' +
@@ -269,7 +331,7 @@
 
         root.querySelector('[data-action="book"]').addEventListener('click', function () {
             closeQrModal();
-            goToFlipBook(bookIndex);
+            openRelatedDocument(slot, bookIndex);
         });
         root.querySelector('[data-action="edit"]').addEventListener('click', function () {
             openEditModal(slot, label);

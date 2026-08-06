@@ -283,20 +283,7 @@
     .cat-mascot { display: none; }
 }
 
-/* ============================================================
-   MODAL "Pilih Tindakan" + MODAL "Perbarui Gambar QR"
-   ------------------------------------------------------------
-   Direstyle biar SATU BAHASA VISUAL sama bagian lain di situs ini:
-   - Kartu berbahan "kertas krem" (#faf9f5) dengan shadow bertumpuk
-     ala halaman FlipBook (lihat .fb-face-text di FlipBookScroll.css)
-   - Aksen pita emas di tepi atas, senada sama .fb-spine
-   - Tipografi Fraunces (judul) + Inter (isi), warna ink yang sama
-     persis dipakai di .qr-hover-text-inner (rgba(17,17,17,...))
-   Dibuat & di-inject via JS (lihat js/QRCodeRevealAnimation.js,
-   fungsi openChoiceModal/openEditModal) ke dalam #qr-modal-root
-   yang juga dibuat otomatis lewat JS -- gak perlu nambah apapun
-   di index.html.
-   ============================================================ */
+
 .qr-modal-overlay {
     position: fixed;
     inset: 0;
