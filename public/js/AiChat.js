@@ -7,11 +7,23 @@
 // sendiri berisi { messages: [...] } dan balasan { reply: "..." } — key tidak pernah terlihat.
 //
 // BARU: fitur "ganti gambar/judul QR lewat chat" (lihat blok KARTU EDIT QR VIA
-// CHAT di bawah). ATURAN KERAS yang sama berlaku di sini: kata sandi
-// (QR_EDIT_PASSWORD) dan berkas gambar yang diunggah TIDAK PERNAH dikirim ke
-// /api/chat atau ikut ke chatHistory. Keduanya cuma dikirim langsung ke
-// endpoint backend sendiri '/api/qr-images/:slot' (same-origin), persis
-// seperti modal "Perbarui Gambar" di panel QR (lihat js/QRCodeRevealAnimation.js).
+// CHAT di bawah) sekarang digerbang status admin (isAdmin, dicek lewat
+// /api/auth/check-session) -- BUKAN kata sandi manual lagi. Otorisasi
+// sebenarnya tetap ditegakkan di server lewat middleware/requireAdmin.js
+// (lihat routes/qrImages.js), jadi walau ada yang coba panggil endpoint
+// langsung tanpa lewat kartu ini, tetap ditolak kalau bukan admin yang login.
+// Berkas gambar yang diunggah TIDAK PERNAH dikirim ke /api/chat atau ikut ke
+// chatHistory -- cuma dikirim langsung ke endpoint backend sendiri
+// '/api/qr-images/:slot' (same-origin), persis seperti modal "Perbarui
+// Gambar" di panel QR (lihat js/QRCodeRevealAnimation.js).
+//
+// BARU: fitur pengaduan/laporan (dan dashboard masyarakat/petugas/admin yang
+// menyertainya) SUDAH TIDAK ADA lagi di situs ini -- tidak ada satupun route
+// backend yang menyentuh database pengaduan (lihat web.js, server.js).
+// Makanya NAV target DASHBOARD_MASYARAKAT / DASHBOARD_PETUGAS / DASHBOARD_ADMIN
+// / FORM_LAPORAN sudah dilepas dari handleNavigation() di bawah -- kalau AI
+// somehow masih pernah mengirim salah satu tag itu, target-nya sekarang
+// diam-diam diabaikan, bukan memicu modal/halaman yang sudah tidak berfungsi.
 
 let chatHistory = [];
 let aiTyping = false;
@@ -21,7 +33,25 @@ let aiTyping = false;
 // disimpan ke chatHistory ataupun dikirim ke /api/chat.
 let pendingAttachment = null;
 
-const QUICK_CHIPS_DEFAULT = ["Ke Buku Sejarah & Latar Belakang", "Scan Katalog Investasi", "Masuk ke Sistem", "Buat Laporan Pengaduan"];
+// BARU: status admin, dicek dari /api/auth/check-session (endpoint yang
+// sudah ada di routes/auth.js) -- dipakai buat nge-gate kartu edit QR di
+// chat ini, sejalan sama gerbang admin yang sama di
+// js/QRCodeRevealAnimation.js. Pengguna biasa (bukan admin / belum login)
+// gak akan pernah dikasih lihat kartu edit ini sama sekali.
+let isAdmin = false;
+
+function loadAdminStatus() {
+  return fetch('/api/auth/check-session')
+    .then(res => res.ok ? res.json() : null)
+    .then(data => {
+      isAdmin = !!(data && data.logged_in && data.role === 'admin');
+    })
+    .catch(() => {
+      isAdmin = false;
+    });
+}
+
+const QUICK_CHIPS_DEFAULT = ["Ke Buku Sejarah & Latar Belakang", "Scan Katalog Investasi", "Masuk ke Sistem", "Lihat Company Profile"];
 
 /* ==========================================================================
    BARU: SISTEM NAVIGASI LOKAL (client-side), TANPA PERLU LEWAT AI BACKEND
@@ -34,10 +64,10 @@ const QUICK_CHIPS_DEFAULT = ["Ke Buku Sejarah & Latar Belakang", "Scan Katalog I
    cocok, LANGSUNG eksekusi aksinya (scroll/loncat/dsb) tanpa nunggu balesan
    AI sama sekali -- makanya kerasa instan.
 
-   Untuk aksi yang emang udah dipegang backend (login, daftar, dashboard,
-   form pengaduan), SENGAJA TIDAK di-intercept di sini -- itu tetep lewat
-   jalur AI seperti biasa (lihat handleNavigation di bawah), soalnya itu
-   udah teruji jalan dan gak ada hubungannya sama fitur baru ini.
+   Untuk aksi yang emang udah dipegang backend (login, daftar), SENGAJA
+   TIDAK di-intercept di sini -- itu tetep lewat jalur AI seperti biasa
+   (lihat handleNavigation di bawah), soalnya itu udah teruji jalan dan gak
+   ada hubungannya sama fitur baru ini.
    ========================================================================== */
 
 // Kata kerja perintah -- navigasi CUMA jalan kalau salah satu kata ini ada.
@@ -181,11 +211,11 @@ function detectAndExecuteLocalAction(rawText) {
    bukan ke/buka/tunjukkan/dst), jadi gak akan pernah tabrakan sama sistem
    navigasi lokal -- keduanya dicek terpisah di sendChatMessageText().
 
-   Kalau niat ini kedetek, kita SAMA SEKALI TIDAK memanggil AI backend.
-   Yang muncul adalah kartu form inline (lihat openQrEditCard) yang minta
-   kata sandi secara manual -- ini juga jadi jaminan keamanan: fitur ini
-   gak bisa "ke-trigger" otomatis oleh AI atau oleh isi pesan orang lain,
-   selalu perlu konfirmasi kata sandi asli dari user.
+   Kalau niat ini kedetek DAN yang chat adalah admin yang sedang login, kita
+   SAMA SEKALI TIDAK memanggil AI backend. Yang muncul adalah kartu form
+   inline (lihat openQrEditCard) -- ini jadi jaminan keamanan tambahan:
+   fitur ini gak bisa "ke-trigger" otomatis oleh AI atau oleh isi pesan
+   orang lain, dan gak akan pernah ditampilkan ke pengguna yang bukan admin.
    ========================================================================== */
 
 const QR_EDIT_VERBS = /\b(ganti|gantikan|mengganti|ubah|ubahin|mengubah|update|perbarui|memperbarui|perbaharui|rubah|edit|pakai|gunakan|pasang|pasangkan)\b/;
@@ -245,7 +275,12 @@ function applyQrUpdateToPage(slot, entry) {
 
   const box = panel.querySelector('.qr-panel-' + slot);
   if (box) {
-    if (entry && entry.filename) {
+    // FIX: field-nya udah lama diganti dari `filename` jadi `url` di
+    // data/qrImageStore.js (lihat routes/qrImages.js) -- sebelumnya di sini
+    // masih baca `entry.filename` yang selalu undefined, jadi gambar di
+    // halaman gak pernah ke-refresh otomatis abis diganti lewat chat
+    // (cuma judulnya doang yang keupdate).
+    if (entry && entry.url) {
       const img = box.querySelector('.qr-img');
       if (img) {
         const v = entry.updatedAt || Date.now();
@@ -273,7 +308,7 @@ function escapeAttr(str) {
   });
 }
 
-const QUICK_CHIPS_EXPLORE = ["Ke Buku Visi & Misi", "Ke Buku Struktur & Layanan", "Kembali ke Beranda", "Buat Laporan Pengaduan"];
+const QUICK_CHIPS_EXPLORE = ["Ke Buku Visi & Misi", "Ke Buku Struktur & Layanan", "Kembali ke Beranda", "Scan Kode QR"];
 
 function initAIChat() {
   chatHistory = [];
@@ -282,9 +317,10 @@ function initAIChat() {
   setupChatAttachments();
   clearPendingAttachment();
   syncSlotLabelsFromMeta();
+  loadAdminStatus();
   setTimeout(() => {
     pushAIMessage(
-      "Halo! Selamat datang di DPMPTSP Kota Palembang. Selain bantu masuk ke sistem, daftar akun, atau bikin laporan pengaduan, aku juga bisa langsung anter kamu ke bagian mana pun di halaman ini — misalnya \"buka buku Visi & Misi halaman 2\" atau \"scan QR Katalog Investasi\". Kamu juga bisa minta aku ganti gambar/judul kotak QR langsung dari sini, tinggal bilang mis. \"ganti background Katalog Investasi\" (nanti aku minta kata sandi & file gambarnya). Mau ke mana dulu?",
+      "Halo! Selamat datang di DPMPTSP Kota Palembang. Selain bantu masuk ke sistem atau daftar akun, aku juga bisa langsung anter kamu ke bagian mana pun di halaman ini — misalnya \"buka buku Visi & Misi halaman 2\" atau \"scan QR Katalog Investasi\". Kalau kamu admin yang sudah login, kamu juga bisa minta aku ganti gambar/judul kotak QR langsung dari sini, tinggal bilang mis. \"ganti background Katalog Investasi\". Mau ke mana dulu?",
       QUICK_CHIPS_DEFAULT
     );
   }, 400);
@@ -413,11 +449,23 @@ async function sendChatMessageText(text) {
   }
 
   // BARU: cek niat "ganti gambar/judul QR". Kalau kena, JANGAN kirim apapun
-  // ke /api/chat -- langsung munculin kartu form inline yang minta kata
-  // sandi. Password & file nanti dikirim manual dari kartu itu langsung ke
-  // '/api/qr-images/:slot', gak pernah lewat sini.
+  // ke /api/chat -- langsung munculin kartu form inline. Berkas gambar nanti
+  // dikirim manual dari kartu itu langsung ke '/api/qr-images/:slot', gak
+  // pernah lewat sini. Otorisasi sekarang lewat sesi admin (isAdmin), BUKAN
+  // kata sandi manual lagi -- kalau yang chat bukan admin, kartunya gak
+  // dimunculin sama sekali (gak ada gunanya nampilin form yang bakal
+  // ditolak server).
   const qrEditIntent = detectQrEditIntent(text);
   if (qrEditIntent) {
+    if (!isAdmin) {
+      setTimeout(() => {
+        pushAIMessage(
+          'Fitur ganti gambar/judul QR ini khusus admin yang sudah login. Silakan masuk ke sistem dulu ya.',
+          QUICK_CHIPS_DEFAULT
+        );
+      }, 250);
+      return;
+    }
     if (!qrEditIntent.slot) {
       setTimeout(() => {
         pushAIMessage(
@@ -487,14 +535,14 @@ function handleNavigation(fullAiText) {
       const data = alpineRoot._x_dataStack && alpineRoot._x_dataStack[0];
       if (!data) return;
 
+      // BARU: DASHBOARD_MASYARAKAT / DASHBOARD_PETUGAS / DASHBOARD_ADMIN /
+      // FORM_LAPORAN sengaja DIHAPUS dari sini -- itu semua peninggalan
+      // fitur pengaduan yang sudah tidak dipakai lagi di situs ini (lihat
+      // catatan BARU di kepala file). Kalau backend somehow masih pernah
+      // mengirim salah satu tag itu, target-nya gak akan cocok ke branch
+      // manapun di bawah -- diam-diam diabaikan, gak memicu apa-apa.
       if (target === 'LOGIN') { data.v = 'login'; data.chatOpen = false; }
       else if (target === 'REGISTER') { data.v = 'register'; data.chatOpen = false; }
-      else if (target === 'DASHBOARD_MASYARAKAT') { data.v = 'dashboard-masyarakat'; data.chatOpen = false; }
-      else if (target === 'DASHBOARD_PETUGAS') { data.v = 'dashboard-petugas'; data.chatOpen = false; }
-      else if (target === 'DASHBOARD_ADMIN') {
-        data.v = 'dashboard-admin'; data.chatOpen = false;
-        setTimeout(() => window.renderAdminChart && window.renderAdminChart(), 80);
-      } else if (target === 'FORM_LAPORAN') { data.modal = true; }
     } catch (err) { /* Alpine belum siap, abaikan */ }
   }, 900);
 }
@@ -569,8 +617,10 @@ function clearPendingAttachment() {
    ==========================================================================
    Dibuat & disuntikkan LANGSUNG ke DOM #chat-messages-box (persis kayak pola
    showTyping()/removeTyping() di atas) -- BUKAN lewat chatHistory, supaya
-   kata sandi & file gambar gak pernah ikut ke-serialize jadi bagian riwayat
-   chat yang dikirim ke /api/chat.
+   berkas gambar gak pernah ikut ke-serialize jadi bagian riwayat chat yang
+   dikirim ke /api/chat. Kartu ini hanya pernah dipanggil kalau isAdmin true
+   (lihat sendChatMessageText) -- jadi gak perlu lagi minta kata sandi di
+   sini, otorisasi sudah ditentukan sesi admin yang sedang login.
    ========================================================================== */
 
 function buildQrEditCardElement(slot, label) {
@@ -581,10 +631,7 @@ function buildQrEditCardElement(slot, label) {
     '<div class="msg-ai-avatar"><i class="fa-solid fa-robot" style="font-size:10px;"></i></div>' +
     '<div class="chat-qr-card">' +
         '<div class="chat-qr-card-title">Perbarui Kotak — ' + escapeHtml(label) + '</div>' +
-        '<p class="chat-qr-card-sub">Masukkan kata sandi untuk menyimpan. Judul dan gambar bisa diubah salah satu atau dua-duanya.</p>' +
-        '<label class="chat-qr-card-label">Kata Sandi' +
-            '<input type="password" class="chat-qr-card-input" data-field="password" autocomplete="off">' +
-        '</label>' +
+        '<p class="chat-qr-card-sub">Judul dan gambar bisa diubah salah satu atau dua-duanya.</p>' +
         '<label class="chat-qr-card-label">Judul Kotak' +
             '<input type="text" class="chat-qr-card-input" data-field="title" maxlength="80" value="' + escapeAttr(label) + '">' +
         '</label>' +
@@ -652,18 +699,10 @@ function openQrEditCard(slot) {
   submitBtn.addEventListener('click', () => {
     errorEl.style.display = 'none';
 
-    const password = card.querySelector('[data-field="password"]').value;
     const title = card.querySelector('[data-field="title"]').value.trim();
     const file = fileInput.files && fileInput.files[0];
 
-    if (!password) {
-      errorEl.textContent = 'Kata sandi wajib diisi.';
-      errorEl.style.display = 'block';
-      return;
-    }
-
     const formData = new FormData();
-    formData.append('password', password);
     if (title) formData.append('title', title);
     if (file) formData.append('image', file);
 
@@ -672,11 +711,14 @@ function openQrEditCard(slot) {
     submitBtn.innerHTML = 'Menyimpan...';
 
     // PENTING: request ini LANGSUNG ke endpoint backend qr-images milik
-    // kita sendiri (same-origin), BUKAN lewat /api/chat -- kata sandi &
-    // berkas gambar TIDAK PERNAH ikut lewat jalur AI/OpenRouter.
+    // kita sendiri (same-origin), BUKAN lewat /api/chat -- berkas gambar
+    // TIDAK PERNAH ikut lewat jalur AI/OpenRouter. Otorisasi ditentukan oleh
+    // sesi admin yang sedang login (cookie), makanya credentials disertakan
+    // eksplisit -- bukan lagi dari kata sandi yang diketik di sini.
     fetch('/api/qr-images/' + slot, {
       method: 'POST',
-      body: formData
+      body: formData,
+      credentials: 'same-origin'
     })
       .then(res => res.json().then(data => ({ ok: res.ok, data })))
       .then(result => {
