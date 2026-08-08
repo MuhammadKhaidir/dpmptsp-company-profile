@@ -8,6 +8,8 @@ const session = require('express-session');
 const path = require('path');
 const apiRoutes = require('./web');
 
+const UpstashSessionStore = require('./lib/redisSessionStore'); // BARU
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -16,8 +18,23 @@ app.use(express.json());
 
 app.use('/assets', express.static(path.join(__dirname, 'Assets')));
 
+// FIX: sebelumnya gak ada `store` di sini -- express-session otomatis
+// jatuh ke MemoryStore (nyimpen sesi di memory proses Node). Itu salah
+// buat Vercel yang serverless: tiap request bisa dijawab instance/
+// container yang beda, jadi sesi yang keset di instance A gak kebaca
+// sama instance B. Efeknya: login "berhasil" (response {success:true}
+// balik normal di request yang sama), tapi request BERIKUTNYA (refresh
+// halaman, check-session, atau endpoint requireAdmin kayak /book/add)
+// sering dianggap belum login sama sekali -- gejalanya persis kayak
+// yang dilaporkan (tombol edit Arccarousel gak pernah nongol, refresh
+// nge-reset login balik ke landing/dashboard yang salah).
+//
+// Sekarang sesi disimpen di Upstash Redis yang SAMA dipakai
+// arcCarouselStore.js dkk (lihat lib/redisSessionStore.js), jadi
+// kebaca konsisten dari instance mana pun yang nanganin request.
 app.use(session({
   secret: process.env.SESSION_SECRET || 'dpmptsp-ganti-secret-ini',
+  store: new UpstashSessionStore(), // BARU
   resave: false,
   saveUninitialized: false,
   cookie: { maxAge: 1000 * 60 * 60 * 2 } // sesi berlaku 2 jam
