@@ -2,14 +2,17 @@
 const mysql = require('mysql2/promise');
 
 const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT || 3306,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  ssl: process.env.DB_SSL === 'true' ? { rejectUnauthorized: true } : undefined,
+  host: process.env.TIDB_HOST,
+  port: process.env.TIDB_PORT || 4000,
+  user: process.env.TIDB_USER,
+  password: process.env.TIDB_PASSWORD,
+  database: process.env.TIDB_DATABASE,
+  ssl: {
+    minVersion: 'TLSv1.2',
+    rejectUnauthorized: true
+  },
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 1,
   queueLimit: 0
 });
 
