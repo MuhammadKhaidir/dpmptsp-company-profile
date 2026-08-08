@@ -16,10 +16,19 @@ function appData() {
         _toastTimer: null,
 
         init() {
-            // Restore a session if one exists (best-effort, ignores failures).
+            // FIX: sebelumnya SEMUA role (termasuk admin) di-restore ke
+            // 'dashboard-' + role saat refresh -- makanya admin yang
+            // refresh halaman selalu kelempar ke panel Super Admin
+            // ('dashboard-admin'), BUKAN balik ke landing kayak pas baru
+            // login. Sekarang dicocokin PERSIS sama logic yang udah
+            // dipakai di form login (index.html): admin -> 'landing',
+            // role lain -> 'dashboard-' + role. Restore ini best-effort,
+            // ignores failures kalau sessionStorage gak kebaca.
             try {
                 var role = sessionStorage.getItem('role');
-                if (role) {
+                if (role === 'admin') {
+                    this.v = 'landing';
+                } else if (role) {
                     this.v = 'dashboard-' + role;
                 }
             } catch (e) { /* sessionStorage unavailable — ignore */ }
