@@ -351,10 +351,15 @@
             .then(r => r.json())
             .then(data => {
                 loading = false;
+                // SESUDAH
                 if (data.success) {
                     sessionStorage.setItem('nama_lengkap', data.nama_lengkap);
                     sessionStorage.setItem('role', data.role);
-                    v = 'dashboard-' + data.role;
+                    if (data.role === 'admin') {
+                        v = 'landing';
+                    } else {
+                        v = 'dashboard-' + data.role;
+                    }
                     fire('Login berhasil sebagai ' + data.role + '!');
                 } else {
                     errMsg = data.message;
