@@ -31,11 +31,11 @@
    pun `background` ditambahin ke .arc-carousel/.arc-track, biar
    #site-bg tetap yang keliatan di belakang, sama kayak section lain.
 
-   FITUR TAMBAH & HAPUS BUKU: grid ini di-render dari data dinamis
-   (lihat js/Arccarousel.js + routes/arcCarouselContent.js), jumlah
-   kartu bisa berubah-ubah kapan aja -- justru ini alasan utama
-   kenapa penataan berbasis Flexbox+wrap lebih cocok dibanding Grid
-   kolom-tetap (lihat penjelasan di atas).
+   FITUR TAMBAH, EDIT & HAPUS BUKU: grid ini di-render dari data
+   dinamis (lihat js/Arccarousel.js + routes/arcCarouselContent.js),
+   jumlah kartu bisa berubah-ubah kapan aja -- justru ini alasan
+   utama kenapa penataan berbasis Flexbox+wrap lebih cocok dibanding
+   Grid kolom-tetap (lihat penjelasan di atas).
 
    REVISI MOBILE-FRIENDLY + FIX POSISI JUDUL (paling baru):
    1) Dulu breakpoint kecil (≤420px) malah MAKSA `flex-basis:100%`
@@ -59,12 +59,29 @@
       gak keliatan kegedean/nabrak pas kartu kecil di HP -- tapi di
       ukuran desktop lama, angkanya di-cap supaya HASIL AKHIRNYA SAMA
       PERSIS kayak sebelumnya (gak ada perubahan tampilan di PC).
+
+   BARU (tombol EDIT): tombol "✎" ditambahin di sebelah tombol "×",
+   dua-duanya sekarang share 2 custom property baru --arc-btn-size &
+   --arc-btn-offset (lihat blok :root .arc-carousel di bawah) biar
+   gak ada rumus clamp() yang diduplikat dua kali. Nilai akhirnya
+   SAMA PERSIS kayak tombol hapus versi lama, jadi gak ada perubahan
+   tampilan buat yang udah ada -- cuma nambah satu tombol baru di
+   sebelahnya (lihat .arc-card-edit di bagian bawah file).
    ============================================================ */
 
 .arc-carousel {
     --arc-card-w: clamp(150px, 17vw, 320px);
     --arc-gap-x: clamp(20px, 3vw, 140px);
     --arc-gap-y: clamp(32px, 4vw, 152px);
+
+    /* BARU: dipakai bareng oleh .arc-card-edit & .arc-card-delete,
+       biar ukuran/posisi dua tombol itu selalu konsisten satu sama
+       lain tanpa nulis clamp() yang sama dua kali. Angkanya SAMA
+       PERSIS kayak clamp() yang dulu di-hardcode langsung di dalam
+       .arc-card-delete. */
+    --arc-btn-size: clamp(16px, calc(var(--arc-card-w) * 0.141), 24px);
+    --arc-btn-offset: clamp(6px, calc(var(--arc-card-w) * 0.0706), 12px);
+    --arc-btn-gap: clamp(4px, calc(var(--arc-card-w) * 0.035), 6px);
 
     position: relative;
     z-index: 1;
@@ -439,12 +456,14 @@
 }
 
 /* ============================================================
-   FITUR TAMBAH & HAPUS BUKU
+   FITUR TAMBAH, EDIT & HAPUS BUKU
    Grid buku di-render dari data DINAMIS (fetch dari
    /api/arc-carousel/content), bukan dari HTML statis -- lihat
    js/Arccarousel.js. Tombol "+ Tambah Buku" nempel di bawah grid,
-   tiap kartu punya tombol "×" kecil buat hapus. Keduanya lewat modal
-   password (pola sama kayak fitur edit FlipBook/QR).
+   tiap kartu punya tombol "✎" (edit) dan "×" (hapus) kecil di pojok
+   kiri atas sampul. Ketiganya cuma tampil buat admin yang lagi
+   login (sesi cookie, dicek lewat /api/auth/check-session) -- bukan
+   lewat modal password lagi.
    ============================================================ */
 
 /* FIX: dulu pakai `grid-column: 1 / -1` (properti khusus CSS Grid)
@@ -476,16 +495,19 @@
 }
 .arc-track::-webkit-scrollbar { width: 6px; }
 .arc-track::-webkit-scrollbar-thumb { background: rgba(203, 164, 84, 0.5); border-radius: 999px; }
-/* Ukuran & posisi tombol hapus sekarang proporsional ke --arc-card-w
-   (dulu fixed 24px & 12px) -- biar gak keliatan segede jempol nempel
-   di pojok kartu yang udah dikecilin di HP. Cap di desktop = sama
-   persis kayak sebelumnya. */
+
+/* Tombol hapus -- posisi & ukuran sekarang lewat --arc-btn-offset /
+   --arc-btn-size (lihat blok :root .arc-carousel di atas), BUKAN
+   clamp() yang di-hardcode langsung lagi. Nilai akhirnya SAMA PERSIS
+   kayak sebelumnya di semua ukuran layar -- ini murni refactor biar
+   gak duplikat rumus sama .arc-card-edit di bawah, gak ada perubahan
+   tampilan. */
 .arc-card-delete {
     position: absolute;
-    top: clamp(6px, calc(var(--arc-card-w) * 0.0706), 12px);
-    left: clamp(6px, calc(var(--arc-card-w) * 0.0706), 12px);
-    width: clamp(16px, calc(var(--arc-card-w) * 0.141), 24px);
-    height: clamp(16px, calc(var(--arc-card-w) * 0.141), 24px);
+    top: var(--arc-btn-offset);
+    left: var(--arc-btn-offset);
+    width: var(--arc-btn-size);
+    height: var(--arc-btn-size);
     border-radius: 50%;
     border: 1px solid rgba(255, 255, 255, 0.25);
     background: rgba(20, 16, 10, 0.55);
@@ -503,6 +525,41 @@
 .arc-card-delete:focus-visible {
     opacity: 1;
     background: rgba(179, 38, 30, 0.85);
+    transform: scale(1.08);
+}
+
+/* BARU: tombol edit -- sama persis strukturnya kayak tombol hapus
+   (ukuran, bentuk, posisi vertikal) TAPI digeser ke kanan sejauh
+   1 lebar tombol + --arc-btn-gap, biar dua-duanya sejajar rapi di
+   pojok kiri atas sampul tanpa numpuk. Warna hover-nya SENGAJA beda
+   dari tombol hapus (gold, bukan merah) -- gold = konsisten sama
+   warna aksen "positif" yang udah dipakai di tombol Unduh PDF /
+   spine / rivet di seluruh kartu ini, sekaligus bikin dua tombol ini
+   gampang dibedain sekilas: gold = ubah, merah = hapus. */
+.arc-card-edit {
+    position: absolute;
+    top: var(--arc-btn-offset);
+    left: calc(var(--arc-btn-offset) + var(--arc-btn-size) + var(--arc-btn-gap));
+    width: var(--arc-btn-size);
+    height: var(--arc-btn-size);
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(20, 16, 10, 0.55);
+    color: #f4ead0;
+    font-size: clamp(9px, calc(var(--arc-card-w) * 0.0706), 12px);
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    opacity: 0.65;
+    transition: opacity .2s ease, background .2s ease, transform .2s ease, color .2s ease;
+}
+.arc-card-edit:hover,
+.arc-card-edit:focus-visible {
+    opacity: 1;
+    background: rgba(203, 164, 84, 0.85);
+    color: #14100a;
     transform: scale(1.08);
 }
 
@@ -527,8 +584,11 @@
     transform: translateY(-2px);
 }
 
-/* Modal tambah/hapus buku -- niru struktur & bahasa visual modal QR
-   (.qr-modal-*) / FlipBook, biar konsisten satu situs. */
+/* Modal tambah/edit/hapus buku -- niru struktur & bahasa visual modal QR
+   (.qr-modal-*) / FlipBook, biar konsisten satu situs. Modal yang sama
+   dipakai buat ketiga mode ('add' / 'edit' / 'delete'), lihat
+   js/Arccarousel.js -- cuma judul, isi field, dan teks tombol submit
+   yang beda per mode. */
 .arc-modal-overlay {
     position: fixed;
     inset: 0;

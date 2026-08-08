@@ -1,23 +1,33 @@
 (() => {
     // ============================================================
-    // FITUR TAMBAH & HAPUS BUKU: grid buku sekarang di-render dari data
-    // DINAMIS (fetch dari /api/arc-carousel/content), BUKAN dari kartu
-    // statis [data-arc-card] di HTML lagi. 5 kartu placeholder "Book"
-    // yang ada di index.html jadi gak kepakai lagi -- boleh dibiarin
-    // aja di HTML (bakal ke-timpa otomatis), atau boleh dikosongin
-    // biar rapi, dua-duanya aman.
+    // FITUR TAMBAH, EDIT & HAPUS BUKU: grid buku sekarang di-render dari
+    // data DINAMIS (fetch dari /api/arc-carousel/content), BUKAN dari
+    // kartu statis [data-arc-card] di HTML lagi. 5 kartu placeholder
+    // "Book" yang ada di index.html jadi gak kepakai lagi -- boleh
+    // dibiarin aja di HTML (bakal ke-timpa otomatis), atau boleh
+    // dikosongin biar rapi, dua-duanya aman.
     //
-    // Tiap kartu punya tombol "×" kecil buat hapus, dan ada tombol
-    // "+ Tambah Buku" di bawah grid. BARU: kedua tombol ini cuma tampil
-    // buat admin yang sedang login (dicek lewat /api/auth/check-session),
-    // bukan lagi lewat modal password -- pola sama kayak fitur edit
-    // FlipBook/QR (lihat routes/arcCarouselContent.js +
-    // data/arcCarouselStore.js + middleware/requireAdmin.js di backend).
+    // Tiap kartu punya tombol "✎" (edit) dan "×" (hapus), dan ada
+    // tombol "+ Tambah Buku" di bawah grid. Ketiga tombol ini cuma
+    // tampil buat admin yang sedang login (dicek lewat
+    // /api/auth/check-session), bukan lagi lewat modal password --
+    // pola sama kayak fitur edit FlipBook/QR (lihat
+    // routes/arcCarouselContent.js + data/arcCarouselStore.js +
+    // middleware/requireAdmin.js di backend).
+    //
+    // BARU: tombol EDIT (✎) -- sebelumnya cuma bisa Tambah & Hapus,
+    // gak ada cara buat ubah buku yang UDAH ada (ganti judul dan/atau
+    // ganti berkas PDF-nya) selain hapus-lalu-tambah-ulang (yang bikin
+    // ganti ID & kehilangan urutan). Sekarang ada openEditModal() +
+    // submitEdit(), reuse modal yang sama persis kayak Tambah (cuma
+    // judul modal & teks tombol submit-nya beda, dan field title-nya
+    // udah keisi otomatis sama judul lama).
     // ============================================================
 
     const API = {
         content: '/api/arc-carousel/content',
         add: '/api/arc-carousel/book/add',
+        edit: '/api/arc-carousel/book/edit',
         delete: '/api/arc-carousel/book/delete'
     };
 
@@ -37,13 +47,14 @@
             this.modalState = null;
             this.fieldRefs = {};
 
-            // BARU: status admin, dicek dari /api/auth/check-session (endpoint
+            // Status admin, dicek dari /api/auth/check-session (endpoint
             // yang sudah ada di routes/auth.js) -- dipakai buat nge-gate
-            // tombol "+ Tambah Buku" dan "x" hapus per kartu. Pengguna biasa
-            // (bukan admin / belum login) gak akan pernah lihat tombol-tombol
-            // ini sama sekali. loadAdminStatus() SENGAJA di-await duluan
-            // sebelum loadBooks(), biar pas renderBooks() jalan, this.isAdmin
-            // udah pasti kebaca statusnya yang benar (bukan race condition).
+            // tombol "+ Tambah Buku" dan tombol "✎"/"×" per kartu.
+            // Pengguna biasa (bukan admin / belum login) gak akan pernah
+            // lihat tombol-tombol ini sama sekali. loadAdminStatus()
+            // SENGAJA di-await duluan sebelum loadBooks(), biar pas
+            // renderBooks() jalan, this.isAdmin udah pasti kebaca
+            // statusnya yang benar (bukan race condition).
             this.isAdmin = false;
 
             this.buildAddButton();
@@ -116,6 +127,13 @@
             cover.appendChild(el('div', 'arc-card-rivet'));
 
             if (this.isAdmin) {
+                const editBtn = el('button', 'arc-card-edit');
+                editBtn.type = 'button';
+                editBtn.setAttribute('aria-label', 'Edit buku "' + (book.title || '') + '"');
+                editBtn.textContent = '✎';
+                editBtn.addEventListener('click', () => this.openEditModal(book));
+                cover.appendChild(editBtn);
+
                 const deleteBtn = el('button', 'arc-card-delete');
                 deleteBtn.type = 'button';
                 deleteBtn.setAttribute('aria-label', 'Hapus buku "' + (book.title || '') + '"');
@@ -153,7 +171,10 @@
 
         // Modal dibangun SEKALI, dipasang ke <body> (bukan di dalam
         // .arc-carousel) -- biar posisinya gak kena reflow/overflow dari
-        // .arc-track yang sekarang bisa scroll internal.
+        // .arc-track yang sekarang bisa scroll internal. Modal yang sama
+        // ini dipakai buat 3 mode: 'add', 'edit', 'delete' -- bedanya
+        // cuma judul, isi field, dan handler submit-nya (lihat
+        // openAddModal / openEditModal / openDeleteModal).
         buildModal() {
             const overlay = el('div', 'arc-modal-overlay');
             overlay.hidden = true;
@@ -237,6 +258,27 @@
             this.modalOverlay.hidden = false;
         }
 
+        // BARU: mode edit -- field title di-prefill sama judul buku yang
+        // udah ada. PDF tetap opsional: kalau field-nya dikosongin, gak
+        // ada entry 'pdf' di FormData sama sekali, jadi backend tau PDF
+        // lama harus dipertahanin (lihat submitEdit() & editBook() di
+        // data/arcCarouselStore.js).
+        openEditModal(book) {
+            this.modalState = { mode: 'edit', book };
+            this.modalTitleEl.textContent = 'Edit Buku';
+            this.modalSubEl.textContent = 'Ubah judul dan/atau ganti berkas PDF-nya. Kosongkan PDF kalau gak mau ganti.';
+            this.modalSubmitBtn.textContent = 'Simpan';
+
+            this.modalFieldsWrap.innerHTML = '';
+            this.fieldRefs = {};
+            this.addField('title', 'Judul Buku', 'text');
+            this.fieldRefs.title.value = book.title || '';
+            this.addField('pdf', 'Ganti Berkas PDF (opsional) Max 4MB', 'file');
+
+            this.modalErrorEl.hidden = true;
+            this.modalOverlay.hidden = false;
+        }
+
         openDeleteModal(book) {
             this.modalState = { mode: 'delete', book };
             this.modalTitleEl.textContent = 'Hapus Buku';
@@ -269,6 +311,9 @@
             try {
                 if (this.modalState.mode === 'add') {
                     await this.submitAdd();
+                } else if (this.modalState.mode === 'edit') {
+                    // BARU
+                    await this.submitEdit();
                 } else {
                     await this.submitDelete();
                 }
@@ -304,6 +349,42 @@
                 this.closeModal();
             } catch (err) {
                 console.error('[Arccarousel] Gagal menambah buku:', err);
+                this.showModalError('Gagal terhubung ke server. Coba lagi.');
+            }
+        }
+
+        // BARU: submit mode edit -- id buku lama dikirim bareng judul baru
+        // & (opsional) PDF baru. Kalau field PDF dikosongin, gak ada entry
+        // 'pdf' di FormData sama sekali -> backend (editBook di
+        // data/arcCarouselStore.js) tau harus PDF lama yang dipertahanin,
+        // bukan dihapus/dikosongin.
+        async submitEdit() {
+            const book = this.modalState.book;
+            const title = this.fieldRefs.title.value.trim();
+            if (!title) {
+                this.showModalError('Judul buku wajib diisi.');
+                return;
+            }
+
+            const fd = new FormData();
+            fd.append('id', book.id);
+            fd.append('title', title);
+            const file = this.fieldRefs.pdf.files && this.fieldRefs.pdf.files[0];
+            if (file) fd.append('pdf', file);
+
+            try {
+                const res = await fetch(API.edit, { method: 'POST', body: fd, credentials: 'same-origin' });
+                const data = await res.json();
+                if (!data.success) {
+                    this.showModalError(data.message || 'Gagal menyimpan perubahan.');
+                    return;
+                }
+                const idx = this.books.findIndex((b) => b.id === book.id);
+                if (idx !== -1) this.books[idx] = data.book;
+                this.renderBooks();
+                this.closeModal();
+            } catch (err) {
+                console.error('[Arccarousel] Gagal mengedit buku:', err);
                 this.showModalError('Gagal terhubung ke server. Coba lagi.');
             }
         }

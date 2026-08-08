@@ -1,16 +1,23 @@
 // routes/arcCarouselContent.js
 //
-// Router Express untuk fitur Tambah/Hapus Buku di ArcCarousel. Endpoint
-// dipertahankan sama persis (GET /api/arc-carousel/content,
-// POST /api/arc-carousel/book/add, POST /api/arc-carousel/book/delete)
-// -- endpoint-nya gak berubah, tapi otorisasinya sekarang sesi admin
+// Router Express untuk fitur Tambah/Edit/Hapus Buku di ArcCarousel.
+// Endpoint dipertahankan sama persis buat add & delete (GET
+// /api/arc-carousel/content, POST /api/arc-carousel/book/add,
+// POST /api/arc-carousel/book/delete) -- otorisasinya sesi admin
 // (lihat requireAdmin di bawah), bukan lagi password manual.
 //
 // FIX lama: sebelumnya route ini manggil store.addBook({ title, file })
 // padahal data/arcCarouselStore.js definisinya addBook(title, pdf) -- dua
 // argumen terpisah, bukan satu object. Sudah disesuaikan.
 //
-// BARU: password per-aksi (ARC_CAROUSEL_EDIT_PASSWORD / QR_EDIT_PASSWORD)
+// BARU: POST /api/arc-carousel/book/edit (multipart/form-data:
+// id, title, pdf?) -- sebelumnya cuma bisa Tambah & Hapus, sekarang
+// bisa update judul & (opsional) ganti berkas PDF buku yang UDAH ada,
+// tanpa perlu hapus-lalu-tambah-ulang. Pola handler-nya SAMA PERSIS
+// kayak /book/add (requireAdmin duluan, lalu multer di-wrap manual
+// biar error upload ke-handle rapi sebelum logic lain jalan).
+//
+// Password per-aksi (ARC_CAROUSEL_EDIT_PASSWORD / QR_EDIT_PASSWORD)
 // DICABUT, digantikan sesi login admin (lihat middleware/requireAdmin.js),
 // konsisten sama routes/qrImages.js, qrBg.js, qrDoc.js.
 
@@ -50,8 +57,8 @@ router.get('/content', async (req, res) => {
 });
 
 // POST /api/arc-carousel/book/add  (multipart/form-data: title, pdf?)
-// BARU: requireAdmin dipasang PALING DEPAN -- kalau bukan admin yang
-// login, request ditolak sebelum sempat parsing multipart body sama sekali.
+// requireAdmin dipasang PALING DEPAN -- kalau bukan admin yang login,
+// request ditolak sebelum sempat parsing multipart body sama sekali.
 router.post('/book/add', requireAdmin, (req, res) => {
     upload.single('pdf')(req, res, async (uploadErr) => {
         try {
@@ -75,6 +82,43 @@ router.post('/book/add', requireAdmin, (req, res) => {
             console.error('[arcCarouselContent] Error tak terduga saat tambah buku:', fatalErr);
             if (!res.headersSent) {
                 res.status(fatalErr.statusCode || 500).json({ success: false, message: fatalErr.message || 'Terjadi kesalahan pada server saat menyimpan buku.' });
+            }
+        }
+    });
+});
+
+// BARU: POST /api/arc-carousel/book/edit  (multipart/form-data: id, title, pdf?)
+// Struktur handler-nya sengaja dibikin identik sama /book/add di atas
+// (requireAdmin duluan, multer di-wrap manual) biar konsisten & gampang
+// dirawat bareng. pdf bersifat opsional: kalau field-nya kosong (gak ada
+// req.file), store.editBook() bakal PERTAHANKAN pdfUrl/pdfPathname lama
+// apa adanya -- cuma title yang pasti diganti.
+router.post('/book/edit', requireAdmin, (req, res) => {
+    upload.single('pdf')(req, res, async (uploadErr) => {
+        try {
+            if (uploadErr) {
+                return res.status(400).json({ success: false, message: uploadErr.message || 'Proses pengunggahan gagal.' });
+            }
+
+            const { id } = req.body;
+            const title = (req.body.title || '').trim();
+
+            if (!id) {
+                return res.status(400).json({ success: false, message: 'ID buku tidak ditemukan.' });
+            }
+            if (!title) {
+                return res.status(400).json({ success: false, message: 'Judul buku wajib diisi.' });
+            }
+
+            const pdf = req.file ? { buffer: req.file.buffer, mimeType: req.file.mimetype } : null;
+
+            const book = await store.editBook(id, title, pdf);
+
+            res.json({ success: true, message: 'Buku berhasil diperbarui.', book });
+        } catch (fatalErr) {
+            console.error('[arcCarouselContent] Error tak terduga saat edit buku:', fatalErr);
+            if (!res.headersSent) {
+                res.status(fatalErr.statusCode || 500).json({ success: false, message: fatalErr.message || 'Terjadi kesalahan pada server saat mengedit buku.' });
             }
         }
     });
