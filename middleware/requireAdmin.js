@@ -1,17 +1,28 @@
 // middleware/requireAdmin.js
 //
-// Gerbang admin untuk SEMUA route yang mengubah/menghapus konten (ganti
-// gambar QR, latar belakang, dokumen terkait, isi carousel, flip book,
-// peta, musik, dst). Dipasang di depan handler POST/PUT/DELETE yang
-// relevan di masing-masing router.
+// Gerbang admin untuk SEMUA route yang mengubah/menghapus konten.
 //
-// Menggantikan model lama (password dikirim ulang tiap aksi lewat form
-// modal) dengan sesi login sesungguhnya: admin login SEKALI lewat
-// /api/auth/login (routes/auth.js, sudah ada), sesi tersimpan di cookie
-// (express-session, sudah di-mount di server.js sebelum semua route),
-// middleware ini tinggal baca req.session.role.
+// SEMENTARA: ditambah console.log diagnostik di setiap titik keputusan,
+// buat nangkep KENAPA persis suatu request ditolak -- ada laporan
+// GET /api/auth/check-session bilang admin, tapi POST ke endpoint yang
+// dilindungi requireAdmin balik 401 beberapa detik kemudian. Logging ini
+// bakal nunjukin: apakah req.sessionID beda-beda antar request (cookie
+// gak konsisten kekirim), atau req.session ada tapi user_id/role-nya
+// kosong (session ke-load tapi datanya gak lengkap/gak ketemu di store).
+// Cabut console.log ini lagi begitu akar masalahnya ketemu.
 
 function requireAdmin(req, res, next) {
+    console.log('[requireAdmin]', {
+        path: req.path,
+        method: req.method,
+        sessionID: req.sessionID,
+        hasSession: !!req.session,
+        user_id: req.session ? req.session.user_id : undefined,
+        role: req.session ? req.session.role : undefined,
+        cookieHeaderPresent: !!req.headers.cookie,
+        cookieHeaderRaw: req.headers.cookie || null
+    });
+
     if (!req.session || !req.session.user_id) {
         return res.status(401).json({
             success: false,
