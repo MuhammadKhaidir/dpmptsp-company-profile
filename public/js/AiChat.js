@@ -17,13 +17,13 @@
 // '/api/qr-images/:slot' (same-origin), persis seperti modal "Perbarui
 // Gambar" di panel QR (lihat js/QRCodeRevealAnimation.js).
 //
-// BARU: fitur pengaduan/laporan (dan dashboard masyarakat/petugas/admin yang
-// menyertainya) SUDAH TIDAK ADA lagi di situs ini -- tidak ada satupun route
-// backend yang menyentuh database pengaduan (lihat web.js, server.js).
-// Makanya NAV target DASHBOARD_MASYARAKAT / DASHBOARD_PETUGAS / DASHBOARD_ADMIN
-// / FORM_LAPORAN sudah dilepas dari handleNavigation() di bawah -- kalau AI
-// somehow masih pernah mengirim salah satu tag itu, target-nya sekarang
-// diam-diam diabaikan, bukan memicu modal/halaman yang sudah tidak berfungsi.
+// BARU: situs ini sekarang login KHUSUS ADMIN -- pendaftaran akun publik
+// dan fitur pengaduan/laporan (beserta dashboard masyarakat/petugas/admin
+// yang menyertainya) SUDAH TIDAK ADA lagi. Makanya NAV target REGISTER,
+// DASHBOARD_MASYARAKAT, DASHBOARD_PETUGAS, DASHBOARD_ADMIN, dan FORM_LAPORAN
+// sudah dilepas dari handleNavigation() di bawah -- kalau AI somehow masih
+// pernah mengirim salah satu tag itu, target-nya sekarang diam-diam
+// diabaikan, bukan memicu modal/halaman yang sudah tidak berfungsi.
 
 let chatHistory = [];
 let aiTyping = false;
@@ -64,10 +64,10 @@ const QUICK_CHIPS_DEFAULT = ["Ke Buku Sejarah & Latar Belakang", "Scan Katalog I
    cocok, LANGSUNG eksekusi aksinya (scroll/loncat/dsb) tanpa nunggu balesan
    AI sama sekali -- makanya kerasa instan.
 
-   Untuk aksi yang emang udah dipegang backend (login, daftar), SENGAJA
-   TIDAK di-intercept di sini -- itu tetep lewat jalur AI seperti biasa
-   (lihat handleNavigation di bawah), soalnya itu udah teruji jalan dan gak
-   ada hubungannya sama fitur baru ini.
+   Untuk aksi yang emang udah dipegang backend (login), SENGAJA TIDAK
+   di-intercept di sini -- itu tetep lewat jalur AI seperti biasa (lihat
+   handleNavigation di bawah), soalnya itu udah teruji jalan dan gak ada
+   hubungannya sama fitur baru ini.
    ========================================================================== */
 
 // Kata kerja perintah -- navigasi CUMA jalan kalau salah satu kata ini ada.
@@ -275,11 +275,6 @@ function applyQrUpdateToPage(slot, entry) {
 
   const box = panel.querySelector('.qr-panel-' + slot);
   if (box) {
-    // FIX: field-nya udah lama diganti dari `filename` jadi `url` di
-    // data/qrImageStore.js (lihat routes/qrImages.js) -- sebelumnya di sini
-    // masih baca `entry.filename` yang selalu undefined, jadi gambar di
-    // halaman gak pernah ke-refresh otomatis abis diganti lewat chat
-    // (cuma judulnya doang yang keupdate).
     if (entry && entry.url) {
       const img = box.querySelector('.qr-img');
       if (img) {
@@ -320,7 +315,7 @@ function initAIChat() {
   loadAdminStatus();
   setTimeout(() => {
     pushAIMessage(
-      "Halo! Selamat datang di DPMPTSP Kota Palembang. Selain bantu masuk ke sistem atau daftar akun, aku juga bisa langsung anter kamu ke bagian mana pun di halaman ini — misalnya \"buka buku Visi & Misi halaman 2\" atau \"scan QR Katalog Investasi\". Kalau kamu admin yang sudah login, kamu juga bisa minta aku ganti gambar/judul kotak QR langsung dari sini, tinggal bilang mis. \"ganti background Katalog Investasi\". Mau ke mana dulu?",
+      "Halo! Selamat datang di DPMPTSP Kota Palembang. Aku bisa langsung anter kamu ke bagian mana pun di halaman ini — misalnya \"buka buku Visi & Misi halaman 2\" atau \"scan QR Katalog Investasi\". Kalau kamu admin yang sudah login, kamu juga bisa minta aku ganti gambar/judul kotak QR langsung dari sini, tinggal bilang mis. \"ganti background Katalog Investasi\". Mau ke mana dulu?",
       QUICK_CHIPS_DEFAULT
     );
   }, 400);
@@ -535,14 +530,13 @@ function handleNavigation(fullAiText) {
       const data = alpineRoot._x_dataStack && alpineRoot._x_dataStack[0];
       if (!data) return;
 
-      // BARU: DASHBOARD_MASYARAKAT / DASHBOARD_PETUGAS / DASHBOARD_ADMIN /
-      // FORM_LAPORAN sengaja DIHAPUS dari sini -- itu semua peninggalan
-      // fitur pengaduan yang sudah tidak dipakai lagi di situs ini (lihat
-      // catatan BARU di kepala file). Kalau backend somehow masih pernah
-      // mengirim salah satu tag itu, target-nya gak akan cocok ke branch
-      // manapun di bawah -- diam-diam diabaikan, gak memicu apa-apa.
+      // BARU: REGISTER, DASHBOARD_MASYARAKAT, DASHBOARD_PETUGAS,
+      // DASHBOARD_ADMIN, dan FORM_LAPORAN sengaja DIHAPUS dari sini --
+      // pendaftaran akun publik dan fitur pengaduan sudah tidak ada di
+      // situs ini (lihat catatan BARU di kepala file). Kalau backend
+      // somehow masih pernah mengirim salah satu tag itu, target-nya gak
+      // akan cocok ke branch manapun di bawah -- diam-diam diabaikan.
       if (target === 'LOGIN') { data.v = 'login'; data.chatOpen = false; }
-      else if (target === 'REGISTER') { data.v = 'register'; data.chatOpen = false; }
     } catch (err) { /* Alpine belum siap, abaikan */ }
   }, 900);
 }

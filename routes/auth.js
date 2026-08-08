@@ -1,5 +1,18 @@
 // routes/auth.js
 // Semua route auth, di-mount di web.js sebagai /api/auth/*
+//
+// BARU: situs ini sekarang login KHUSUS ADMIN. Pendaftaran akun publik
+// (masyarakat/petugas) sudah dicabut -- itu peninggalan fitur pengaduan
+// yang sudah tidak dipakai lagi (lihat AI_SYSTEM_PROMPT di web.js dan
+// middleware/requireAdmin.js). Endpoint /register TETAP di-mount (bukan
+// dihapus total) supaya kalau masih ada form registrasi lama yang belum
+// sempat dibongkar di frontend, dia dapat pesan jelas -- bukan error
+// jaringan mentah (404) yang membingungkan.
+//
+// Akun masyarakat/petugas LAMA yang masih ada di tabel `users` (dari
+// sebelum fitur ini dicabut) TETAP BISA cocok kredensialnya (email/NIK &
+// kata sandi benar), tapi ditolak di /login karena role-nya bukan 'admin'
+// -- lihat pengecekan di bawah.
 
 const express = require('express');
 const bcrypt = require('bcryptjs');
@@ -7,41 +20,12 @@ const pool = require('../config/database');
 
 const router = express.Router();
 
-// POST /api/auth/register
-router.post('/register', async (req, res) => {
-  try {
-    const { nama_lengkap, nik, no_hp, email, password } = req.body;
-
-    if (!nama_lengkap || !nik || !no_hp || !email || !password) {
-      return res.json({ success: false, message: 'Semua kolom wajib diisi' });
-    }
-    if (!/^\d{16}$/.test(nik)) {
-      return res.json({ success: false, message: 'NIK harus 16 digit angka' });
-    }
-    if (password.length < 8) {
-      return res.json({ success: false, message: 'Kata sandi minimal 8 karakter' });
-    }
-
-    const [existing] = await pool.query(
-      'SELECT id FROM users WHERE email = ? OR nik = ?',
-      [email, nik]
-    );
-    if (existing.length > 0) {
-      return res.json({ success: false, message: 'Email atau NIK sudah terdaftar' });
-    }
-
-    const hash = await bcrypt.hash(password, 10);
-    await pool.query(
-      `INSERT INTO users (nik, nama_lengkap, email, no_hp, password, role)
-       VALUES (?, ?, ?, ?, ?, 'masyarakat')`,
-      [nik, nama_lengkap, email, no_hp, hash]
-    );
-
-    res.json({ success: true, message: 'Registrasi berhasil, silakan login' });
-  } catch (err) {
-    console.error('[auth.js] /register error:', err);
-    res.status(500).json({ success: false, message: 'Terjadi kesalahan server' });
-  }
+// POST /api/auth/register -- dinonaktifkan, lihat catatan di atas.
+router.post('/register', (req, res) => {
+  res.status(403).json({
+    success: false,
+    message: 'Pendaftaran akun publik sudah tidak tersedia. Sistem ini kini khusus untuk admin.'
+  });
 });
 
 // POST /api/auth/login
@@ -62,6 +46,12 @@ router.post('/login', async (req, res) => {
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.json({ success: false, message: 'Email/NIK atau kata sandi salah' });
+    }
+
+    // BARU: tolak akun non-admin walau kredensialnya benar -- sisa akun
+    // masyarakat/petugas dari fitur pengaduan lama gak lagi bisa masuk.
+    if (user.role !== 'admin') {
+      return res.json({ success: false, message: 'Akun ini tidak memiliki akses. Sistem ini kini khusus untuk admin.' });
     }
 
     req.session.user_id = user.id;
