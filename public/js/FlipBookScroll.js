@@ -21,6 +21,35 @@ const FLIPBOOK_API = {
   deleteBook: '/api/flipbook/book/delete'
 };
 
+// BARU: status admin, dicek dari /api/auth/check-session (endpoint yang
+// sudah ada di routes/auth.js) -- dipakai buat nge-gate tombol pensil
+// (edit), tempat sampah (hapus halaman), "+ Tambah Halaman", dan "Hapus
+// Buku Ini". Pengguna biasa (bukan admin / belum login) cuma bisa baca
+// dan scroll flip book, gak akan pernah lihat tombol-tombol edit ini
+// sama sekali.
+//
+// PENTING soal nama variabel: file ini SENGAJA TIDAK dibungkus IIFE
+// seperti js/MusicPlayer.js atau js/MapSection.js (semua const/function
+// di sini langsung ada di scope global halaman). js/AiChat.js juga
+// begitu, dan sudah lebih dulu mendeklarasikan `let isAdmin` di scope
+// global. Kalau di sini dipakai nama yang sama (`isAdmin`), begitu kedua
+// script sama-sama dimuat di satu halaman akan terjadi
+// "SyntaxError: Identifier 'isAdmin' has already been declared" yang
+// bikin SELURUH javascript halaman berhenti jalan. Makanya di sini
+// dipakai nama unik: fbIsAdmin / loadFbAdminStatus.
+let fbIsAdmin = false;
+
+function loadFbAdminStatus() {
+  return fetch('/api/auth/check-session')
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      fbIsAdmin = !!(data && data.logged_in && data.role === 'admin');
+    })
+    .catch(() => {
+      fbIsAdmin = false;
+    });
+}
+
 const DEFAULT_BOOKS = [
   {
     title: 'Sejarah & Latar Belakang',
@@ -490,17 +519,23 @@ class FlipBookScroll {
     this.bookActionsWrap = el('div', 'fb-book-actions');
     this.sticky.appendChild(this.bookActionsWrap);
 
-    this.addPageBtn = el('button', 'fb-add-page-btn');
-    this.addPageBtn.type = 'button';
-    this.addPageBtn.textContent = '+ Tambah Halaman';
-    this.addPageBtn.addEventListener('click', () => this.openAddPageModal(this.activeIndex));
-    this.bookActionsWrap.appendChild(this.addPageBtn);
+    // BARU: tombol "+ Tambah Halaman" & "Hapus Buku Ini" cuma dibangun
+    // kalau fbIsAdmin true. this.addPageBtn/this.deleteBookBtn jadi
+    // undefined buat pengguna biasa -- lihat guard `if (this.deleteBookBtn)`
+    // di render() yang jaga-jaga soal ini.
+    if (fbIsAdmin) {
+      this.addPageBtn = el('button', 'fb-add-page-btn');
+      this.addPageBtn.type = 'button';
+      this.addPageBtn.textContent = '+ Tambah Halaman';
+      this.addPageBtn.addEventListener('click', () => this.openAddPageModal(this.activeIndex));
+      this.bookActionsWrap.appendChild(this.addPageBtn);
 
-    this.deleteBookBtn = el('button', 'fb-delete-book-btn');
-    this.deleteBookBtn.type = 'button';
-    this.deleteBookBtn.textContent = 'Hapus Buku Ini';
-    this.deleteBookBtn.addEventListener('click', () => this.openDeleteBookModal(this.activeIndex));
-    this.bookActionsWrap.appendChild(this.deleteBookBtn);
+      this.deleteBookBtn = el('button', 'fb-delete-book-btn');
+      this.deleteBookBtn.type = 'button';
+      this.deleteBookBtn.textContent = 'Hapus Buku Ini';
+      this.deleteBookBtn.addEventListener('click', () => this.openDeleteBookModal(this.activeIndex));
+      this.bookActionsWrap.appendChild(this.deleteBookBtn);
+    }
 
     this.flipBooks = this.books.map((book, i) => this.makeFlipBook(book, i));
 
@@ -513,8 +548,14 @@ class FlipBookScroll {
   // jalur.
   makeFlipBook(book, index) {
     return new FlipBook(this.stage, book, index, {
-      onEdit: (leafType, contentIndex) => this.openEditModal(index, leafType, contentIndex),
-      onDeletePage: (contentIndex) => this.openDeletePageModal(index, contentIndex),
+      // BARU: onEdit/onDeletePage cuma diisi kalau fbIsAdmin true. Karena
+      // buildFace()/buildCoverFace()/buildTextFace()/buildBackFace() sudah
+      // mengecek `if (onEdit) ...`/`if (onDelete) ...` sebelum menambahkan
+      // tombol pensil/tempat sampah, meng-null-kan keduanya di sini otomatis
+      // membuat tombol-tombol itu TIDAK PERNAH dibuat sama sekali untuk
+      // pengguna biasa -- bukan cuma disembunyikan lewat CSS.
+      onEdit: fbIsAdmin ? (leafType, contentIndex) => this.openEditModal(index, leafType, contentIndex) : null,
+      onDeletePage: fbIsAdmin ? (contentIndex) => this.openDeletePageModal(index, contentIndex) : null,
       onBookClick: () => this.toggleBookActions(index)
     });
   }
@@ -527,6 +568,7 @@ class FlipBookScroll {
   // diabaikan; lagipula begitu opacity-nya ~0, buku itu display:none jadi
   // gak akan pernah "kena klik").
   toggleBookActions(index) {
+    if (!fbIsAdmin) return; // panel "Tambah Halaman"/"Hapus Buku Ini" khusus admin
     if (index !== this.activeIndex) return;
     this.actionsOpen = !this.actionsOpen;
     this.bookActionsWrap.classList.toggle('is-open', this.actionsOpen);
@@ -575,14 +617,6 @@ class FlipBookScroll {
     imageRow.appendChild(imageInput);
     modal.appendChild(imageRow);
 
-    const passwordLabel = el('label', 'fb-edit-password-label');
-    passwordLabel.textContent = 'Kata sandi edit';
-    const passwordInput = el('input', 'fb-edit-password-input');
-    passwordInput.type = 'password';
-    passwordInput.placeholder = 'Masukkan kata sandi';
-    passwordLabel.appendChild(passwordInput);
-    modal.appendChild(passwordLabel);
-
     const errorMsg = el('p', 'fb-edit-error');
     errorMsg.hidden = true;
     modal.appendChild(errorMsg);
@@ -608,7 +642,6 @@ class FlipBookScroll {
     this.editImageRow = imageRow;
     this.editImagePreview = imagePreview;
     this.editImageInput = imageInput;
-    this.editPasswordInput = passwordInput;
     this.editErrorEl = errorMsg;
     this.editSaveBtn = saveBtn;
 
@@ -681,7 +714,6 @@ class FlipBookScroll {
     }
 
     this.editErrorEl.hidden = true;
-    this.editPasswordInput.value = '';
 
     this.editModalOpen = true;
     this.editOverlay.hidden = false;
@@ -706,7 +738,6 @@ class FlipBookScroll {
     this.editImagePreview.removeAttribute('src');
 
     this.editErrorEl.hidden = true;
-    this.editPasswordInput.value = '';
 
     this.editModalOpen = true;
     this.editOverlay.hidden = false;
@@ -735,7 +766,6 @@ class FlipBookScroll {
     this.editImagePreview.removeAttribute('src');
 
     this.editErrorEl.hidden = true;
-    this.editPasswordInput.value = '';
 
     this.editModalOpen = true;
     this.editOverlay.hidden = false;
@@ -765,7 +795,6 @@ class FlipBookScroll {
     this.editImagePreview.removeAttribute('src');
 
     this.editErrorEl.hidden = true;
-    this.editPasswordInput.value = '';
 
     this.editModalOpen = true;
     this.editOverlay.hidden = false;
@@ -784,31 +813,26 @@ class FlipBookScroll {
 
   async submitEditModal() {
     if (!this.editState) return;
-    const password = this.editPasswordInput.value;
-    if (!password) {
-      this.showEditError('Kata sandi wajib diisi.');
-      return;
-    }
 
     this.editSaveBtn.disabled = true;
     this.editErrorEl.hidden = true;
 
     try {
       if (this.editState.mode === 'add') {
-        await this.submitAddPage(this.editState.bookIndex, password);
+        await this.submitAddPage(this.editState.bookIndex);
       } else if (this.editState.mode === 'deletePage') {
-        await this.submitDeletePage(this.editState.bookIndex, this.editState.contentIndex, password);
+        await this.submitDeletePage(this.editState.bookIndex, this.editState.contentIndex);
       } else if (this.editState.mode === 'deleteBook') {
-        await this.submitDeleteBook(this.editState.bookIndex, password);
+        await this.submitDeleteBook(this.editState.bookIndex);
       } else {
-        await this.submitPageEdit(this.editState, password);
+        await this.submitPageEdit(this.editState);
       }
     } finally {
       this.editSaveBtn.disabled = false;
     }
   }
 
-  async submitPageEdit(state, password) {
+  async submitPageEdit(state) {
     const fd = new FormData();
     fd.append('bookIndex', String(state.bookIndex));
     fd.append('leafType', state.leafType);
@@ -816,12 +840,14 @@ class FlipBookScroll {
     Object.keys(this.editFieldRefs).forEach((key) => {
       fd.append(key, this.editFieldRefs[key].value);
     });
-    fd.append('password', password);
     const file = this.editImageInput.files && this.editImageInput.files[0];
     if (file) fd.append('image', file);
 
     try {
-      const res = await fetch(FLIPBOOK_API.editPage, { method: 'POST', body: fd });
+      // credentials: 'same-origin' -- otorisasi sekarang ditentukan oleh
+      // sesi admin yang sedang login (cookie), bukan lagi dari kata sandi
+      // yang diketik di form.
+      const res = await fetch(FLIPBOOK_API.editPage, { method: 'POST', body: fd, credentials: 'same-origin' });
       const data = await res.json();
       if (!data.success) {
         this.showEditError(data.message || 'Gagal menyimpan perubahan.');
@@ -840,13 +866,12 @@ class FlipBookScroll {
     }
   }
 
-  async submitAddPage(bookIndex, password) {
+  async submitAddPage(bookIndex) {
     const fd = new FormData();
     fd.append('bookIndex', String(bookIndex));
-    fd.append('password', password);
 
     try {
-      const res = await fetch(FLIPBOOK_API.addPage, { method: 'POST', body: fd });
+      const res = await fetch(FLIPBOOK_API.addPage, { method: 'POST', body: fd, credentials: 'same-origin' });
       const data = await res.json();
       if (!data.success) {
         this.showEditError(data.message || 'Gagal menambah halaman.');
@@ -863,14 +888,13 @@ class FlipBookScroll {
   // FITUR HAPUS: hapus satu halaman isi. Jumlah halaman di buku itu
   // berubah -> sama kayak addPage, buku itu di-rebuild total (buku lain
   // gak disentuh).
-  async submitDeletePage(bookIndex, contentIndex, password) {
+  async submitDeletePage(bookIndex, contentIndex) {
     const fd = new FormData();
     fd.append('bookIndex', String(bookIndex));
     fd.append('contentIndex', String(contentIndex));
-    fd.append('password', password);
 
     try {
-      const res = await fetch(FLIPBOOK_API.deletePage, { method: 'POST', body: fd });
+      const res = await fetch(FLIPBOOK_API.deletePage, { method: 'POST', body: fd, credentials: 'same-origin' });
       const data = await res.json();
       if (!data.success) {
         this.showEditError(data.message || 'Gagal menghapus halaman.');
@@ -889,13 +913,12 @@ class FlipBookScroll {
   // dibongkar & dibangun ulang dari array buku terbaru (lihat
   // rebuildAll()), soalnya index semua buku SESUDAH buku yang dihapus
   // ikut geser.
-  async submitDeleteBook(bookIndex, password) {
+  async submitDeleteBook(bookIndex) {
     const fd = new FormData();
     fd.append('bookIndex', String(bookIndex));
-    fd.append('password', password);
 
     try {
-      const res = await fetch(FLIPBOOK_API.deleteBook, { method: 'POST', body: fd });
+      const res = await fetch(FLIPBOOK_API.deleteBook, { method: 'POST', body: fd, credentials: 'same-origin' });
       const data = await res.json();
       if (!data.success) {
         this.showEditError(data.message || 'Gagal menghapus buku.');
@@ -1271,10 +1294,14 @@ class FlipBookScroll {
 
     // FITUR HAPUS: gak boleh hapus buku terakhir yang tersisa -- tombol
     // "Hapus Buku Ini" otomatis nonaktif kalau cuma sisa 1 buku.
-    this.deleteBookBtn.disabled = this.books.length <= 1;
-    this.deleteBookBtn.title = this.books.length <= 1
-      ? 'Minimal harus ada 1 buku, tidak bisa dihapus semua.'
-      : '';
+    // Guard `if (this.deleteBookBtn)` -- elemen ini undefined buat
+    // pengguna biasa (lihat build(), cuma dibangun kalau fbIsAdmin).
+    if (this.deleteBookBtn) {
+      this.deleteBookBtn.disabled = this.books.length <= 1;
+      this.deleteBookBtn.title = this.books.length <= 1
+        ? 'Minimal harus ada 1 buku, tidak bisa dihapus semua.'
+        : '';
+    }
 
     const activeBook = this.flipBooks[activeIndex];
     const revealBase = activeBook ? clamp01(activeBook.lastOpacity) : 1;
@@ -1428,7 +1455,16 @@ async function init() {
   container.appendChild(loadingEl);
 
   const config = window.FlipBookScrollConfig || {};
-  const serverBooks = await fetchFlipbookContent();
+  // BARU: loadFbAdminStatus() WAJIB kelar duluan sebelum FlipBookScroll
+  // dibikin -- constructor-nya langsung manggil build(), yang nentuin
+  // apakah tombol edit/hapus/tambah dibangun berdasarkan fbIsAdmin SAAT
+  // ITU JUGA (bukan reaktif). Kalau dijalankan belakangan/dibiarkan async
+  // lepas, ada risiko tombol-tombol itu telanjur gak dibangun sebelum
+  // status admin sempat diketahui.
+  const [serverBooks] = await Promise.all([
+    fetchFlipbookContent(),
+    loadFbAdminStatus()
+  ]);
 
   if (loadingEl.parentNode) loadingEl.parentNode.removeChild(loadingEl);
 

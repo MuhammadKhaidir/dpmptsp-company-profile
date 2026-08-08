@@ -3,8 +3,9 @@
 // Peta interaktif lokasi investasi (Leaflet.js + tile CARTO/OpenStreetMap,
 // gratis, tanpa API key). Titik lokasi disimpan lewat backend
 // (data/mapStore.js + routes/map.js), dan bisa ditambah/diubah/dihapus
-// lewat panel "Kelola Lokasi" yang dilindungi kata sandi (variabel .env
-// yang sama dengan fitur QR/musik: QR_EDIT_PASSWORD).
+// lewat panel "Kelola Lokasi" yang cuma bisa diakses admin yang sedang
+// login (bukan lagi lewat kata sandi manual -- lihat isAdmin/
+// loadAdminStatus di bawah).
 //
 // FITUR PENCARIAN: kotak cari di pojok kiri-atas peta, mendukung
 // 3 mode sekaligus dalam satu input --
@@ -14,8 +15,9 @@
 //   3) Ketik koordinat langsung, mis. "-2.9909, 104.7566" (lat, lng) --
 //      langsung lompat ke titik itu tanpa perlu request ke server
 // Hasil dari mode 2 & 3 ditampilkan sebagai marker sementara (biru,
-// belum tersimpan), lengkap tombol "Tambahkan ke Lokasi Investasi" yang
-// membuka form tambah lokasi (masih perlu kata sandi untuk menyimpan).
+// belum tersimpan), lengkap tombol "Tambahkan ke Lokasi Investasi" (BARU:
+// cuma tampil buat admin yang sedang login) yang membuka form tambah
+// lokasi.
 //
 // FITUR RUTE (baru): tombol "Rute ke Sini" muncul di popup SETIAP
 // marker -- baik lokasi investasi yang sudah tersimpan, maupun marker
@@ -61,6 +63,25 @@
     var routeAbortController = null;
     var routeDestination = null; // { lat, lng, label } tujuan rute yang sedang aktif (dipakai tombol "Coba Lagi")
     var routeRequestId = 0; // penanda supaya hasil geolocation/fetch yang sudah "basi" (dibatalkan/diganti rute baru) tidak dipakai
+
+    // BARU: status admin, dicek dari /api/auth/check-session (endpoint yang
+    // sudah ada di routes/auth.js) -- dipakai buat nge-gate tombol "Kelola
+    // Lokasi" dan tombol "Tambahkan ke Lokasi Investasi" di popup hasil
+    // pencarian. Pengguna biasa (bukan admin / belum login) cuma bisa lihat
+    // peta, cari lokasi, dan minta rute -- gak akan pernah lihat tombol
+    // kelola/tambah lokasi sama sekali.
+    var isAdmin = false;
+
+    function loadAdminStatus() {
+        return fetch('/api/auth/check-session')
+            .then(function (res) { return res.ok ? res.json() : null; })
+            .then(function (data) {
+                isAdmin = !!(data && data.logged_in && data.role === 'admin');
+            })
+            .catch(function () {
+                isAdmin = false;
+            });
+    }
 
     function escapeHtml(str) {
         return String(str == null ? '' : str).replace(/[&<>"']/g, function (ch) {
@@ -124,9 +145,13 @@
         html += '<button type="button" class="map-popup-route-btn" data-route-btn>' +
                     '<i class="fa-solid fa-route"></i> Rute ke Sini' +
                 '</button>';
-        html += '<button type="button" class="map-popup-add-btn" data-temp-add>' +
-                    '<i class="fa-solid fa-map-pin"></i> Tambahkan ke Lokasi Investasi' +
-                '</button>';
+        // BARU: tombol "Tambahkan ke Lokasi Investasi" cuma dirender kalau
+        // admin lagi login -- lihat isAdmin di atas.
+        if (isAdmin) {
+            html += '<button type="button" class="map-popup-add-btn" data-temp-add>' +
+                        '<i class="fa-solid fa-map-pin"></i> Tambahkan ke Lokasi Investasi' +
+                    '</button>';
+        }
         return html;
     }
 
@@ -297,10 +322,7 @@
             '<div class="map-modal-overlay" data-map-close>' +
                 '<div class="map-modal-box map-modal-box-wide" role="dialog" aria-modal="true">' +
                     '<h3 class="map-modal-title">Kelola Lokasi Investasi</h3>' +
-                    '<p class="map-modal-sub">Masukkan kata sandi untuk menambah, mengubah, atau menghapus titik lokasi pada peta.</p>' +
-                    '<label class="map-edit-label">Kata Sandi' +
-                        '<input type="password" class="map-edit-input" id="map-manage-password" autocomplete="off">' +
-                    '</label>' +
+                    '<p class="map-modal-sub">Tambah, ubah, atau hapus titik lokasi pada peta.</p>' +
                     '<p class="map-edit-error" data-manage-error style="display:none;"></p>' +
                     '<button type="button" class="map-modal-btn map-modal-btn-primary" data-add-location>' +
                         '<i class="fa-solid fa-map-pin"></i> Tambah Lokasi Baru' +
@@ -345,11 +367,6 @@
         });
     }
 
-    function getManagePassword(root) {
-        var input = root.querySelector('#map-manage-password');
-        return input ? input.value : '';
-    }
-
     function showManageError(root, message) {
         var errorEl = root.querySelector('[data-manage-error]');
         if (!errorEl) return;
@@ -358,16 +375,9 @@
     }
 
     function submitDelete(id, root) {
-        var password = getManagePassword(root);
-        if (!password) {
-            showManageError(root, 'Kata sandi wajib diisi.');
-            return;
-        }
-
         fetch('/api/map/' + id, {
             method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: password })
+            credentials: 'same-origin'
         })
             .then(function (res) {
                 return res.json().then(function (data) { return { ok: res.ok, data: data }; });
@@ -410,9 +420,6 @@
                         '<label class="map-edit-label">Deskripsi (opsional)' +
                             '<textarea class="map-edit-textarea" name="description" rows="3" maxlength="600">' + escapeHtml(data.description || '') + '</textarea>' +
                         '</label>' +
-                        '<label class="map-edit-label">Kata Sandi' +
-                            '<input type="password" class="map-edit-input" name="password" required autocomplete="off">' +
-                        '</label>' +
                         '<button type="button" class="map-modal-btn map-modal-btn-ghost" data-reposition>' +
                             '<i class="fa-solid fa-crosshairs"></i> Tandai Ulang Posisi di Peta' +
                         '</button>' +
@@ -450,7 +457,6 @@
             errorEl.style.display = 'none';
 
             var payload = {
-                password: form.querySelector('[name="password"]').value,
                 title: form.querySelector('[name="title"]').value,
                 description: form.querySelector('[name="description"]').value,
                 lat: data.lat,
@@ -466,7 +472,8 @@
             fetch(url, {
                 method: method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
+                body: JSON.stringify(payload),
+                credentials: 'same-origin'
             })
                 .then(function (res) {
                     return res.json().then(function (d) { return { ok: res.ok, data: d }; });
@@ -495,7 +502,13 @@
     function setupManageButton() {
         var btn = document.getElementById('map-manage-btn');
         if (!btn) return;
-        btn.addEventListener('click', openManagePanel);
+        // BARU: tombol ini sudah disembunyikan (display:none) dari awal
+        // lewat DOMContentLoaded di bawah, sebelum status admin dipastikan.
+        // Baru ditampilkan lagi di sini kalau memang admin.
+        if (isAdmin) {
+            btn.style.display = '';
+            btn.addEventListener('click', openManagePanel);
+        }
     }
 
     function setupPickCancelButton() {
@@ -1181,9 +1194,17 @@
     }
 
     document.addEventListener('DOMContentLoaded', function () {
+        // Sembunyikan tombol "Kelola Lokasi" dari awal biar gak sempat
+        // "kedip" kelihatan buat pengguna biasa sebelum status admin
+        // dipastikan (fetch check-session butuh sedikit waktu).
+        var manageBtn = document.getElementById('map-manage-btn');
+        if (manageBtn) manageBtn.style.display = 'none';
+
         initMap();
-        setupManageButton();
         setupPickCancelButton();
         setupSearchBox();
+        loadAdminStatus().then(function () {
+            setupManageButton();
+        });
     });
 })();

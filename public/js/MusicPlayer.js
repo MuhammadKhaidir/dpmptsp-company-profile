@@ -4,8 +4,9 @@
 // pojok kanan bawah, senada dengan .chat-fab di pojok kiri bawah) yang
 // saat diklik menampilkan panel (daftar lagu atau kontrol "sedang
 // diputar") -- BUKAN langsung memutar lagu. Hingga 3 slot lagu bisa
-// dikelola (tambah/ganti/hapus) lewat panel "Kelola Musik" yang
-// dilindungi kata sandi.
+// dikelola (tambah/ganti/hapus) lewat panel "Kelola Musik", yang cuma
+// bisa diakses admin yang sedang login (bukan lagi lewat kata sandi
+// manual -- lihat isAdmin/loadAdminStatus di bawah).
 //
 // Semua elemen (tombol, elemen <audio>, panel) dibuat otomatis lewat JS,
 // tidak perlu menambah apa pun di index.html selain baris <link> CSS dan
@@ -20,6 +21,23 @@
     var trackListCache = [];
 
     var SLOTS = ['slot1', 'slot2', 'slot3']; // harus sinkron dengan data/musicStore.js
+
+    // BARU: status admin, dicek dari /api/auth/check-session (endpoint yang
+    // sudah ada di routes/auth.js) -- dipakai buat nge-gate tombol "Kelola
+    // Musik". Pengguna biasa (bukan admin / belum login) cuma bisa lihat &
+    // putar lagu, gak akan pernah lihat tombol kelola-nya sama sekali.
+    var isAdmin = false;
+
+    function loadAdminStatus() {
+        return fetch('/api/auth/check-session')
+            .then(function (res) { return res.ok ? res.json() : null; })
+            .then(function (data) {
+                isAdmin = !!(data && data.logged_in && data.role === 'admin');
+            })
+            .catch(function () {
+                isAdmin = false;
+            });
+    }
 
     function ensureAudioEl() {
         if (audioEl) return audioEl;
@@ -186,6 +204,13 @@
     function openTrackListPanel() {
         var root = ensureModalRoot();
 
+        // BARU: tombol "Kelola Musik" cuma dirender kalau admin lagi login.
+        var manageButtonHtml = isAdmin
+            ? '<button type="button" class="music-manage-link" data-open-manage>' +
+                  '<i class="fa-solid fa-gear"></i> Kelola Musik' +
+              '</button>'
+            : '';
+
         root.innerHTML =
             '<div class="music-modal-overlay" data-music-close>' +
                 '<div class="music-modal-box" role="dialog" aria-modal="true">' +
@@ -194,15 +219,14 @@
                     '<div class="music-track-list" data-track-list>' +
                         '<p class="music-loading">Memuat daftar lagu...</p>' +
                     '</div>' +
-                    '<button type="button" class="music-manage-link" data-open-manage>' +
-                        '<i class="fa-solid fa-gear"></i> Kelola Musik' +
-                    '</button>' +
+                    manageButtonHtml +
                     '<button type="button" class="music-modal-cancel" data-music-close>Tutup</button>' +
                 '</div>' +
             '</div>';
 
         bindOverlayClose(root);
-        root.querySelector('[data-open-manage]').addEventListener('click', openManagePanel);
+        var manageBtn = root.querySelector('[data-open-manage]');
+        if (manageBtn) manageBtn.addEventListener('click', openManagePanel);
 
         fetchTrackList().then(function (tracks) {
             var listEl = root.querySelector('[data-track-list]');
@@ -328,10 +352,7 @@
             '<div class="music-modal-overlay" data-music-close>' +
                 '<div class="music-modal-box music-modal-box-wide" role="dialog" aria-modal="true">' +
                     '<h3 class="music-modal-title">Kelola Musik</h3>' +
-                    '<p class="music-modal-sub">Masukkan kata sandi untuk menambah, mengganti, atau menghapus lagu (maksimal 3 lagu).</p>' +
-                    '<label class="music-edit-label">Kata Sandi' +
-                        '<input type="password" class="music-edit-input" id="music-manage-password" autocomplete="off">' +
-                    '</label>' +
+                    '<p class="music-modal-sub">Tambah, ganti, atau hapus lagu (maksimal 3 lagu).</p>' +
                     '<p class="music-edit-error" data-manage-error style="display:none;"></p>' +
                     '<div class="music-manage-list" data-manage-list>' +
                         '<p class="music-loading">Memuat data lagu...</p>' +
@@ -365,11 +386,6 @@
         });
     }
 
-    function getManagePassword(root) {
-        var input = root.querySelector('#music-manage-password');
-        return input ? input.value : '';
-    }
-
     function showManageError(root, message) {
         var errorEl = root.querySelector('[data-manage-error]');
         if (!errorEl) return;
@@ -378,21 +394,17 @@
     }
 
     function submitSlotUpload(slot, form, root) {
-        var password = getManagePassword(root);
-        if (!password) {
-            showManageError(root, 'Kata sandi wajib diisi.');
-            return;
-        }
-
         var formData = new FormData(form);
-        formData.append('password', password);
 
         var submitBtn = form.querySelector('button[type="submit"]');
         var originalHtml = submitBtn.innerHTML;
         submitBtn.disabled = true;
         submitBtn.innerHTML = 'Mengunggah...';
 
-        fetch('/api/music/' + slot, { method: 'POST', body: formData })
+        // credentials: 'same-origin' -- otorisasi sekarang ditentukan oleh
+        // sesi admin yang sedang login (cookie), bukan lagi dari kata sandi
+        // yang diketik di form.
+        fetch('/api/music/' + slot, { method: 'POST', body: formData, credentials: 'same-origin' })
             .then(parseJsonResponse)
             .then(function (data) {
                 if (!data || !data.success) {
@@ -409,16 +421,9 @@
     }
 
     function submitSlotDelete(slot, root) {
-        var password = getManagePassword(root);
-        if (!password) {
-            showManageError(root, 'Kata sandi wajib diisi.');
-            return;
-        }
-
         fetch('/api/music/' + slot, {
             method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ password: password })
+            credentials: 'same-origin'
         })
             .then(parseJsonResponse)
             .then(function (data) {
@@ -443,5 +448,6 @@
         ensureAudioEl();
         ensureFab();
         fetchTrackList(); // preload cache biar panel pertama kebuka lebih cepat
+        loadAdminStatus();
     });
 })();

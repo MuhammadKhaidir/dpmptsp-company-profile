@@ -8,9 +8,11 @@
     // biar rapi, dua-duanya aman.
     //
     // Tiap kartu punya tombol "×" kecil buat hapus, dan ada tombol
-    // "+ Tambah Buku" di bawah grid. Keduanya lewat modal password,
-    // pola sama kayak fitur edit FlipBook/QR (lihat routes/
-    // arcCarouselContent.js + data/arcCarouselStore.js di backend).
+    // "+ Tambah Buku" di bawah grid. BARU: kedua tombol ini cuma tampil
+    // buat admin yang sedang login (dicek lewat /api/auth/check-session),
+    // bukan lagi lewat modal password -- pola sama kayak fitur edit
+    // FlipBook/QR (lihat routes/arcCarouselContent.js +
+    // data/arcCarouselStore.js + middleware/requireAdmin.js di backend).
     // ============================================================
 
     const API = {
@@ -35,9 +37,39 @@
             this.modalState = null;
             this.fieldRefs = {};
 
+            // BARU: status admin, dicek dari /api/auth/check-session (endpoint
+            // yang sudah ada di routes/auth.js) -- dipakai buat nge-gate
+            // tombol "+ Tambah Buku" dan "x" hapus per kartu. Pengguna biasa
+            // (bukan admin / belum login) gak akan pernah lihat tombol-tombol
+            // ini sama sekali. loadAdminStatus() SENGAJA di-await duluan
+            // sebelum loadBooks(), biar pas renderBooks() jalan, this.isAdmin
+            // udah pasti kebaca statusnya yang benar (bukan race condition).
+            this.isAdmin = false;
+
             this.buildAddButton();
             this.buildModal();
-            this.loadBooks();
+
+            this.loadAdminStatus().then(() => {
+                this.applyAdminUI();
+                this.loadBooks();
+            });
+        }
+
+        loadAdminStatus() {
+            return fetch('/api/auth/check-session')
+                .then((res) => (res.ok ? res.json() : null))
+                .then((data) => {
+                    this.isAdmin = !!(data && data.logged_in && data.role === 'admin');
+                })
+                .catch(() => {
+                    this.isAdmin = false;
+                });
+        }
+
+        applyAdminUI() {
+            if (this.addBtn) {
+                this.addBtn.style.display = this.isAdmin ? '' : 'none';
+            }
         }
 
         async loadBooks() {
@@ -83,12 +115,14 @@
             cover.appendChild(el('div', 'arc-card-spine'));
             cover.appendChild(el('div', 'arc-card-rivet'));
 
-            const deleteBtn = el('button', 'arc-card-delete');
-            deleteBtn.type = 'button';
-            deleteBtn.setAttribute('aria-label', 'Hapus buku "' + (book.title || '') + '"');
-            deleteBtn.textContent = '×';
-            deleteBtn.addEventListener('click', () => this.openDeleteModal(book));
-            cover.appendChild(deleteBtn);
+            if (this.isAdmin) {
+                const deleteBtn = el('button', 'arc-card-delete');
+                deleteBtn.type = 'button';
+                deleteBtn.setAttribute('aria-label', 'Hapus buku "' + (book.title || '') + '"');
+                deleteBtn.textContent = '×';
+                deleteBtn.addEventListener('click', () => this.openDeleteModal(book));
+                cover.appendChild(deleteBtn);
+            }
 
             const pdfUrl = book.pdfUrl || '';
             const link = document.createElement(pdfUrl ? 'a' : 'span');
@@ -111,6 +145,7 @@
             const btn = el('button', 'arc-add-book-btn');
             btn.type = 'button';
             btn.textContent = '+ Tambah Buku';
+            btn.style.display = 'none'; // disembunyikan dulu, ditampilkan di applyAdminUI() kalau admin
             btn.addEventListener('click', () => this.openAddModal());
             this.root.appendChild(btn);
             this.addBtn = btn;
@@ -197,7 +232,6 @@
             this.fieldRefs = {};
             this.addField('title', 'Judul Buku', 'text');
             this.addField('pdf', 'Berkas PDF (opsional) Max 4MB', 'file');
-            this.addField('password', 'Kata Sandi', 'password');
 
             this.modalErrorEl.hidden = true;
             this.modalOverlay.hidden = false;
@@ -211,7 +245,6 @@
 
             this.modalFieldsWrap.innerHTML = '';
             this.fieldRefs = {};
-            this.addField('password', 'Kata Sandi', 'password');
 
             this.modalErrorEl.hidden = true;
             this.modalOverlay.hidden = false;
@@ -229,27 +262,22 @@
 
         async submitModal() {
             if (!this.modalState) return;
-            const password = this.fieldRefs.password ? this.fieldRefs.password.value : '';
-            if (!password) {
-                this.showModalError('Kata sandi wajib diisi.');
-                return;
-            }
 
             this.modalSubmitBtn.disabled = true;
             this.modalErrorEl.hidden = true;
 
             try {
                 if (this.modalState.mode === 'add') {
-                    await this.submitAdd(password);
+                    await this.submitAdd();
                 } else {
-                    await this.submitDelete(password);
+                    await this.submitDelete();
                 }
             } finally {
                 this.modalSubmitBtn.disabled = false;
             }
         }
 
-        async submitAdd(password) {
+        async submitAdd() {
             const title = this.fieldRefs.title.value.trim();
             if (!title) {
                 this.showModalError('Judul buku wajib diisi.');
@@ -258,12 +286,14 @@
 
             const fd = new FormData();
             fd.append('title', title);
-            fd.append('password', password);
             const file = this.fieldRefs.pdf.files && this.fieldRefs.pdf.files[0];
             if (file) fd.append('pdf', file);
 
             try {
-                const res = await fetch(API.add, { method: 'POST', body: fd });
+                // credentials: 'same-origin' -- otorisasi sekarang ditentukan
+                // oleh sesi admin yang sedang login (cookie), bukan lagi dari
+                // kata sandi yang diketik di form.
+                const res = await fetch(API.add, { method: 'POST', body: fd, credentials: 'same-origin' });
                 const data = await res.json();
                 if (!data.success) {
                     this.showModalError(data.message || 'Gagal menambah buku.');
@@ -278,14 +308,13 @@
             }
         }
 
-        async submitDelete(password) {
+        async submitDelete() {
             const book = this.modalState.book;
             const fd = new FormData();
             fd.append('id', book.id);
-            fd.append('password', password);
 
             try {
-                const res = await fetch(API.delete, { method: 'POST', body: fd });
+                const res = await fetch(API.delete, { method: 'POST', body: fd, credentials: 'same-origin' });
                 const data = await res.json();
                 if (!data.success) {
                     this.showModalError(data.message || 'Gagal menghapus buku.');

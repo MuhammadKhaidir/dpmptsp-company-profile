@@ -1,21 +1,25 @@
 // routes/music.js
 //
 // Endpoint & URL SENGAJA dipertahankan sama persis (/api/music/list,
-// /api/music/file/:slot, POST & DELETE /api/music/:slot) -- frontend
-// (js/MusicPlayer.js) gak perlu diubah.
+// /api/music/file/:slot, POST & DELETE /api/music/:slot) -- endpoint-nya
+// gak berubah, tapi otorisasinya sekarang sesi admin (lihat requireAdmin
+// di bawah), bukan lagi password manual.
 //
 // CATATAN soal /file/:slot: dulu route ini streaming byte manual pakai
 // Range header (buat fitur seek/scrubbing). Sekarang cukup REDIRECT ke
 // URL Vercel Blob -- elemen <audio> otomatis ikutin redirect, dan Range
 // request buat seek tetap jalan normal langsung ke Blob-nya (Vercel Blob
 // mendukung Range request secara native), jadi gak ada fungsi yang hilang.
+//
+// BARU: password per-aksi (QR_EDIT_PASSWORD) DICABUT, digantikan sesi
+// login admin (lihat middleware/requireAdmin.js), konsisten sama route
+// edit lainnya.
 
 const express = require('express');
 const multer = require('multer');
-const crypto = require('crypto');
 
 const store = require('../data/musicStore');
-const { getJSON, setJSON, delKey } = require('../lib/redisClient');
+const requireAdmin = require('../middleware/requireAdmin');
 
 const router = express.Router();
 
@@ -40,56 +44,6 @@ const upload = multer({
         cb(null, true);
     }
 });
-
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_SECONDS = 5 * 60;
-
-function getClientIp(req) {
-    return req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
-}
-function lockoutKey(req) {
-    return `music-lockout:${getClientIp(req)}`;
-}
-
-async function checkLockout(req, res) {
-    const rec = await getJSON(lockoutKey(req));
-    if (rec && rec.lockedUntil && Date.now() < rec.lockedUntil) {
-        const waitSec = Math.ceil((rec.lockedUntil - Date.now()) / 1000);
-        res.status(429).json({
-            success: false,
-            message: `Terlalu banyak percobaan yang gagal. Silakan coba kembali dalam ${waitSec} detik.`
-        });
-        return false;
-    }
-    return true;
-}
-
-async function registerFailedAttempt(req) {
-    const key = lockoutKey(req);
-    const rec = (await getJSON(key)) || { count: 0, lockedUntil: 0 };
-    rec.count += 1;
-    if (rec.count >= MAX_ATTEMPTS) {
-        rec.lockedUntil = Date.now() + LOCKOUT_SECONDS * 1000;
-        rec.count = 0;
-    }
-    await setJSON(key, rec, { ex: LOCKOUT_SECONDS * 2 });
-}
-
-async function clearFailedAttempts(req) {
-    await delKey(lockoutKey(req));
-}
-
-function verifyPassword(inputPassword) {
-    const real = process.env.QR_EDIT_PASSWORD;
-    if (!real) return { ok: false, reason: 'not-configured' };
-    if (!inputPassword) return { ok: false, reason: 'wrong' };
-
-    const a = Buffer.from(String(inputPassword));
-    const b = Buffer.from(String(real));
-    if (a.length !== b.length) return { ok: false, reason: 'wrong' };
-    const match = crypto.timingSafeEqual(a, b);
-    return { ok: match, reason: match ? null : 'wrong' };
-}
 
 router.get('/list', async (req, res) => {
     try {
@@ -118,7 +72,7 @@ router.get('/file/:slot', async (req, res) => {
     }
 });
 
-router.post('/:slot', (req, res) => {
+router.post('/:slot', requireAdmin, (req, res) => {
     const { slot } = req.params;
     if (!store.isValidSlot(slot)) {
         return res.status(404).json({ success: false, message: 'Slot tidak dikenali.' });
@@ -130,23 +84,7 @@ router.post('/:slot', (req, res) => {
                 return res.status(400).json({ success: false, message: uploadErr.message || 'Proses pengunggahan gagal.' });
             }
 
-            if (!(await checkLockout(req, res))) return;
-
-            const { password, title } = req.body;
-            const verdict = verifyPassword(password);
-
-            if (!verdict.ok) {
-                await registerFailedAttempt(req);
-                if (verdict.reason === 'not-configured') {
-                    return res.status(500).json({
-                        success: false,
-                        message: 'Fitur pengelolaan musik belum dikonfigurasi. Silakan atur QR_EDIT_PASSWORD pada Environment Variables server terlebih dahulu.'
-                    });
-                }
-                return res.status(401).json({ success: false, message: 'Kata sandi yang Anda masukkan salah.' });
-            }
-
-            await clearFailedAttempts(req);
+            const { title } = req.body;
 
             if (!req.file) {
                 return res.status(400).json({ success: false, message: 'Tidak ada berkas lagu yang dikirim.' });
@@ -177,7 +115,7 @@ router.post('/:slot', (req, res) => {
     });
 });
 
-router.delete('/:slot', (req, res) => {
+router.delete('/:slot', requireAdmin, (req, res) => {
     const { slot } = req.params;
     if (!store.isValidSlot(slot)) {
         return res.status(404).json({ success: false, message: 'Slot tidak dikenali.' });
@@ -185,23 +123,6 @@ router.delete('/:slot', (req, res) => {
 
     (async () => {
         try {
-            if (!(await checkLockout(req, res))) return;
-
-            const password = req.body && req.body.password;
-            const verdict = verifyPassword(password);
-
-            if (!verdict.ok) {
-                await registerFailedAttempt(req);
-                if (verdict.reason === 'not-configured') {
-                    return res.status(500).json({
-                        success: false,
-                        message: 'Fitur pengelolaan musik belum dikonfigurasi. Silakan atur QR_EDIT_PASSWORD pada Environment Variables server terlebih dahulu.'
-                    });
-                }
-                return res.status(401).json({ success: false, message: 'Kata sandi yang Anda masukkan salah.' });
-            }
-
-            await clearFailedAttempts(req);
             await store.clearSlotTrack(slot);
             res.json({ success: true, message: 'Lagu berhasil dihapus.' });
         } catch (fatalErr) {

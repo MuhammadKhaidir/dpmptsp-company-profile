@@ -1,80 +1,20 @@
 // routes/map.js
 //
-// Endpoint & URL dipertahankan sama persis. Rate-limit sekarang lewat
-// Redis (bukan Map di memory), pola sama dengan routes/qrImages.js.
+// Endpoint & URL dipertahankan sama persis.
+//
+// BARU: password per-aksi (QR_EDIT_PASSWORD) DICABUT, digantikan sesi
+// login admin (lihat middleware/requireAdmin.js), konsisten sama route
+// edit lainnya.
 
 const express = require('express');
-const crypto = require('crypto');
 
 const store = require('../data/mapStore');
-const { getJSON, setJSON, delKey } = require('../lib/redisClient');
+const requireAdmin = require('../middleware/requireAdmin');
 
 const router = express.Router();
 
 const MAX_TITLE_LENGTH = 100;
 const MAX_DESCRIPTION_LENGTH = 600;
-
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_SECONDS = 5 * 60;
-
-function getClientIp(req) {
-    return req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
-}
-function lockoutKey(req) {
-    return `map-lockout:${getClientIp(req)}`;
-}
-
-async function checkLockout(req, res) {
-    const rec = await getJSON(lockoutKey(req));
-    if (rec && rec.lockedUntil && Date.now() < rec.lockedUntil) {
-        const waitSec = Math.ceil((rec.lockedUntil - Date.now()) / 1000);
-        res.status(429).json({
-            success: false,
-            message: `Terlalu banyak percobaan yang gagal. Silakan coba kembali dalam ${waitSec} detik.`
-        });
-        return false;
-    }
-    return true;
-}
-
-async function registerFailedAttempt(req) {
-    const key = lockoutKey(req);
-    const rec = (await getJSON(key)) || { count: 0, lockedUntil: 0 };
-    rec.count += 1;
-    if (rec.count >= MAX_ATTEMPTS) {
-        rec.lockedUntil = Date.now() + LOCKOUT_SECONDS * 1000;
-        rec.count = 0;
-    }
-    await setJSON(key, rec, { ex: LOCKOUT_SECONDS * 2 });
-}
-
-async function clearFailedAttempts(req) {
-    await delKey(lockoutKey(req));
-}
-
-function verifyPassword(inputPassword) {
-    const real = process.env.QR_EDIT_PASSWORD;
-    if (!real) return { ok: false, reason: 'not-configured' };
-    if (!inputPassword) return { ok: false, reason: 'wrong' };
-
-    const a = Buffer.from(String(inputPassword));
-    const b = Buffer.from(String(real));
-    if (a.length !== b.length) return { ok: false, reason: 'wrong' };
-    const match = crypto.timingSafeEqual(a, b);
-    return { ok: match, reason: match ? null : 'wrong' };
-}
-
-async function handlePasswordFailure(req, res, verdict) {
-    await registerFailedAttempt(req);
-    if (verdict.reason === 'not-configured') {
-        res.status(500).json({
-            success: false,
-            message: 'Fitur pengelolaan peta belum dikonfigurasi. Silakan atur QR_EDIT_PASSWORD pada Environment Variables server terlebih dahulu.'
-        });
-        return;
-    }
-    res.status(401).json({ success: false, message: 'Kata sandi yang Anda masukkan salah.' });
-}
 
 function validateCoords(lat, lng) {
     const latNum = Number(lat);
@@ -95,14 +35,9 @@ router.get('/list', async (req, res) => {
     }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', requireAdmin, async (req, res) => {
     try {
-        if (!(await checkLockout(req, res))) return;
-
         const body = req.body || {};
-        const verdict = verifyPassword(body.password);
-        if (!verdict.ok) return handlePasswordFailure(req, res, verdict);
-        await clearFailedAttempts(req);
 
         const coords = validateCoords(body.lat, body.lng);
         if (!coords) {
@@ -125,14 +60,9 @@ router.post('/', async (req, res) => {
     }
 });
 
-router.put('/:id', async (req, res) => {
+router.put('/:id', requireAdmin, async (req, res) => {
     try {
-        if (!(await checkLockout(req, res))) return;
-
         const body = req.body || {};
-        const verdict = verifyPassword(body.password);
-        if (!verdict.ok) return handlePasswordFailure(req, res, verdict);
-        await clearFailedAttempts(req);
 
         const existing = await store.getById(req.params.id);
         if (!existing) {
@@ -175,15 +105,8 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', requireAdmin, async (req, res) => {
     try {
-        if (!(await checkLockout(req, res))) return;
-
-        const body = req.body || {};
-        const verdict = verifyPassword(body.password);
-        if (!verdict.ok) return handlePasswordFailure(req, res, verdict);
-        await clearFailedAttempts(req);
-
         const deleted = await store.deleteLocation(req.params.id);
         if (!deleted) {
             return res.status(404).json({ success: false, message: 'Lokasi tidak ditemukan.' });
