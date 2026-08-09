@@ -22,22 +22,6 @@ const FLIPBOOK_API = {
   deleteBook: '/api/flipbook/book/delete'
 };
 
-// BARU: status admin, dicek dari /api/auth/check-session (endpoint yang
-// sudah ada di routes/auth.js) -- dipakai buat nge-gate tombol pensil
-// (edit), tempat sampah (hapus halaman), "+ Tambah Halaman", dan "Hapus
-// Buku Ini". Pengguna biasa (bukan admin / belum login) cuma bisa baca
-// dan scroll flip book, gak akan pernah lihat tombol-tombol edit ini
-// sama sekali.
-//
-// PENTING soal nama variabel: file ini SENGAJA TIDAK dibungkus IIFE
-// seperti js/MusicPlayer.js atau js/MapSection.js (semua const/function
-// di sini langsung ada di scope global halaman). js/AiChat.js juga
-// begitu, dan sudah lebih dulu mendeklarasikan `let isAdmin` di scope
-// global. Kalau di sini dipakai nama yang sama (`isAdmin`), begitu kedua
-// script sama-sama dimuat di satu halaman akan terjadi
-// "SyntaxError: Identifier 'isAdmin' has already been declared" yang
-// bikin SELURUH javascript halaman berhenti jalan. Makanya di sini
-// dipakai nama unik: fbIsAdmin / loadFbAdminStatus.
 let fbIsAdmin = false;
 
 function loadFbAdminStatus() {
@@ -105,11 +89,6 @@ function text(tag, className, content) {
   return node;
 }
 
-// FITUR EDIT: tombol pensil kecil buat buka modal edit. Selalu tampil
-// separuh transparan (bukan cuma pas hover) -- soalnya .fb-book pakai
-// pointer-events:none, jadi hover di FACE-nya gak pernah nyampe ke CSS
-// (event-nya udah "tembus" duluan). Tombolnya sendiri tetap punya
-// pointer-events:auto jadi tetap bisa diklik & punya hover-nya sendiri.
 function buildEditButton(onEdit) {
   const btn = el('button', 'fb-edit-btn');
   btn.type = 'button';
@@ -123,11 +102,6 @@ function buildEditButton(onEdit) {
   return btn;
 }
 
-// FITUR HAPUS HALAMAN: tombol tempat sampah kecil, pola & alasan sama
-// persis kayak buildEditButton di atas -- cuma dipasang di pojok kiri
-// (edit di kanan), dan CUMA muncul di halaman ISI (lihat buildTextFace),
-// gak muncul di sampul depan/belakang karena itu bukan hal yang bisa
-// "dihapus" satuan (dihapus bareng seluruh buku lewat tombol "Hapus
 // Buku Ini").
 function buildDeleteButton(onDelete) {
   const btn = el('button', 'fb-delete-btn');
@@ -247,14 +221,6 @@ class FlipBook {
     this.root.style.zIndex = '0';
     this.root.style.display = 'none';
 
-    // FITUR: TOMBOL AKSI BUKU (TAMBAH/HAPUS) CUMA MUNCUL PAS BUKU DIKLIK
-    // Klik di badan buku (bukan di tombol pensil/tempat sampah kecil yang
-    // masing-masing sudah e.stopPropagation() duluan di buildEditButton/
-    // buildDeleteButton) buat toggle tampil/sembunyi panel "Tambah
-    // Halaman"/"Hapus Buku Ini" di FlipBookScroll. Ditaruh di root
-    // .fb-book (bukan di satu face doang) soalnya semua halaman/sampul
-    // numpuk penuh (inset:0) ngisi seluruh badan buku ini, jadi klik di
-    // face mana pun tetap ke-bubble sampai sini.
     this.root.addEventListener('click', () => {
       if (this.callbacks.onBookClick) this.callbacks.onBookClick(this.index);
     });
@@ -264,12 +230,6 @@ class FlipBook {
 
     this.pageEls = [];
 
-    // FITUR EDIT: referensi tiap face yang BOLEH diedit, dipakai sama
-    // applyEdit() buat update tulisan/gambar langsung di DOM tanpa
-    // bongkar ulang seluruh buku (biar gak ganggu animasi yang lagi
-    // jalan). editableFronts[0] = sampul depan, editableFronts[1..] =
-    // halaman isi (index p, sama kayak posisi leaf). editableBack =
-    // sampul belakang (cuma ada di leaf terakhir).
     this.editableFronts = [];
     this.editableBack = null;
 
@@ -335,9 +295,6 @@ class FlipBook {
     this.travelPx = vw / 2 + this.pageWidth / 2 + SIDE_MARGIN;
   }
 
-  // FITUR EDIT: update tulisan/gambar satu leaf langsung di DOM yang
-  // sudah ada, tanpa rebuild. leafData = objek leaf terbaru dari server
-  // (hasil response backend), berisi field teks + { image: { url } }.
   applyEdit(leafType, contentIndex, leafData) {
     let target;
     if (leafType === 'cover') target = this.editableFronts[0];
@@ -404,7 +361,7 @@ class FlipBook {
       scale = openScaleBump(spreadT);
     }
 
-    const shiftPx = isMobileViewport() ? 0 : (this.pageWidth / 2) * spreadT;
+    const shiftPx = (this.pageWidth / 2) * spreadT;
 
     this.root.style.transform =
       `translate(-50%, -50%) translateX(${xOffset}px) translateX(${shiftPx}px) rotateY(${rot}deg) scale(${scale})`;
@@ -476,9 +433,6 @@ class FlipBookScroll {
     this.pinEnd = 0;
     this.totalDistance = 1;
 
-    // FITUR: state buka/tutup panel tombol "Tambah Halaman"/"Hapus Buku
-    // Ini" -- defaultnya TERTUTUP total, baru kebuka kalau badan buku
-    // yang lagi aktif diklik (lihat toggleBookActions()).
     this.actionsOpen = false;
 
     // FITUR EDIT: state modal edit / tambah halaman / hapus.
@@ -533,18 +487,9 @@ this.stage = el('div', 'fb-stage');
     this.mobileNav.appendChild(this.nextBtn);
     this.sticky.appendChild(this.mobileNav);
 
-    // FITUR EDIT + HAPUS: wrapper buat tombol "+ Tambah Halaman" &
-    // "Hapus Buku Ini" biar bisa disandingkan di posisi yang sama
-    // (dulu cuma ada satu tombol tambah halaman doang di sini). Defaultnya
-    // disembunyikan lewat CSS (.fb-book-actions), baru muncul lewat class
-    // .is-open pas buku aktif diklik (lihat toggleBookActions() di bawah).
     this.bookActionsWrap = el('div', 'fb-book-actions');
     this.sticky.appendChild(this.bookActionsWrap);
 
-    // BARU: tombol "+ Tambah Halaman" & "Hapus Buku Ini" cuma dibangun
-    // kalau fbIsAdmin true. this.addPageBtn/this.deleteBookBtn jadi
-    // undefined buat pengguna biasa -- lihat guard `if (this.deleteBookBtn)`
-    // di render() yang jaga-jaga soal ini.
     if (fbIsAdmin) {
       this.addPageBtn = el('button', 'fb-add-page-btn');
       this.addPageBtn.type = 'button';
@@ -564,31 +509,16 @@ this.stage = el('div', 'fb-stage');
     this.buildEditOverlay();
   }
 
-  // FITUR HAPUS: dipusatkan di sini (dipakai pas build() awal, maupun
-  // pas rebuildBook()/rebuildAll() sesudah tambah/hapus halaman/buku),
-  // biar callback onEdit/onDeletePage/onBookClick-nya konsisten di semua
   // jalur.
   makeFlipBook(book, index) {
     return new FlipBook(this.stage, book, index, {
-      // BARU: onEdit/onDeletePage cuma diisi kalau fbIsAdmin true. Karena
-      // buildFace()/buildCoverFace()/buildTextFace()/buildBackFace() sudah
-      // mengecek `if (onEdit) ...`/`if (onDelete) ...` sebelum menambahkan
-      // tombol pensil/tempat sampah, meng-null-kan keduanya di sini otomatis
-      // membuat tombol-tombol itu TIDAK PERNAH dibuat sama sekali untuk
-      // pengguna biasa -- bukan cuma disembunyikan lewat CSS.
+
       onEdit: fbIsAdmin ? (leafType, contentIndex) => this.openEditModal(index, leafType, contentIndex) : null,
       onDeletePage: fbIsAdmin ? (contentIndex) => this.openDeletePageModal(index, contentIndex) : null,
       onBookClick: () => this.toggleBookActions(index)
     });
   }
 
-  // FITUR: TOMBOL AKSI BUKU (TAMBAH/HAPUS) CUMA MUNCUL PAS BUKU DIKLIK
-  // Toggle tampil/sembunyi this.bookActionsWrap. Dipanggil dari listener
-  // 'click' yang dipasang di FlipBook.root (lihat constructor FlipBook).
-  // Guard `index !== this.activeIndex` -- cuma buku yang LAGI AKTIF di
-  // layar yang boleh buka panelnya (buku yang lagi transisi masuk/keluar
-  // diabaikan; lagipula begitu opacity-nya ~0, buku itu display:none jadi
-  // gak akan pernah "kena klik").
   toggleBookActions(index) {
     if (!fbIsAdmin) return; // panel "Tambah Halaman"/"Hapus Buku Ini" khusus admin
     if (index !== this.activeIndex) return;
@@ -602,10 +532,6 @@ this.stage = el('div', 'fb-stage');
     this.bookActionsWrap.classList.remove('is-open');
   }
 
-  // FITUR EDIT: modal edit / tambah halaman / hapus -- dibangun SEKALI,
-  // dipasang langsung ke <body> (bukan di dalam .fb-stage) biar
-  // posisinya gak kena reflow/transform dari animasi buku, sama kayak
-  // alasan cat mascot dipindah ke position:fixed nempel di <body>.
   buildEditOverlay() {
     const overlay = el('div', 'fb-edit-overlay');
     overlay.hidden = true;
@@ -793,9 +719,6 @@ this.stage = el('div', 'fb-stage');
     this.editOverlay.hidden = false;
   }
 
-  // FITUR HAPUS: buka modal konfirmasi buat hapus SATU BUKU utuh. Gak
-  // dipanggil sama sekali kalau cuma sisa 1 buku (lihat render() -- tombol
-  // Hapus Buku Ini otomatis ke-disable), tapi tetap dijaga di sini juga.
   openDeleteBookModal(bookIndex) {
     const book = this.books[bookIndex];
     if (!book || this.books.length <= 1) return;
@@ -930,11 +853,6 @@ this.stage = el('div', 'fb-stage');
     }
   }
 
-  // FITUR HAPUS: hapus satu buku UTUH. Jumlah buku (bukan cuma jumlah
-  // halaman di 1 buku) yang berubah -> seluruh instance FlipBook perlu
-  // dibongkar & dibangun ulang dari array buku terbaru (lihat
-  // rebuildAll()), soalnya index semua buku SESUDAH buku yang dihapus
-  // ikut geser.
   async submitDeleteBook(bookIndex) {
     const fd = new FormData();
     fd.append('bookIndex', String(bookIndex));
@@ -966,10 +884,6 @@ this.stage = el('div', 'fb-stage');
     this.render();
   }
 
-  // FITUR HAPUS: jumlah BUKU berubah -> bongkar SEMUA instance FlipBook
-  // yang ada, bangun ulang total dari array buku terbaru (index-nya
-  // udah pasti bener soalnya langsung dari response server, bukan hasil
-  // splice manual di sisi client).
   rebuildAll(newBooksData) {
     this.flipBooks.forEach((fb) => {
       if (fb && fb.root && fb.root.parentNode) fb.root.parentNode.removeChild(fb.root);
@@ -986,9 +900,7 @@ this.stage = el('div', 'fb-stage');
     this.flipBooks = this.books.map((book, i) => this.makeFlipBook(book, i));
 
     this.activeIndex = -1;
-    // FITUR: daftar buku berubah total (ada yang kehapus, index geser) ->
-    // tutup panel tombol aksi biar gak nyangkut ke buku yang udah gak
-    // valid lagi.
+
     this.closeBookActions();
     this.recomputeBounds();
     this.progress = clamp01(this.progress);
@@ -1021,15 +933,7 @@ this.stage = el('div', 'fb-stage');
             this.inView = entry.isIntersecting;
           });
         },
-        // FIX MOBILE: sebelumnya '25% 0px 25% 0px'. Kegedean jarak jauh
-        // sebelum section beneran nongol, this.inView masih false, jadi
-        // onScroll() nge-skip checkReentry() (lihat guard `if (!this.inView)
-        // return`) walaupun scroll udah deket banget sama pinStart/pinEnd.
-        // Di HP, momentum scroll bisa nempuh ratusan px dalam SATU event
-        // 'scroll' yang telat nembak -- kalau baru "siaga" pas udah mepet
-        // 25%, keburu kelewat. Dilebarin ke 60% biar checkReentry() udah
-        // mulai mantau dari lebih jauh, ngasih lebih banyak kesempatan buat
-        // nangkep batas sebelum keburu ke-skip.
+
         { rootMargin: '60% 0px 60% 0px' }
       );
       this.observer.observe(this.container);
@@ -1100,16 +1004,6 @@ this.stage = el('div', 'fb-stage');
     this.lastScrollY = targetY;
   }
 
-  // FIX MOBILE: dipakai KHUSUS pas checkReentry() mau ngunci dari posisi
-  // scroll MENTAH (window.scrollY) yang bisa jadi udah "loncat" jauh gara-
-  // gara momentum/inertia scroll HP -- event 'scroll' baru sempet ketangkep
-  // pas posisi udah nyasar ke tengah-tengah animasi buka/tutup salah satu
-  // halaman. Tanpa snapping ini, buku bisa nongol dalam kondisi "aneh":
-  // separuh kebuka, miring ke samping, kepotong -- padahal user sama sekali
-  // gak sempet liat proses geraknya (di-skip gara-gara scroll kenceng).
-  // snapProgress() motong ke titik "bersih" terdekat (buku full ketutup di
-  // satu halaman, BUKAN nanggung di tengah flip), jadi frame pertama yang
-  // di-render pas lock nyala selalu rapi.
   snapProgress(raw) {
     const nBooks = this.books.length;
     const globalFloat = clamp01(raw) * nBooks;
@@ -1155,15 +1049,7 @@ checkReentry() {
     } else if (y < prev) {
       // User sedang SCROLL KE ATAS masuk ke area buku
       if (prev >= this.pinEnd - 10) {
-        // FIX: dulu initialProgress = 1, itu artinya buku terakhir ada di
-        // local = 1 (posisi PALING UJUNG exit -- opacity 0, udah geser
-        // keluar layar, alias "invisible"). Makanya begitu masuk lagi dari
-        // bawah, buku sempet "hilang" dulu (nge-render kosong) sebelum
-        // animasi baliknya kelihatan. Sekarang ditaruh tepat di
-        // local = EXIT_START, yaitu posisi terakhir buku itu masih 100%
-        // kelihatan utuh (belum mulai geser/transparan keluar), jadi pas
-        // discroll ke atas dari bawah, buku terakhir langsung nongol utuh
-        // duluan, baru pas discroll ke atas lagi kebalik animasinya.
+
         initialProgress = (this.books.length - 1 + EXIT_START) / this.books.length;
         lockAtEnd = true;
       } else {
@@ -1199,15 +1085,6 @@ checkReentry() {
     if (this.editModalOpen) return;
     if (!e.touches || e.touches.length > 1) return;
 
-    // FIX MOBILE: sebelumnya kalau belum `locked`, fungsi ini langsung
-    // `return` -- artinya SELAMA proses drag jari di HP, satu-satunya cara
-    // checkReentry() kepanggil adalah lewat event 'scroll', yang di HP suka
-    // jarang/telat nembak pas momentum lagi kenceng. Akibatnya scroll bisa
-    // "kebablasan" ninggalin section buku sebelum lock sempet nyala (buku
-    // ke-skip / keliatan lompat). Sekarang tiap touchmove (jauh lebih rapat
-    // frame-nya daripada 'scroll' pas drag aktif) ikut manggil checkReentry()
-    // duluan, biar batas section ketangkep lebih cepat selagi jari masih
-    // nempel di layar -- bukan nunggu browser "ngasih tau" belakangan.
     if (!this.locked) {
       if (this.inView) this.checkReentry();
       return;
@@ -1268,11 +1145,6 @@ onResize() {
     this.scheduleRender();
   }
 
-  // FITUR: klik DI LUAR buku aktif & di luar panel tombol aksi (dan di
-  // luar overlay modal edit, biar tombol Batal/Simpan di modal nggak
-  // ikut nutup panel aksi di belakangnya) -> otomatis nutup panel
-  // "Tambah Halaman"/"Hapus Buku Ini". Pola sama kayak overlay modal
-  // yang nutup pas klik area gelap di luar .fb-edit-modal.
   onDocumentClick(e) {
     if (!this.actionsOpen) return;
     const insideBook = e.target.closest && e.target.closest('.fb-book');
@@ -1339,16 +1211,10 @@ onResize() {
       Array.from(this.dotsWrap.children).forEach((dot, i) => {
         dot.classList.toggle('on', i === activeIndex);
       });
-      // FITUR: pindah ke buku lain (activeIndex berubah) -> otomatis
-      // tutup panel "Tambah Halaman"/"Hapus Buku Ini" biar gak "nyangkut"
-      // ke buku yang salah pas user geser scroll.
+
       this.closeBookActions();
     }
 
-    // FITUR HAPUS: gak boleh hapus buku terakhir yang tersisa -- tombol
-    // "Hapus Buku Ini" otomatis nonaktif kalau cuma sisa 1 buku.
-    // Guard `if (this.deleteBookBtn)` -- elemen ini undefined buat
-    // pengguna biasa (lihat build(), cuma dibangun kalau fbIsAdmin).
     if (this.deleteBookBtn) {
       this.deleteBookBtn.disabled = this.books.length <= 1;
       this.deleteBookBtn.title = this.books.length <= 1
@@ -1363,22 +1229,6 @@ onResize() {
     this.caption.style.setProperty('--fb-reveal-y', `${(1 - r) * TEXT_REVEAL_RISE}px`);
   }
 
-  /* ================================================================
-     Navigasi terprogram ke buku tertentu -- DIPERLUAS: sekarang juga
-     bisa loncat ke HALAMAN ISI tertentu di dalam buku, bukan cuma ke
-     posisi "sampul buku" doang. Dipanggil dari js/AiChat.js maupun
-     js/QRCodeRevealAnimation.js lewat window.__flipBookScrollInstance.
-
-     index: 0 = buku pertama, 1 = kedua, 2 = ketiga, dst.
-     pageNumber: OPSIONAL. Kalau null/undefined -> perilaku LAMA (buka
-     ke posisi sampul depan, tertutup) -- ini yang dipakai
-     QRCodeRevealAnimation.js, TIDAK BERUBAH SAMA SEKALI.
-     Kalau diisi angka -> loncat ke halaman ISI itu (nomor sesuai label
-     "Hal. 01/02/03" di kontennya). Kalau angkanya lebih besar dari
-     jumlah halaman yang beneran ada, otomatis di-clamp ke halaman
-     terakhir, dan hasil clamp itu dikembalikan lewat return value
-     supaya pemanggil (AiChat.js) bisa kasih tau user.
-     ================================================================ */
   goToBook(index, pageNumber) {
     const i = Math.max(0, Math.min(this.books.length - 1, index));
     const book = this.flipBooks[i];
@@ -1387,20 +1237,11 @@ onResize() {
     const reduceMotion = window.matchMedia &&
       window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    // Struktur leaf per buku: leaf 0 = sampul depan, leaf 1..N = halaman
-    // isi (Hal. 01, 02, ...), leaf terakhir baliknya = sampul belakang.
-    // Nomor halaman isi (1-based, sesuai label "Hal. 01/02/03") SAMA
-    // PERSIS dengan index leaf-nya (leaf 0 udah kepakai sampul depan).
-    // openLocal = leafIndex / n naruh leaf itu PAS di posisi "belum
-    // kebalik" (front-nya nampang duluan, leaf sebelumnya baru aja
-    // kebalik) -- itungannya konsisten sama logic per-halaman yang
-    // sudah ada di FlipBook.update() (lihat variabel `t` di situ).
     let openLocal;
     let pageInfo = null;
 
     if (pageNumber == null) {
-      // Perilaku LAMA, tidak diubah: buka ke posisi "buku baru masuk /
-      // tertutup".
+
       openLocal = 0;
     } else {
       const n = book.pageCount;
@@ -1482,9 +1323,6 @@ onResize() {
   }
 }
 
-// FITUR EDIT: ambil data buku dari backend (routes/flipbookContent.js).
-// Kalau gagal (server down / belum di-deploy route-nya / offline), balik
-// null biar caller fallback ke DEFAULT_BOOKS / config.books kayak biasa.
 async function fetchFlipbookContent() {
   try {
     const res = await fetch(FLIPBOOK_API.content);
@@ -1508,12 +1346,7 @@ async function init() {
   container.appendChild(loadingEl);
 
   const config = window.FlipBookScrollConfig || {};
-  // BARU: loadFbAdminStatus() WAJIB kelar duluan sebelum FlipBookScroll
-  // dibikin -- constructor-nya langsung manggil build(), yang nentuin
-  // apakah tombol edit/hapus/tambah dibangun berdasarkan fbIsAdmin SAAT
-  // ITU JUGA (bukan reaktif). Kalau dijalankan belakangan/dibiarkan async
-  // lepas, ada risiko tombol-tombol itu telanjur gak dibangun sebelum
-  // status admin sempat diketahui.
+
   const [serverBooks] = await Promise.all([
     fetchFlipbookContent(),
     loadFbAdminStatus()
