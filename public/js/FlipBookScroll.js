@@ -10,6 +10,7 @@ const SIDE_MARGIN = 800;
 const SIDE_ROT = 30;
 const OPEN_SCALE_BUMP = 0.14;
 const TEXT_REVEAL_RISE = 18;
+const isMobileViewport = () => window.matchMedia('(max-width: 720px)').matches;
 
 // FITUR EDIT: endpoint backend (routes/flipbookContent.js), dipasang di
 // server lewat app.use('/api/flipbook', require('./routes/flipbookContent')).
@@ -403,7 +404,7 @@ class FlipBook {
       scale = openScaleBump(spreadT);
     }
 
-    const shiftPx = (this.pageWidth / 2) * spreadT;
+    const shiftPx = isMobileViewport() ? 0 : (this.pageWidth / 2) * spreadT;
 
     this.root.style.transform =
       `translate(-50%, -50%) translateX(${xOffset}px) translateX(${shiftPx}px) rotateY(${rot}deg) scale(${scale})`;
@@ -489,14 +490,20 @@ class FlipBookScroll {
     this.addEvents();
 
     this.recomputeBounds();
-    this.checkReentry();
+    if (isMobileViewport()) {
+      this.progress = clamp01(ENTER_END / this.books.length); // buku 0, tertutup, langsung tampak
+    } else {
+      this.checkReentry();
+    }
     this.render();
   }
 
   build() {
     this.container.classList.add('flipbook-scroll-wrap');
     this.container.style.position = 'relative';
-    this.container.style.height = `${this.books.length * this.segmentVh}vh`;
+    this.container.style.height = isMobileViewport()
+      ? '100svh'
+      : `${this.books.length * this.segmentVh}vh`;
 
     this.sticky = el('div', 'flipbook-scroll-sticky');
     this.container.appendChild(this.sticky);
@@ -507,9 +514,20 @@ class FlipBookScroll {
     this.stage = el('div', 'fb-stage');
     this.sticky.appendChild(this.stage);
 
-    this.dotsWrap = el('div', 'fb-dots');
-    this.books.forEach(() => this.dotsWrap.appendChild(el('span', 'fb-dot')));
-    this.sticky.appendChild(this.dotsWrap);
+    this.mobileNav = el('div', 'fb-mobile-nav');
+    this.prevBtn = el('button', 'fb-mobile-nav-btn fb-mobile-prev');
+    this.prevBtn.type = 'button';
+    this.prevBtn.setAttribute('aria-label', 'Halaman sebelumnya');
+    this.prevBtn.textContent = '‹';
+    this.prevBtn.addEventListener('click', () => this.stepPage(-1));
+    this.nextBtn = el('button', 'fb-mobile-nav-btn fb-mobile-next');
+    this.nextBtn.type = 'button';
+    this.nextBtn.setAttribute('aria-label', 'Halaman berikutnya');
+    this.nextBtn.textContent = '›';
+    this.nextBtn.addEventListener('click', () => this.stepPage(1));
+    this.mobileNav.appendChild(this.prevBtn);
+    this.mobileNav.appendChild(this.nextBtn);
+    this.sticky.appendChild(this.mobileNav);
 
     // FITUR EDIT + HAPUS: wrapper buat tombol "+ Tambah Halaman" &
     // "Hapus Buku Ini" biar bisa disandingkan di posisi yang sama
@@ -954,7 +972,9 @@ class FlipBookScroll {
     });
 
     this.books = newBooksData;
-    this.container.style.height = `${this.books.length * this.segmentVh}vh`;
+    this.container.style.height = isMobileViewport()
+      ? '100svh'
+      : `${this.books.length * this.segmentVh}vh`;
 
     this.dotsWrap.innerHTML = '';
     this.books.forEach(() => this.dotsWrap.appendChild(el('span', 'fb-dot')));
@@ -1108,8 +1128,9 @@ class FlipBookScroll {
     return clamp01((bookIndex + snappedLocal) / nBooks);
   }
 
-  checkReentry() {
+checkReentry() {
     if (this.locked) return;
+    if (isMobileViewport()) return; // HP: gak pake scroll-jack, biar scroll normal aja
     const y = window.scrollY;
 
     // Jika posisi scroll di luar rentang container buku, hiraukan
@@ -1233,8 +1254,11 @@ class FlipBookScroll {
     this.checkReentry();
   }
 
-  onResize() {
+onResize() {
     this.flipBooks.forEach(fb => fb.measure());
+    this.container.style.height = isMobileViewport()
+      ? '100svh'
+      : `${this.books.length * this.segmentVh}vh`;
     this.recomputeBounds();
     if (this.locked) this.lockBodyScroll(this.savedScrollY);
     this.scheduleRender();
@@ -1260,6 +1284,31 @@ class FlipBookScroll {
     if (this.progress <= 0 && deltaY < 0) { this.releaseLock(-1); return; }
     this.progress = clamp01(this.progress + deltaY / this.totalDistance);
     this.scheduleRender();
+  }
+
+  stepPage(direction) {
+    if (this.editModalOpen || !this.flipBooks.length) return;
+    const nBooks = this.books.length;
+    const bookIndex = Math.min(nBooks - 1, Math.max(0, Math.floor(this.progress * nBooks + 1e-6)));
+    const book = this.flipBooks[bookIndex];
+    const n = book ? book.pageCount : 1;
+    const stepSize = (EXIT_START - ENTER_END) / n / nBooks;
+    const target = this.snapProgress(clamp01(this.progress + direction * stepSize));
+
+    const reduceMotion = window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduceMotion) { this.progress = target; this.render(); return; }
+
+    const from = this.progress;
+    const duration = 450;
+    const start = performance.now();
+    const tick = (now) => {
+      const t = clamp01((now - start) / duration);
+      this.progress = lerp(from, target, easeOutCubic(t));
+      this.render();
+      if (t < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
   }
 
   scheduleRender() {

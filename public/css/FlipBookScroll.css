@@ -120,6 +120,44 @@
   transform: scale(1.35);
 }
 
+.fb-mobile-nav {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .fb-mobile-nav {
+    display: flex;
+    position: absolute;
+    inset: 0;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 4px;
+    pointer-events: none;
+    z-index: 70;
+  }
+
+  .fb-mobile-nav-btn {
+    pointer-events: auto;
+    width: 40px;
+    height: 40px;
+    border-radius: 999px;
+    border: 1px solid rgba(203, 164, 84, 0.5);
+    background: rgba(250, 249, 245, 0.85);
+    color: #14100a;
+    font-size: 20px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 18px rgba(20, 16, 10, 0.25);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+
+  .fb-mobile-nav-btn:active {
+    transform: scale(0.92);
+  }
+}
+
 /* ---- Buku (Di Tengah Layar) ---- */
 
 /* FITUR: TOMBOL AKSI BUKU (TAMBAH/HAPUS) CUMA MUNCUL PAS BUKU DIKLIK
