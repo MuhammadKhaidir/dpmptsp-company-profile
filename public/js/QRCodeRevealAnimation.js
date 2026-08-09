@@ -16,8 +16,9 @@
     // ================================================================
     // BARU: metadata "dokumen terkait" per slot, di-load dari backend
     // (data/qrDocStore.js lewat routes/qrDoc.js) -- BUKAN hardcode lagi.
-    // Diisi/diubah lewat menu "Perbarui Tampilan Kode QR" (password sama
-    // kayak fitur ganti gambar/judul/BG). Bentuknya:
+    // Diisi/diubah lewat menu "Perbarui Tampilan Kode QR" (sekarang
+    // gerbangnya sesi login admin, bukan password manual lagi -- lihat
+    // fetchAdminStatus() & openChoiceModal() di bawah). Bentuknya:
     //   { mode: 'link' | 'pdf' | null, url: string | null, updatedAt }
     // Kalau mode-nya null / belum pernah diisi, tombol "Lihat Dokumen
     // Terkait" otomatis fallback ke perilaku lama (scroll ke flip book).
@@ -158,6 +159,26 @@
             .catch(function () {
                 // Backend fitur dokumen-terkait belum kepasang/offline --
                 // diamkan aja, tombol otomatis fallback ke flip book.
+            });
+    }
+
+    // ================================================================
+    // BARU: cek status admin dari /api/auth/check-session -- pola yang
+    // SAMA PERSIS kayak js/Arccarousel.js. SENGAJA di-fetch ULANG tiap
+    // openChoiceModal() dipanggil (bukan dicek sekali pas halaman pertama
+    // kali kebuka lalu di-cache), biar statusnya selalu akurat walau ada
+    // login/logout/sesi expire di tab lain sambil orang lagi browsing --
+    // modal ini jarang dibuka (cuma pas klik kotak QR), jadi biaya fetch
+    // ulang tiap buka modal kecil banget dibanding manfaat akurasinya.
+    // ================================================================
+    function fetchAdminStatus() {
+        return fetch('/api/auth/check-session')
+            .then(function (res) { return res.ok ? res.json() : null; })
+            .then(function (data) {
+                return !!(data && data.logged_in && data.role === 'admin');
+            })
+            .catch(function () {
+                return false;
             });
     }
 
@@ -310,37 +331,58 @@
         document.addEventListener('keydown', onEscCloseModal);
     }
 
+    // BARU: sekarang async (nunggu fetchAdminStatus() dulu) -- tombol
+    // "Perbarui Tampilan Kode QR" cuma di-render ke DOM kalau isAdmin
+    // true. Pengguna biasa / yang belum login CUMA lihat tombol "Lihat
+    // Dokumen Terkait" & "Batal", gak ada jejak fitur edit sama sekali.
     function openChoiceModal(slot, bookIndex) {
-        var root = ensureQrModalRoot();
-        var label = SLOT_LABELS[slot] || 'Kode QR Ini';
-        var docInfo = getRelatedDocInfo(slot);
+        fetchAdminStatus().then(function (isAdmin) {
+            var root = ensureQrModalRoot();
+            var label = SLOT_LABELS[slot] || 'Kode QR Ini';
+            var docInfo = getRelatedDocInfo(slot);
 
-        root.innerHTML =
-            '<div class="qr-modal-overlay" data-qr-close>' +
-                '<div class="qr-modal-box" role="dialog" aria-modal="true">' +
-                    '<h3 class="qr-modal-title">' + escapeHtml(label) + '</h3>' +
-                    '<p class="qr-modal-sub">Silakan pilih tindakan yang ingin dilakukan terhadap kode QR ini.</p>' +
-                    '<button type="button" class="qr-modal-btn qr-modal-btn-primary" data-action="book">' +
-                        '<i class="fa-solid ' + docInfo.icon + '"></i> ' + escapeHtml(docInfo.label) +
-                    '</button>' +
-                    '<button type="button" class="qr-modal-btn qr-modal-btn-ghost" data-action="edit">' +
-                        '<i class="fa-solid fa-image"></i> Perbarui Tampilan Kode QR' +
-                    '</button>' +
-                    '<button type="button" class="qr-modal-cancel" data-qr-close>Batal</button>' +
-                '</div>' +
-            '</div>';
+            var editButtonHtml = isAdmin
+                ? '<button type="button" class="qr-modal-btn qr-modal-btn-ghost" data-action="edit">' +
+                      '<i class="fa-solid fa-image"></i> Perbarui Tampilan Kode QR' +
+                  '</button>'
+                : '';
 
-        bindOverlayClose(root);
+            root.innerHTML =
+                '<div class="qr-modal-overlay" data-qr-close>' +
+                    '<div class="qr-modal-box" role="dialog" aria-modal="true">' +
+                        '<h3 class="qr-modal-title">' + escapeHtml(label) + '</h3>' +
+                        '<p class="qr-modal-sub">Silakan pilih tindakan yang ingin dilakukan terhadap kode QR ini.</p>' +
+                        '<button type="button" class="qr-modal-btn qr-modal-btn-primary" data-action="book">' +
+                            '<i class="fa-solid ' + docInfo.icon + '"></i> ' + escapeHtml(docInfo.label) +
+                        '</button>' +
+                        editButtonHtml +
+                        '<button type="button" class="qr-modal-cancel" data-qr-close>Batal</button>' +
+                    '</div>' +
+                '</div>';
 
-        root.querySelector('[data-action="book"]').addEventListener('click', function () {
-            closeQrModal();
-            openRelatedDocument(slot, bookIndex);
-        });
-        root.querySelector('[data-action="edit"]').addEventListener('click', function () {
-            openEditModal(slot, label);
+            bindOverlayClose(root);
+
+            root.querySelector('[data-action="book"]').addEventListener('click', function () {
+                closeQrModal();
+                openRelatedDocument(slot, bookIndex);
+            });
+
+            // BARU: tombol edit cuma ada di DOM kalau isAdmin true, jadi
+            // query-nya perlu null-safe (gak selalu ketemu elemennya).
+            var editBtn = root.querySelector('[data-action="edit"]');
+            if (editBtn) {
+                editBtn.addEventListener('click', function () {
+                    openEditModal(slot, label);
+                });
+            }
         });
     }
 
+    // BARU: field "Kata Sandi" DICABUT TOTAL -- otorisasi sekarang
+    // ditentukan sesi admin yang sedang login (cookie), bukan lagi
+    // password yang diketik ulang tiap kali submit. Modal ini cuma bisa
+    // kebuka lewat tombol yang sendirinya udah di-gate isAdmin di
+    // openChoiceModal() di atas, jadi gak perlu re-check di sini.
     function openEditModal(slot, label) {
         var root = ensureQrModalRoot();
 
@@ -348,11 +390,8 @@
             '<div class="qr-modal-overlay" data-qr-close>' +
                 '<div class="qr-modal-box" role="dialog" aria-modal="true">' +
                     '<h3 class="qr-modal-title">Perbarui Kode QR — ' + escapeHtml(label) + '</h3>' +
-                    '<p class="qr-modal-sub">Masukkan kata sandi, lalu ubah judul, gambar kode QR, gambar latar belakang, dan/atau dokumen terkait untuk melanjutkan. Bagian yang dikosongkan tidak akan diubah.</p>' +
+                    '<p class="qr-modal-sub">Ubah judul, gambar kode QR, gambar latar belakang, dan/atau dokumen terkait untuk melanjutkan. Bagian yang dikosongkan tidak akan diubah.</p>' +
                     '<form class="qr-edit-form" data-qr-edit-form>' +
-                        '<label class="qr-edit-label">Kata Sandi' +
-                            '<input type="password" class="qr-edit-input" name="password" required autocomplete="off">' +
-                        '</label>' +
                         '<label class="qr-edit-label">Judul Kotak' +
                             '<input type="text" class="qr-edit-input" name="title" maxlength="80" value="' + escapeHtml(label) + '">' +
                         '</label>' +
@@ -393,7 +432,6 @@
             e.preventDefault();
             errorEl.style.display = 'none';
 
-            var passwordVal = form.querySelector('[name="password"]').value;
             var titleVal = form.querySelector('[name="title"]').value;
             var imageInput = form.querySelector('[name="image"]');
             var bgInput = form.querySelector('[name="bgImage"]');
@@ -413,12 +451,16 @@
             // TIDAK ikut dikirim di request ini -- kalau ikut, endpoint ini
             // akan menolaknya karena hanya menerima satu field file
             // bernama "image".
+            //
+            // BARU: gak ada lagi field 'password' di FormData -- otorisasi
+            // sekarang lewat cookie sesi (credentials: 'same-origin'),
+            // divalidasi backend via middleware/requireAdmin.js (sama
+            // persis pola-nya kayak /api/arc-carousel/book/add dkk).
             var qrFormData = new FormData();
-            qrFormData.append('password', passwordVal);
             qrFormData.append('title', titleVal);
             if (imageFile) qrFormData.append('image', imageFile);
 
-            fetch('/api/qr-images/' + slot, { method: 'POST', body: qrFormData })
+            fetch('/api/qr-images/' + slot, { method: 'POST', body: qrFormData, credentials: 'same-origin' })
                 .then(function (res) {
                     return res.json().then(function (data) { return { ok: res.ok, data: data }; });
                 })
@@ -427,7 +469,7 @@
                         throw new Error(result.data.message || 'Gagal memperbarui kode QR.');
                     }
 
-                    // SESUDAH — entry sekarang punya `url`, bukan `filename`
+                    // entry sekarang punya `url`, bukan `filename`
                     var entry = result.data.entry || {};
                     if (entry.url) {
                         applyCustomImage(slot, entry);
@@ -440,16 +482,15 @@
 
                     // Tahap 2 (opsional): kalau ada berkas gambar latar yang
                     // dipilih, lanjut kirim ke endpoint TERPISAH
-                    // (/api/qr-bg/:slot) pakai kata sandi yang sama. Dipisah
-                    // jadi request sendiri karena target penyimpanannya
-                    // beda (lihat routes/qrBg.js), bukan karena kata sandinya
-                    // beda.
+                    // (/api/qr-bg/:slot). Dipisah jadi request sendiri
+                    // karena target penyimpanannya beda (lihat
+                    // routes/qrBg.js), bukan karena otorisasinya beda --
+                    // dua-duanya sama-sama lewat sesi admin sekarang.
                     if (bgFile) {
                         var bgFormData = new FormData();
-                        bgFormData.append('password', passwordVal);
                         bgFormData.append('image', bgFile);
 
-                        return fetch('/api/qr-bg/' + slot, { method: 'POST', body: bgFormData })
+                        return fetch('/api/qr-bg/' + slot, { method: 'POST', body: bgFormData, credentials: 'same-origin' })
                             .then(function (res2) {
                                 return res2.json().then(function (data2) { return { ok: res2.ok, data: data2 }; });
                             })
@@ -463,15 +504,14 @@
                 })
                 .then(function () {
                     // Tahap 3 (opsional): dokumen terkait -- endpoint TERPISAH
-                    // lagi (/api/qr-doc/:slot), pakai kata sandi yang sama.
-                    // Prioritas kalau lebih dari satu field diisi bareng:
-                    // hapus > upload PDF > tautan website.
+                    // lagi (/api/qr-doc/:slot). Prioritas kalau lebih dari
+                    // satu field diisi bareng: hapus > upload PDF > tautan
+                    // website.
                     if (clearDocVal) {
                         var clearFormData = new FormData();
-                        clearFormData.append('password', passwordVal);
                         clearFormData.append('mode', 'clear');
 
-                        return fetch('/api/qr-doc/' + slot, { method: 'POST', body: clearFormData })
+                        return fetch('/api/qr-doc/' + slot, { method: 'POST', body: clearFormData, credentials: 'same-origin' })
                             .then(function (res3) {
                                 return res3.json().then(function (data3) { return { ok: res3.ok, data: data3 }; });
                             })
@@ -485,11 +525,10 @@
 
                     if (docFile) {
                         var docFormData = new FormData();
-                        docFormData.append('password', passwordVal);
                         docFormData.append('mode', 'pdf');
                         docFormData.append('document', docFile);
 
-                        return fetch('/api/qr-doc/' + slot, { method: 'POST', body: docFormData })
+                        return fetch('/api/qr-doc/' + slot, { method: 'POST', body: docFormData, credentials: 'same-origin' })
                             .then(function (res3) {
                                 return res3.json().then(function (data3) { return { ok: res3.ok, data: data3 }; });
                             })
@@ -503,11 +542,10 @@
 
                     if (docUrlVal) {
                         var linkFormData = new FormData();
-                        linkFormData.append('password', passwordVal);
                         linkFormData.append('mode', 'link');
                         linkFormData.append('url', docUrlVal);
 
-                        return fetch('/api/qr-doc/' + slot, { method: 'POST', body: linkFormData })
+                        return fetch('/api/qr-doc/' + slot, { method: 'POST', body: linkFormData, credentials: 'same-origin' })
                             .then(function (res3) {
                                 return res3.json().then(function (data3) { return { ok: res3.ok, data: data3 }; });
                             })

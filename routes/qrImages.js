@@ -1,9 +1,30 @@
+// routes/qrImages.js
+//
+// Router Express untuk fitur "ganti gambar & judul kode QR". Endpoint &
+// URL dipertahankan sama persis (GET /api/qr-images/meta,
+// GET /api/qr-images/file/:slot, POST /api/qr-images/:slot) -- frontend
+// (QRCodeRevealAnimation.js) gak perlu diubah bentuk request-nya, cuma
+// gak kirim field 'password' lagi.
+//
+// BARU: password per-aksi (QR_EDIT_PASSWORD) DICABUT TOTAL, digantikan
+// sesi login admin (lihat middleware/requireAdmin.js) -- konsisten sama
+// routes/arcCarouselContent.js, qrBg.js, qrDoc.js. Ikut kecabut juga
+// SELURUH mekanisme lockout/rate-limit per-IP (checkLockout,
+// registerFailedAttempt, dkk) -- itu dulu dibikin khusus buat nahan
+// orang nebak-nebak password lewat endpoint ini, sekarang gak relevan
+// lagi karena gak ada password yang bisa ditebak di sini sama sekali.
+// (Percobaan login yang gagal sekarang jadi urusan /api/auth/login di
+// routes/auth.js, bukan di sini -- itu di luar cakupan perubahan ini.)
+//
+// Env var QR_EDIT_PASSWORD jadi gak kepakai lagi di file ini -- aman
+// dibiarin nganggur di Environment Variables Vercel, atau dihapus kalau
+// mau beres-beres, dua-duanya gak ngaruh ke jalannya fitur ini.
+
 const express = require('express');
 const multer = require('multer');
-const crypto = require('crypto');
 
 const store = require('../data/qrImageStore');
-const { getJSON, setJSON, delKey } = require('../lib/redisClient');
+const requireAdmin = require('../middleware/requireAdmin');
 
 const router = express.Router();
 
@@ -23,58 +44,8 @@ const upload = multer({
     }
 });
 
-const MAX_ATTEMPTS = 5;
-const LOCKOUT_SECONDS = 5 * 60; // 5 menit
-
-function getClientIp(req) {
-    return req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
-}
-
-function lockoutKey(req) {
-    return `qr-lockout:${getClientIp(req)}`;
-}
-
-async function checkLockout(req, res) {
-    const rec = await getJSON(lockoutKey(req));
-    if (rec && rec.lockedUntil && Date.now() < rec.lockedUntil) {
-        const waitSec = Math.ceil((rec.lockedUntil - Date.now()) / 1000);
-        res.status(429).json({
-            success: false,
-            message: `Terlalu banyak percobaan yang gagal. Silakan coba kembali dalam ${waitSec} detik.`
-        });
-        return false;
-    }
-    return true;
-}
-
-async function registerFailedAttempt(req) {
-    const key = lockoutKey(req);
-    const rec = (await getJSON(key)) || { count: 0, lockedUntil: 0 };
-    rec.count += 1;
-    if (rec.count >= MAX_ATTEMPTS) {
-        rec.lockedUntil = Date.now() + LOCKOUT_SECONDS * 1000;
-        rec.count = 0;
-    }
-    // TTL 2x lockout window biar key otomatis kebersihin sendiri di Redis.
-    await setJSON(key, rec, { ex: LOCKOUT_SECONDS * 2 });
-}
-
-async function clearFailedAttempts(req) {
-    await delKey(lockoutKey(req));
-}
-
-function verifyPassword(inputPassword) {
-    const real = process.env.QR_EDIT_PASSWORD;
-    if (!real) return { ok: false, reason: 'not-configured' };
-    if (!inputPassword) return { ok: false, reason: 'wrong' };
-
-    const a = Buffer.from(String(inputPassword));
-    const b = Buffer.from(String(real));
-    if (a.length !== b.length) return { ok: false, reason: 'wrong' };
-    const match = crypto.timingSafeEqual(a, b);
-    return { ok: match, reason: match ? null : 'wrong' };
-}
-
+// GET /api/qr-images/meta -- publik, siapa aja boleh baca (dipakai buat
+// nampilin gambar/judul custom ke SEMUA pengunjung, bukan cuma admin).
 router.get('/meta', async (req, res) => {
     try {
         const meta = await store.getMeta();
@@ -85,6 +56,8 @@ router.get('/meta', async (req, res) => {
     }
 });
 
+// GET /api/qr-images/file/:slot -- publik juga, ini yang nampilin gambar
+// QR-nya sendiri ke pengunjung biasa.
 router.get('/file/:slot', async (req, res) => {
     const { slot } = req.params;
     if (!store.isValidSlot(slot)) {
@@ -102,37 +75,23 @@ router.get('/file/:slot', async (req, res) => {
     }
 });
 
-router.post('/:slot', (req, res) => {
+// POST /api/qr-images/:slot -- BARU: requireAdmin dipasang PALING DEPAN,
+// sebelum handler apa pun jalan. Kalau bukan admin yang login, request
+// ditolak duluan sebelum sempat parsing multipart body / sentuh slot
+// sama sekali -- pola sama persis kayak routes/arcCarouselContent.js.
+router.post('/:slot', requireAdmin, (req, res) => {
     const { slot } = req.params;
     if (!store.isValidSlot(slot)) {
         return res.status(404).json({ success: false, message: 'Slot tidak dikenali.' });
     }
 
     upload.single('image')(req, res, async (uploadErr) => {
-
         try {
             if (uploadErr) {
                 return res.status(400).json({ success: false, message: uploadErr.message || 'Proses pengunggahan gagal.' });
             }
 
-            if (!(await checkLockout(req, res))) return;
-
-            const { password, title } = req.body;
-            const verdict = verifyPassword(password);
-
-            if (!verdict.ok) {
-                await registerFailedAttempt(req);
-                if (verdict.reason === 'not-configured') {
-                    return res.status(500).json({
-                        success: false,
-                        message: 'Fitur pembaruan gambar belum dikonfigurasi. Silakan atur QR_EDIT_PASSWORD pada Environment Variables server terlebih dahulu.'
-                    });
-                }
-                return res.status(401).json({ success: false, message: 'Kata sandi yang Anda masukkan salah.' });
-            }
-
-            await clearFailedAttempts(req);
-
+            const { title } = req.body;
             const trimmedTitle = typeof title === 'string' ? title.trim() : '';
 
             if (trimmedTitle.length > MAX_TITLE_LENGTH) {
