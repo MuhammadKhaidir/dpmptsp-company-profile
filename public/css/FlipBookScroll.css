@@ -809,12 +809,6 @@ textarea.fb-edit-field-input {
 
 @media (max-width: 720px) {
   .fb-book {
-    /* FIX: 68vw kegedean -- pas buku kebuka (spread 2 halaman), lebar
-       visualnya bisa sampai ~2.3x lebar .fb-book ini (halaman yang
-       udah kebalik "mekar" ke kiri spine + efek scale saat baca).
-       68vw x 2.3 jelas kepotong layar HP. Diganti 34vw (maksimal
-       170px) supaya pas dibuka, total lebarnya tetap muat tanpa
-       kepotong. */
     width: min(34vw, 170px);
   }
   .fb-caption {
@@ -833,16 +827,42 @@ textarea.fb-edit-field-input {
     bottom: 6%;
   }
 
-  /* FIX: tombol edit/hapus (28px, posisi tetap top:10px) numpuk sama
-     teks nomor halaman pas buku dikecilin buat HP -- padding-top yang
-     tadinya persen (11% dari lebar buku) jadi kekecilan seiring
-     bukunya ngecil, bikin teksnya nyusup ke bawah tombol. Dikasih
-     padding-top tetap (px) khusus HP biar selalu ada jarak aman,
-     berapa pun kecilnya buku. */
+  /* FIX: teks kepanjangan bisa discroll DI DALAM kartu, bukan tumpah
+     keluar. Cuma dinyalain di sini (mobile) -- desktop tetap pakai
+     display:contents aslinya, gak kesentuh. */
+  .fb-face-text .fb-reveal {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .fb-face-text .fb-reveal::-webkit-scrollbar {
+    width: 3px;
+  }
+  .fb-face-text .fb-reveal::-webkit-scrollbar-thumb {
+    background: rgba(203, 164, 84, 0.4);
+    border-radius: 999px;
+  }
+
   .fb-face-text {
-    padding-top: 40px;
-    padding-right: 9%;
-    padding-bottom: 9%;
-    padding-left: 9%;
+    padding: 9% 8%;
+  }
+
+  /* FIX: tombol pensil/tempat sampah ikut dikecilin, proporsional sama
+     kartu yang sekarang lebih kecil di HP. */
+  .fb-edit-btn,
+  .fb-delete-btn {
+    width: 22px;
+    height: 22px;
+    font-size: 10px;
+    top: 6px;
+  }
+  .fb-edit-btn {
+    right: 6px;
+  }
+  .fb-delete-btn {
+    left: 6px;
   }
 }
