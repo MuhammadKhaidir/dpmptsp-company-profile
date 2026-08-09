@@ -808,12 +808,41 @@ textarea.fb-edit-field-input {
 }
 
 @media (max-width: 720px) {
-  .fb-book-actions {
-    bottom: 5%;
+  .fb-book {
+    /* FIX: 68vw kegedean -- pas buku kebuka (spread 2 halaman), lebar
+       visualnya bisa sampai ~2.3x lebar .fb-book ini (halaman yang
+       udah kebalik "mekar" ke kiri spine + efek scale saat baca).
+       68vw x 2.3 jelas kepotong layar HP. Diganti 34vw (maksimal
+       170px) supaya pas dibuka, total lebarnya tetap muat tanpa
+       kepotong. */
+    width: min(34vw, 170px);
   }
-  .fb-add-page-btn,
-  .fb-delete-book-btn {
-    font-size: 11px;
-    padding: 7px 14px;
+  .fb-caption {
+    top: 8%;
+    left: 50%;
+    max-width: 85%;
+    text-align: center;
+    font-size: clamp(16px, 5vw, 22px);
+    color: #14100a;
+    transform: translateX(-50%) translateY(var(--fb-reveal-y, 0px));
+  }
+  .fb-caption::before {
+    display: none;
+  }
+  .fb-dots {
+    bottom: 6%;
+  }
+
+  /* FIX: tombol edit/hapus (28px, posisi tetap top:10px) numpuk sama
+     teks nomor halaman pas buku dikecilin buat HP -- padding-top yang
+     tadinya persen (11% dari lebar buku) jadi kekecilan seiring
+     bukunya ngecil, bikin teksnya nyusup ke bawah tombol. Dikasih
+     padding-top tetap (px) khusus HP biar selalu ada jarak aman,
+     berapa pun kecilnya buku. */
+  .fb-face-text {
+    padding-top: 40px;
+    padding-right: 9%;
+    padding-bottom: 9%;
+    padding-left: 9%;
   }
 }
