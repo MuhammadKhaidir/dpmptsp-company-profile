@@ -511,8 +511,12 @@ class FlipBookScroll {
     this.caption = el('div', 'fb-caption');
     this.sticky.appendChild(this.caption);
 
-    this.stage = el('div', 'fb-stage');
+this.stage = el('div', 'fb-stage');
     this.sticky.appendChild(this.stage);
+
+    this.dotsWrap = el('div', 'fb-dots');
+    this.books.forEach(() => this.dotsWrap.appendChild(el('span', 'fb-dot')));
+    this.sticky.appendChild(this.dotsWrap);
 
     this.mobileNav = el('div', 'fb-mobile-nav');
     this.prevBtn = el('button', 'fb-mobile-nav-btn fb-mobile-prev');
