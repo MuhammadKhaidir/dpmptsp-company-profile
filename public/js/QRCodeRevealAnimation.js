@@ -13,16 +13,7 @@
         right: 'Profil Investasi Kota Palembang'
     };
 
-    // ================================================================
-    // BARU: metadata "dokumen terkait" per slot, di-load dari backend
-    // (data/qrDocStore.js lewat routes/qrDoc.js) -- BUKAN hardcode lagi.
-    // Diisi/diubah lewat menu "Perbarui Tampilan Kode QR" (sekarang
-    // gerbangnya sesi login admin, bukan password manual lagi -- lihat
-    // fetchAdminStatus() & openChoiceModal() di bawah). Bentuknya:
-    //   { mode: 'link' | 'pdf' | null, url: string | null, updatedAt }
-    // Kalau mode-nya null / belum pernah diisi, tombol "Lihat Dokumen
-    // Terkait" otomatis fallback ke perilaku lama (scroll ke flip book).
-    // ================================================================
+
     var customDocMeta = {};
 
     function play(boxes) {
@@ -58,11 +49,7 @@
     }
 
     function setupHover(panel) {
-        // Sengaja cuma BOX yang punya listener (bukan teksnya). Jadi status
-        // hover 100% ngikutin kursor di area box: begitu kursor keluar dari
-        // box, box langsung mengecil lagi -- walaupun kursor pindah ke area
-        // teks penjelasan di sebelahnya. Teksnya cuma "penumpang", gak ikut
-        // pegang status hover sama sekali.
+
         var slots = [
             { selector: '.qr-panel-left', hoverClass: 'is-hover-left' },
             { selector: '.qr-panel-center', hoverClass: 'is-hover-center' },
@@ -110,11 +97,6 @@
         if (fb) fb.scrollIntoView({ behavior: 'smooth' });
     }
 
-    // ================================================================
-    // BARU: baca info dokumen terkait dari customDocMeta (hasil load
-    // /api/qr-doc/meta), dipakai buat nentuin icon/label tombol di modal
-    // pilihan, dan ke mana tombol itu ngarah pas diklik.
-    // ================================================================
     function getRelatedDocInfo(slot) {
         var doc = customDocMeta[slot];
         var url = (doc && doc.url) ? doc.url : '';
@@ -136,10 +118,7 @@
         var info = getRelatedDocInfo(slot);
 
         if (info.url) {
-            // Otomatis kebuka di tab baru -- kalau linknya PDF, browser
-            // bakal nampilin lewat PDF viewer bawaan; kalau website,
-            // dibuka kayak tab biasa. noopener/noreferrer buat keamanan
-            // standar pas buka tab baru dari link eksternal.
+
             window.open(info.url, '_blank', 'noopener,noreferrer');
             return;
         }
@@ -162,15 +141,6 @@
             });
     }
 
-    // ================================================================
-    // BARU: cek status admin dari /api/auth/check-session -- pola yang
-    // SAMA PERSIS kayak js/Arccarousel.js. SENGAJA di-fetch ULANG tiap
-    // openChoiceModal() dipanggil (bukan dicek sekali pas halaman pertama
-    // kali kebuka lalu di-cache), biar statusnya selalu akurat walau ada
-    // login/logout/sesi expire di tab lain sambil orang lagi browsing --
-    // modal ini jarang dibuka (cuma pas klik kotak QR), jadi biaya fetch
-    // ulang tiap buka modal kecil banget dibanding manfaat akurasinya.
-    // ================================================================
     function fetchAdminStatus() {
         return fetch('/api/auth/check-session')
             .then(function (res) { return res.ok ? res.json() : null; })
@@ -182,14 +152,6 @@
             });
     }
 
-    /* ================================================================
-       Modal pilihan (klik box) + modal ganti gambar, latar, judul QR,
-       dan dokumen terkait
-       ----------------------------------------------------------------
-       #qr-modal-root dibuat otomatis lewat JS (gak perlu nambah apapun
-       di index.html), dipakai ulang buat kedua modal (isinya diganti
-       total tiap buka modal baru).
-       ================================================================ */
     function ensureQrModalRoot() {
         var root = document.getElementById('qr-modal-root');
         if (!root) {
@@ -211,9 +173,7 @@
     }
 
     function fireToast(message) {
-        // Numpang ke fungsi fire() milik Alpine (lihat index.html: fire('...')
-        // dipakai buat toast sukses login/registrasi/dll). Dibungkus try/catch
-        // biar aman kalau somehow Alpine belum siap -- diamkan aja kalau gagal.
+
         try {
             var data = document.body._x_dataStack && document.body._x_dataStack[0];
             if (data && typeof data.fire === 'function') {
@@ -261,20 +221,33 @@
         SLOT_LABELS[slot] = title;
     }
 
-    /* ================================================================
-       Gambar LATAR BELAKANG (elemen .qr-hover-bg-left/center/right yang
-       muncul redup di belakang kotak saat di-hover). Ini gambar yang
-       BEDA dari gambar kode QR itu sendiri, disimpan lewat endpoint
-       terpisah (/api/qr-bg/...) yang didukung data/qrBgStore.js +
-       routes/qrBg.js -- keduanya independen dari sistem gambar QR yang
-       sudah ada, biar gak saling ganggu.
+    function applyCustomDescription(slot, description) {
+        if (!description) return;
 
-       Diterapkan lewat inline style (bukan nambah/ubah class CSS), yang
-       otomatis menang atas rule .qr-hover-bg-left/center/right di CSS
-       (inline style selalu lebih diprioritaskan browser). Kalau belum
-       pernah di-upload custom, tampilan otomatis tetap pakai gambar
-       default dari CSS seperti biasa.
-       ================================================================ */
+        var panel = document.getElementById('qr-panel');
+        if (!panel) return;
+
+        var inner = panel.querySelector('.qr-hover-text-' + slot + ' .qr-hover-text-inner');
+        if (!inner) return;
+
+        // Coba class khusus dulu (.qr-hover-desc), kalau HTML-nya belum
+        // dikasih class itu, fallback ke elemen <p> pertama yang ada di
+        // dalam kotak hover text (sejajar sama <h4> judul).
+        var descEl = inner.querySelector('.qr-hover-desc') || inner.querySelector('p');
+        if (descEl) descEl.textContent = description;
+    }
+
+    function getCurrentDescription(slot) {
+        var panel = document.getElementById('qr-panel');
+        if (!panel) return '';
+
+        var inner = panel.querySelector('.qr-hover-text-' + slot + ' .qr-hover-text-inner');
+        if (!inner) return '';
+
+        var descEl = inner.querySelector('.qr-hover-desc') || inner.querySelector('p');
+        return descEl ? descEl.textContent.trim() : '';
+    }
+
     function applyCustomBgImage(slot, entry) {
         var scene = document.getElementById('qr-scene');
         if (!scene) return;
@@ -315,6 +288,9 @@
                     if (info && info.title) {
                         applyCustomTitle(slot, info.title);
                     }
+                    if (info && info.description) {
+                        applyCustomDescription(slot, info.description);
+                    }
                 });
             })
             .catch(function () {
@@ -331,10 +307,6 @@
         document.addEventListener('keydown', onEscCloseModal);
     }
 
-    // BARU: sekarang async (nunggu fetchAdminStatus() dulu) -- tombol
-    // "Perbarui Tampilan Kode QR" cuma di-render ke DOM kalau isAdmin
-    // true. Pengguna biasa / yang belum login CUMA lihat tombol "Lihat
-    // Dokumen Terkait" & "Batal", gak ada jejak fitur edit sama sekali.
     function openChoiceModal(slot, bookIndex) {
         fetchAdminStatus().then(function (isAdmin) {
             var root = ensureQrModalRoot();
@@ -372,28 +344,27 @@
             var editBtn = root.querySelector('[data-action="edit"]');
             if (editBtn) {
                 editBtn.addEventListener('click', function () {
-                    openEditModal(slot, label);
+                    openEditModal(slot, label, getCurrentDescription(slot));
                 });
             }
         });
     }
 
-    // BARU: field "Kata Sandi" DICABUT TOTAL -- otorisasi sekarang
-    // ditentukan sesi admin yang sedang login (cookie), bukan lagi
-    // password yang diketik ulang tiap kali submit. Modal ini cuma bisa
-    // kebuka lewat tombol yang sendirinya udah di-gate isAdmin di
-    // openChoiceModal() di atas, jadi gak perlu re-check di sini.
-    function openEditModal(slot, label) {
+    function openEditModal(slot, label, description) {
         var root = ensureQrModalRoot();
+        description = description || '';
 
         root.innerHTML =
             '<div class="qr-modal-overlay" data-qr-close>' +
                 '<div class="qr-modal-box" role="dialog" aria-modal="true">' +
                     '<h3 class="qr-modal-title">Perbarui Kode QR — ' + escapeHtml(label) + '</h3>' +
-                    '<p class="qr-modal-sub">Ubah judul, gambar kode QR, gambar latar belakang, dan/atau dokumen terkait untuk melanjutkan. Bagian yang dikosongkan tidak akan diubah.</p>' +
+                    '<p class="qr-modal-sub">Ubah judul, deskripsi, gambar kode QR, gambar latar belakang, dan/atau dokumen terkait untuk melanjutkan. Bagian yang dikosongkan tidak akan diubah.</p>' +
                     '<form class="qr-edit-form" data-qr-edit-form>' +
                         '<label class="qr-edit-label">Judul Kotak' +
                             '<input type="text" class="qr-edit-input" name="title" maxlength="80" value="' + escapeHtml(label) + '">' +
+                        '</label>' +
+                        '<label class="qr-edit-label">Deskripsi (teks penjelasan yang muncul saat kotak di-hover)' +
+                            '<textarea class="qr-edit-input qr-edit-textarea" name="description" maxlength="240" rows="3" placeholder="Tulis deskripsi singkat tentang kode QR ini...">' + escapeHtml(description) + '</textarea>' +
                         '</label>' +
                         '<label class="qr-edit-label">Berkas Gambar Kode QR (Format PNG, JPG, WEBP, atau GIF — Maksimal 5MB, kosongkan jika tidak ingin mengganti)' +
                             '<input type="file" class="qr-edit-input" name="image" accept="image/png,image/jpeg,image/webp,image/gif">' +
@@ -433,6 +404,7 @@
             errorEl.style.display = 'none';
 
             var titleVal = form.querySelector('[name="title"]').value;
+            var descriptionVal = form.querySelector('[name="description"]').value;
             var imageInput = form.querySelector('[name="image"]');
             var bgInput = form.querySelector('[name="bgImage"]');
             var imageFile = imageInput && imageInput.files[0];
@@ -446,18 +418,9 @@
             submitBtn.disabled = true;
             submitBtn.innerHTML = 'Sedang Menyimpan...';
 
-            // Tahap 1: kirim judul + (opsional) gambar kode QR ke endpoint
-            // yang sudah ada (/api/qr-images/:slot). Field bgImage SENGAJA
-            // TIDAK ikut dikirim di request ini -- kalau ikut, endpoint ini
-            // akan menolaknya karena hanya menerima satu field file
-            // bernama "image".
-            //
-            // BARU: gak ada lagi field 'password' di FormData -- otorisasi
-            // sekarang lewat cookie sesi (credentials: 'same-origin'),
-            // divalidasi backend via middleware/requireAdmin.js (sama
-            // persis pola-nya kayak /api/arc-carousel/book/add dkk).
             var qrFormData = new FormData();
             qrFormData.append('title', titleVal);
+            qrFormData.append('description', descriptionVal);
             if (imageFile) qrFormData.append('image', imageFile);
 
             fetch('/api/qr-images/' + slot, { method: 'POST', body: qrFormData, credentials: 'same-origin' })
@@ -480,12 +443,10 @@
                         label = entry.title;
                     }
 
-                    // Tahap 2 (opsional): kalau ada berkas gambar latar yang
-                    // dipilih, lanjut kirim ke endpoint TERPISAH
-                    // (/api/qr-bg/:slot). Dipisah jadi request sendiri
-                    // karena target penyimpanannya beda (lihat
-                    // routes/qrBg.js), bukan karena otorisasinya beda --
-                    // dua-duanya sama-sama lewat sesi admin sekarang.
+                    if (entry.description) {
+                        applyCustomDescription(slot, entry.description);
+                    }
+
                     if (bgFile) {
                         var bgFormData = new FormData();
                         bgFormData.append('image', bgFile);
@@ -503,10 +464,7 @@
                     }
                 })
                 .then(function () {
-                    // Tahap 3 (opsional): dokumen terkait -- endpoint TERPISAH
-                    // lagi (/api/qr-doc/:slot). Prioritas kalau lebih dari
-                    // satu field diisi bareng: hapus > upload PDF > tautan
-                    // website.
+
                     if (clearDocVal) {
                         var clearFormData = new FormData();
                         clearFormData.append('mode', 'clear');
@@ -604,30 +562,6 @@
         return frames;
     }
 
-    // ================================================================
-    // FIX: stuck/macet animasi kucing pas ada interaksi lain (peta,
-    // musik, fetch data, dll) -- HANYA terjadi di production (Vercel),
-    // gak di localhost.
-    //
-    // Root cause: Image() yang dibikin lewat preload() itu gak nempel ke
-    // DOM dan gak disimpen reference-nya. Browser (Chrome dkk) ngasih
-    // prioritas fetch RENDAH buat gambar kayak gini. Begitu ada request
-    // lain jalan bareng (load tile peta, streaming musik, fetch data),
-    // browser bisa nge-CANCEL request gambar prioritas-rendah ini duluan
-    // buat ngasih jalan ke request yang dianggap lebih penting -- persis
-    // kayak yang kelihatan di Network tab (CatAttack1-6.png berstatus
-    // "canceled"). Pas itu kejadian, <img> kucingnya ya cuma diem
-    // nampilin frame terakhir yang sukses -- makanya keliatan "macet".
-    //
-    // Di localhost latency-nya ~0ms jadi request selalu kelar duluan
-    // sebelum sempat di-cancel -- makanya normal-normal aja di situ.
-    //
-    // Fix: (1) kasih fetchPriority "high" biar browser gak nyepelein
-    // request ini, (2) simpen reference-nya di catPreloadedImages biar
-    // gak sempet di-garbage-collect, (3) auto-retry kalau ada frame yang
-    // tetep gagal/ke-cancel, baik pas preload maupun pas lagi tampil
-    // (self-healing, gak nyangkut permanen).
-    // ================================================================
     var catPreloadedImages = [];
 
     function preload(frames) {

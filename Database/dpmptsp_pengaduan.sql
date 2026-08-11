@@ -5,7 +5,7 @@
 -- Host: 127.0.0.1
 -- Generation Time: Jul 03, 2026 at 03:14 AM
 -- Server version: 10.4.32-MariaDB
--- PHP Version: 8.0.30
+-- PHP Version: 8.0.30, Database/dpmptsp_pengaduan.sql
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
