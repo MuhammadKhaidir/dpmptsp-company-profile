@@ -31,6 +31,7 @@ const router = express.Router();
 const ALLOWED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 const MAX_FILE_SIZE = 4 * 1024 * 1024;
 const MAX_TITLE_LENGTH = 80; // ubah di sini kalau perlu batas karakter judul berbeda
+const MAX_DESCRIPTION_LENGTH = 240; // samain sama maxlength textarea deskripsi di frontend
 
 const upload = multer({
     storage: multer.memoryStorage(),
@@ -91,8 +92,9 @@ router.post('/:slot', requireAdmin, (req, res) => {
                 return res.status(400).json({ success: false, message: uploadErr.message || 'Proses pengunggahan gagal.' });
             }
 
-            const { title } = req.body;
+            const { title, description } = req.body;
             const trimmedTitle = typeof title === 'string' ? title.trim() : '';
+            const trimmedDescription = typeof description === 'string' ? description.trim() : '';
 
             if (trimmedTitle.length > MAX_TITLE_LENGTH) {
                 return res.status(400).json({
@@ -101,8 +103,15 @@ router.post('/:slot', requireAdmin, (req, res) => {
                 });
             }
 
-            if (!req.file && !trimmedTitle) {
-                return res.status(400).json({ success: false, message: 'Tidak ada berkas gambar atau judul baru yang dikirim.' });
+            if (trimmedDescription.length > MAX_DESCRIPTION_LENGTH) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Deskripsi terlalu panjang (maksimal ${MAX_DESCRIPTION_LENGTH} karakter).`
+                });
+            }
+
+            if (!req.file && !trimmedTitle && !trimmedDescription) {
+                return res.status(400).json({ success: false, message: 'Tidak ada berkas gambar, judul, atau deskripsi baru yang dikirim.' });
             }
 
             let entry;
@@ -112,10 +121,11 @@ router.post('/:slot', requireAdmin, (req, res) => {
                     buffer: req.file.buffer,
                     mimeType: req.file.mimetype,
                     ext,
-                    title: trimmedTitle || undefined
+                    title: trimmedTitle || undefined,
+                    description: trimmedDescription || undefined
                 });
             } else {
-                entry = await store.setSlotTitle(slot, trimmedTitle);
+                entry = await store.setSlotTitle(slot, trimmedTitle || undefined, trimmedDescription || undefined);
             }
 
             res.json({

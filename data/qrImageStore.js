@@ -40,9 +40,9 @@ async function getSlotImage(slot) {
     return getJSON(keyFor(slot));
 }
 
-// params: { buffer, mimeType, ext, title? }
-// title cuma diubah kalau dikirim (undefined = judul lama dipertahankan).
-async function setSlotImage(slot, { buffer, mimeType, ext, title }) {
+// params: { buffer, mimeType, ext, title?, description? }
+// title/description cuma diubah kalau dikirim (undefined = value lama dipertahankan).
+async function setSlotImage(slot, { buffer, mimeType, ext, title, description }) {
     if (!isValidSlot(slot)) throw new Error('Slot tidak valid: ' + slot);
 
     const prev = await getSlotImage(slot);
@@ -58,6 +58,7 @@ async function setSlotImage(slot, { buffer, mimeType, ext, title }) {
         pathname: blob.pathname,
         mimeType,
         title: (title !== undefined ? title : (prev ? prev.title : null)) || null,
+        description: (description !== undefined ? description : (prev ? prev.description : null)) || null,
         updatedAt: Date.now()
     };
 
@@ -75,13 +76,17 @@ async function setSlotImage(slot, { buffer, mimeType, ext, title }) {
     return entry;
 }
 
-async function setSlotTitle(slot, title) {
+async function setSlotTitle(slot, title, description) {
     if (!isValidSlot(slot)) throw new Error('Slot tidak valid: ' + slot);
     const prev = await getSlotImage(slot);
     const entry = Object.assign(
-        { url: null, pathname: null, mimeType: null },
+        { url: null, pathname: null, mimeType: null, title: null, description: null },
         prev,
-        { title, updatedAt: Date.now() }
+        {
+            title: title !== undefined ? title : (prev ? prev.title : null),
+            description: description !== undefined ? description : (prev ? prev.description : null),
+            updatedAt: Date.now()
+        }
     );
     await setJSON(keyFor(slot), entry);
     return entry;
@@ -92,8 +97,8 @@ async function getMeta() {
     await Promise.all(SLOTS.map(async (slot) => {
         const entry = await getSlotImage(slot);
         meta[slot] = entry
-            ? { hasCustom: !!entry.url, url: entry.url, updatedAt: entry.updatedAt, title: entry.title || null }
-            : { hasCustom: false, url: null, updatedAt: null, title: null };
+            ? { hasCustom: !!entry.url, url: entry.url, updatedAt: entry.updatedAt, title: entry.title || null, description: entry.description || null }
+            : { hasCustom: false, url: null, updatedAt: null, title: null, description: null };
     }));
     return meta;
 }
