@@ -369,27 +369,6 @@
   50% { box-shadow: 0 0 28px rgba(203, 164, 84, 0.55), inset 2px 0 4px rgba(0, 0, 0, 0.4); }
 }
 
-@media (max-width: 720px) {
-  .fb-book {
-    width: min(68vw, 240px);
-  }
-  .fb-caption {
-    top: 8%;
-    left: 50%;
-    max-width: 85%;
-    text-align: center;
-    font-size: clamp(16px, 5vw, 22px);
-    color: #14100a;
-    transform: translateX(-50%) translateY(var(--fb-reveal-y, 0px));
-  }
-  .fb-caption::before {
-    display: none;
-  }
-  .fb-dots {
-    bottom: 6%;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .fb-book {
     transition: opacity 0.3s ease;

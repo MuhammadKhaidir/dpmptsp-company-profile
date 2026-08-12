@@ -216,6 +216,7 @@ class FlipBook {
     this.pageWidth = 0;
     this.travelPx = 0;
     this.lastOpacity = 0;
+    this.measuredReal = false; // FIX: true kalau offsetWidth pernah kebaca beneran (bukan fallback)
 
     this.root = el('div', 'fb-book');
     this.root.style.zIndex = '0';
@@ -288,8 +289,9 @@ class FlipBook {
     const measuredWidth = this.root.offsetWidth;
     if (measuredWidth > 0) {
       this.pageWidth = measuredWidth;
+      this.measuredReal = true; // FIX: baru sah kalau bukan fallback
     } else if (!this.pageWidth) {
-      this.pageWidth = 280;
+      this.pageWidth = 280; // fallback sementara selama .fb-book masih display:none
     }
     const vw = window.innerWidth || 1000;
     this.travelPx = vw / 2 + this.pageWidth / 2 + SIDE_MARGIN;
@@ -323,7 +325,22 @@ class FlipBook {
   }
 
   update(local) {
-    if (!this.pageWidth || this.pageWidth === 320) {
+    // FIX BUG "buku kedua nempel ke kanan pas dibuka":
+    // Sebelumnya kondisi ini `!this.pageWidth || this.pageWidth === 320`,
+    // padahal fallback di measure() itu 280, bukan 320 -- jadi begitu
+    // sebuah buku gagal ke-measure pertama kali (offsetWidth = 0 karena
+    // .fb-book masih display:none saat baru dibuat), pageWidth-nya
+    // NYANGKUT di 280 SELAMANYA, gak pernah dicoba ukur ulang.
+    // Buku pertama kebetulan "selamat" karena langsung tampil dari awal
+    // load, jadi sempat ke-ukur ulang lewat resize/scroll. Buku kedua
+    // (dan seterusnya) baru display:block pas user geser ke sana --
+    // di titik itu gak ada lagi resize yang men-trigger measure() ulang,
+    // jadi pageWidth-nya tetap 280 (kegedean dari lebar aslinya di HP).
+    // Efeknya: shiftPx = (pageWidth/2) * spreadT jadi kegedean pas buku
+    // dibuka, buku ketarik ke kanan, gak balik ke tengah.
+    // Sekarang pakai flag `measuredReal`, jadi tiap frame tetap nyoba
+    // measure() ulang sampai beneran dapet lebar asli dari DOM.
+    if (!this.measuredReal) {
       this.measure();
     }
 
