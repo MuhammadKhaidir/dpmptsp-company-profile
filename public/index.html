@@ -374,47 +374,9 @@
         </form>
         </div>
 
-        <p style="margin-top:18px;text-align:center;font-size:13px;color:rgba(255,255,255,.42);">
-            Belum terdaftar? <span @click="v='register'" style="color:#c4b5fd;font-weight:700;cursor:pointer;">Registrasi NIK Baru</span>
+        <p style="margin-top:18px;text-align:center;font-size:12.5px;color:rgba(255,255,255,.34);">
+            Belum punya akun? Hubungi admin DPMPTSP untuk pembuatan akun.
         </p>
-    </div>
-</div>
-
-<div x-show="v==='register'" x-cloak class="inner" style="display:flex;align-items:center;justify-content:center;padding:40px 16px;">
-    <div class="auth-card" style="max-width:510px;">
-        <h2 style="font-size:21px;font-weight:800;letter-spacing:-.03em;margin-bottom:5px;">Pendaftaran Akun Masyarakat</h2>
-        <p style="font-size:13px;color:rgba(255,255,255,.42);margin-bottom:22px;">Pastikan data NIK valid sesuai KTP asli</p>
-
-        <div x-data="{ nama_lengkap:'', nik:'', no_hp:'', email:'', password:'', errMsg:'', loading:false }">
-        <form @submit.prevent="
-            errMsg = '';
-            loading = true;
-            fetch('/api/auth/register', {
-                method: 'POST',
-                headers: {'Content-Type':'application/json'},
-                body: JSON.stringify({ nama_lengkap, nik, no_hp, email, password })
-            })
-            .then(r => r.json())
-            .then(data => {
-                loading = false;
-                if (data.success) {
-                    v = 'login';
-                    fire('Registrasi sukses! Silakan login');
-                } else {
-                    errMsg = data.message;
-                }
-            })
-            .catch(() => { loading = false; errMsg = 'Gagal terhubung ke server'; })
-        " style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-            <div style="grid-column:1/-1;"><label class="a-label">Nama Lengkap Sesuai KTP</label><input type="text" x-model="nama_lengkap" required placeholder="Nama Lengkap" class="a-input"></div>
-            <div><label class="a-label">NIK (16 Digit)</label><input type="text" x-model="nik" maxlength="16" required placeholder="16 Digit NIK" class="a-input"></div>
-            <div><label class="a-label">No HP (WhatsApp)</label><input type="tel" x-model="no_hp" required placeholder="08xxxxxxxxxx" class="a-input"></div>
-            <div style="grid-column:1/-1;"><label class="a-label">Email Aktif</label><input type="email" x-model="email" required placeholder="email@contoh.com" class="a-input"></div>
-            <div style="grid-column:1/-1;"><label class="a-label">Buat Kata Sandi</label><input type="password" x-model="password" required placeholder="Minimal 8 karakter" class="a-input"></div>
-            <p x-show="errMsg" x-text="errMsg" style="grid-column:1/-1;color:#fca5a5;font-size:12.5px;font-weight:600;margin-top:-6px;"></p>
-            <div style="grid-column:1/-1;margin-top:4px;"><button type="submit" class="a-btn" :disabled="loading" x-text="loading ? 'Memproses...' : 'Selesaikan Pendaftaran'"></button></div>
-        </form>
-        </div>
     </div>
 </div>
 
