@@ -10,7 +10,7 @@
 // jaringan mentah (404) yang membingungkan.
 //
 // Akun masyarakat/petugas LAMA yang masih ada di tabel `users` (dari
-// sebelum fitur ini dicabut) TETAP BISA cocok kredensialnya (email/NIK &
+// sebelum fitur ini dicabut) TETAP BISA cocok kredensialnya (email/name &
 // kata sandi benar), tapi ditolak di /login karena role-nya bukan 'admin'
 // -- lihat pengecekan di bawah.
 
@@ -34,18 +34,18 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.json({ success: false, message: 'Email/NIK dan kata sandi wajib diisi' });
+      return res.json({ success: false, message: 'Email/Name dan kata sandi wajib diisi' });
     }
 
-    // Login bisa pakai email ATAU NIK (sesuai label form "Email / NIK")
+    // Login bisa pakai email ATAU name (sesuai label form "Email / Name")
     const [rows] = await pool.query(
-      'SELECT id, nama_lengkap, password, role FROM users WHERE email = ? OR nik = ? LIMIT 1',
+      'SELECT id, nama_lengkap, password, role FROM users WHERE email = ? OR name = ? LIMIT 1',
       [email, email]
     );
     const user = rows[0];
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
-      return res.json({ success: false, message: 'Email/NIK atau kata sandi salah' });
+      return res.json({ success: false, message: 'Email/Name atau kata sandi salah' });
     }
 
     // BARU: tolak akun non-admin walau kredensialnya benar -- sisa akun
