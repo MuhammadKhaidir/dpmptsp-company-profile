@@ -76,3 +76,22 @@
     box-shadow: 0 1px 3px rgba(15, 42, 67, 0.18);
     border: 1px solid #D6DBE0;
 }
+
+/* TAMBAHAN -- text layer transparan biar teks PDF tetep bisa di-select & Ctrl+F */
+.di-page-wrap {
+    position: relative;
+}
+
+.di-text-layer {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    line-height: 1;
+}
+
+.di-text-layer span {
+    position: absolute;
+    color: transparent;
+    white-space: pre;
+    transform-origin: 0 0;
+}

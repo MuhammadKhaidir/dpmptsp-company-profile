@@ -15,8 +15,8 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-app.use('/api/data-investasi', require('./routes/dataInvestasi.route'));
 app.use('/assets', express.static(path.join(__dirname, 'Assets')));
+app.use('/api/data-investasi', require('./routes/dataInvestasi.route')); 
 
 // FIX: sebelumnya gak ada `store` di sini -- express-session otomatis
 // jatuh ke MemoryStore (nyimpen sesi di memory proses Node). Itu salah
@@ -63,6 +63,7 @@ const arcCarouselRouter = require('./routes/arcCarouselContent');
    app.use('/api/arc-carousel', arcCarouselRouter);
 
    app.use('/api/qr-doc', require('./routes/qrDoc'));
+   app.use('/api/data-investasi', require('./routes/dataInvestasi.route'));
 
 
 // Semua route non-API jatuh ke index.html — routing halaman (login/dashboard/dll)

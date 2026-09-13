@@ -1,69 +1,92 @@
-/**
- * routes/dataInvestasi.route.js
- *
- * Contoh endpoint buat halaman Data Investasi.
- * Ini GENERIC — sesuaikan sama cara koneksi DB (TiDB/MySQL) & middleware
- * admin-auth yang udah lo punya di project. Ganti nama tabel/kolom kalau perlu.
- *
- * Kalau lo punya route serupa yang udah jalan (misal buat upload QR code image),
- * kasih liat filenya, biar gw samain persis pola-nya biar konsisten sama codebase lo.
- */
+// routes/dataInvestasi.route.js
+//
+// Router buat halaman Data Investasi: satu dokumen PDF aktif yang
+// ditampilkan penuh di halaman (lihat DataInvestasiPage.js). Upload/hapus
+// cuma bisa admin -- ngikutin pola sama persis kayak routes/qrDoc.js:
+// sesi login admin (middleware/requireAdmin.js), berkas di Vercel Blob,
+// metadata di Upstash Redis (lihat data/dataInvestasiStore.js).
 
 const express = require('express');
 const multer = require('multer');
-const { put } = require('@vercel/blob');
+
+const store = require('../data/dataInvestasiStore');
+const requireAdmin = require('../middleware/requireAdmin');
+
 const router = express.Router();
 
-// simpen file sementara di memory sebelum di-upload ke Vercel Blob
-const upload = multer({ storage: multer.memoryStorage() });
+const MAX_FILE_SIZE = 4 * 1024 * 1024; // batas body Vercel Functions ~4.5MB, disisain jarak aman
 
-// TODO: ganti ini pake middleware admin-auth (session) yang udah lo bikin
-const requireAdmin = require('../middleware/requireAdmin.js');
-
-// GET: ambil URL PDF Data Investasi yang lagi aktif — dipanggil sama DataInvestasiPage.js
-router.get('/', async (req, res) => {
-    try {
-        const db = req.app.locals.db; // sesuaikan sama koneksi DB existing lo
-        const [rows] = await db.query(
-            'SELECT pdf_url FROM data_investasi ORDER BY updated_at DESC LIMIT 1'
-        );
-        res.json({ pdfUrl: rows[0]?.pdf_url || null });
-    } catch (err) {
-        console.error('Gagal ambil data investasi:', err);
-        res.status(500).json({ error: 'Gagal ambil data investasi' });
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: MAX_FILE_SIZE },
+    fileFilter: (req, file, cb) => {
+        if (file.mimetype !== 'application/pdf') {
+            cb(new Error('Format berkas tidak didukung. Hanya PDF yang diterima.'));
+            return;
+        }
+        cb(null, true);
     }
 });
 
-// POST: admin upload PDF baru
-router.post('/upload', /* requireAdmin, */ upload.single('pdf'), async (req, res) => {
+// Publik -- dipanggil DataInvestasiPage.js buat nampilin dokumen aktif.
+router.get('/', async (req, res) => {
     try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'File PDF wajib diisi' });
-        }
-        if (req.file.mimetype !== 'application/pdf') {
-            return res.status(400).json({ error: 'File harus berformat PDF' });
-        }
-
-        const blob = await put(
-            `data-investasi/${Date.now()}-${req.file.originalname}`,
-            req.file.buffer,
-            { access: 'public', contentType: 'application/pdf' }
-        );
-
-        const db = req.app.locals.db;
-        await db.query(
-            'INSERT INTO data_investasi (pdf_url, updated_at) VALUES (?, NOW())',
-            [blob.url]
-        );
-
-        res.json({ success: true, pdfUrl: blob.url });
+        const entry = await store.getPdf();
+        res.json({
+            success: true,
+            pdfUrl: entry ? entry.url : null,
+            originalName: entry ? entry.originalName : null,
+            updatedAt: entry ? entry.updatedAt : null
+        });
     } catch (err) {
-        console.error('Gagal upload PDF:', err);
-        res.status(500).json({ error: 'Gagal upload PDF' });
+        console.error('[dataInvestasi] Gagal ambil dokumen:', err);
+        res.status(500).json({ success: false, message: 'Gagal mengambil data dari server.' });
+    }
+});
+
+// Admin upload / ganti dokumen PDF yang aktif.
+router.post('/upload', requireAdmin, (req, res) => {
+    upload.single('pdf')(req, res, async (uploadErr) => {
+        try {
+            if (uploadErr) {
+                return res.status(400).json({ success: false, message: uploadErr.message || 'Proses pengunggahan gagal.' });
+            }
+            if (!req.file) {
+                return res.status(400).json({ success: false, message: 'File PDF wajib diisi.' });
+            }
+
+            const entry = await store.setPdf({
+                buffer: req.file.buffer,
+                mimeType: req.file.mimetype,
+                originalName: req.file.originalname
+            });
+
+            res.json({
+                success: true,
+                message: 'Dokumen berhasil diunggah.',
+                pdfUrl: entry.url,
+                originalName: entry.originalName,
+                updatedAt: entry.updatedAt
+            });
+        } catch (fatalErr) {
+            console.error('[dataInvestasi] Error tak terduga (upload):', fatalErr);
+            if (!res.headersSent) {
+                res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server saat mengunggah dokumen.' });
+            }
+        }
+    });
+});
+
+// Admin hapus dokumen yang lagi aktif -- balik kosong sampai admin
+// upload lagi yang baru.
+router.post('/delete', requireAdmin, async (req, res) => {
+    try {
+        await store.clearPdf();
+        res.json({ success: true, message: 'Dokumen berhasil dihapus.' });
+    } catch (err) {
+        console.error('[dataInvestasi] Gagal hapus dokumen:', err);
+        res.status(500).json({ success: false, message: 'Terjadi kesalahan pada server saat menghapus dokumen.' });
     }
 });
 
 module.exports = router;
-
-// Di server.js / app.js, daftarin route ini:
-// app.use('/api/data-investasi', require('./routes/dataInvestasi.route'));
