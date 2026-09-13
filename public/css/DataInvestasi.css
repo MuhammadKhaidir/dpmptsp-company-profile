@@ -95,3 +95,62 @@
     white-space: pre;
     transform-origin: 0 0;
 }
+
+/* TAMBAHAN -- text layer transparan biar teks PDF tetep bisa di-select & Ctrl+F */
+.di-page-wrap { position: relative; }
+.di-text-layer { position: absolute; inset: 0; overflow: hidden; line-height: 1; }
+.di-text-layer span { position: absolute; color: transparent; white-space: pre; transform-origin: 0 0; }
+
+/* TAMBAHAN -- tombol admin di toolbar */
+.di-toolbar__actions { display: flex; align-items: center; gap: 8px; }
+
+.di-admin-btn {
+    color: #0F2A43;
+    font-weight: 600;
+    font-size: 13px;
+    background: #fff;
+    border: 1px solid #0F2A43;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.di-admin-btn:hover { background: #0F2A43; color: #fff; }
+.di-admin-btn--danger { color: #8A3B2B; border-color: #E3C4BA; }
+.di-admin-btn--danger:hover { background: #8A3B2B; border-color: #8A3B2B; color: #fff; }
+
+/* TAMBAHAN -- modal upload/ganti/hapus PDF */
+.di-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 42, 67, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+.di-modal-overlay[hidden] { display: none; }
+
+.di-modal-box {
+    background: #fff;
+    border-radius: 8px;
+    padding: 24px;
+    width: 90%;
+    max-width: 420px;
+    position: relative;
+}
+.di-modal-close {
+    position: absolute; top: 12px; right: 12px;
+    border: none; background: transparent;
+    font-size: 20px; line-height: 1; cursor: pointer;
+    color: #5A6B7B;
+}
+.di-modal-title { margin: 0 0 6px; color: #0F2A43; font-size: 17px; }
+.di-modal-sub { margin: 0 0 16px; color: #5A6B7B; font-size: 13px; }
+.di-modal-fields input[type="file"] { width: 100%; font-size: 13px; }
+.di-modal-error { color: #8A3B2B; font-size: 13px; margin: 10px 0 0; }
+.di-modal-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.di-modal-cancel, .di-modal-submit {
+    padding: 8px 16px; border-radius: 4px; font-weight: 600; cursor: pointer; font-size: 13px;
+}
+.di-modal-cancel { background: #fff; border: 1px solid #D6DBE0; color: #5A6B7B; }
+.di-modal-submit { background: #0F2A43; border: 1px solid #0F2A43; color: #fff; }
