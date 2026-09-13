@@ -10,7 +10,11 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-    <script src="js/NavDropdown.js"></script>
+    <!-- FIX: sebelumnya gak ada `defer`, jadi script ini kejalanin SEBELUM
+         <header>/.nav-dropdown ada di DOM (soalnya taruhnya di <head>) --
+         akibatnya querySelectorAll selalu nemu 0 elemen & klik/tap buat
+         buka submenu "Informasi" gak pernah beneran ke-attach. -->
+    <script src="js/NavDropdown.js" defer></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,800;9..144,900&display=swap" rel="stylesheet">
@@ -95,22 +99,43 @@
         permanen, dan dikasih position:fixed biar tetap nempel di atas
         section mana pun yang lagi aktif (independen dari .hero).
     -->
-    <header class="hero-nav" data-hero-in="nav" style="position:fixed;top:0;left:0;right:0;z-index:1000;">
-        <a href="#home-section" class="nav-pill water-hover">Home</a>
-
-        <div class="nav-dropdown">
-            <button type="button" class="nav-pill water-hover dropdown-toggle">
-                Informasi <span class="dropdown-arrow">▾</span>
+    <!--
+        UPDATE: navbar diturunin dikit (top:0 -> top:16px) & sekarang
+        seluruh isinya (Home, Informasi, Kontak) disimpen di balik
+        tombol garis tiga (.nav-burger). x-data lokal di sini (navOpen)
+        gak nyampur sama state global appData() di <body>. Diteken
+        sekali -> kebuka (.nav-menu muncul), diteken lagi/klik di
+        luar/Escape -> ketutup lagi.
+    -->
+    <header class="hero-nav" data-hero-in="nav" style="position:fixed;top:16px;left:0;right:0;z-index:1000;padding:0 20px;" x-data="{ navOpen: false }" @keydown.escape.window="navOpen = false">
+        <div class="nav-menu-wrap" @click.outside="navOpen = false">
+            <button type="button" class="nav-burger water-hover" :class="{ 'is-open': navOpen }" @click="navOpen = !navOpen" :aria-expanded="navOpen ? 'true' : 'false'" aria-controls="hero-nav-menu" aria-label="Buka/tutup menu navigasi">
+                <span class="nav-burger-line"></span>
+                <span class="nav-burger-line"></span>
+                <span class="nav-burger-line"></span>
             </button>
-            <div class="dropdown-menu">
-                <a href="#data-investasi-section" class="dropdown-item">Potensi Investasi</a>
-                <a href="#profil-kota-section" class="dropdown-item">Profil DPMPTSP</a>
-                <a href="#QR-Kode" class="dropdown-item">QR Kode</a>
-                <a href="#map-section" class="dropdown-item">Kawasan & Peta</a>
-            </div>
-        </div>
 
-        <a href="#kontak-section" class="nav-pill water-hover">Kontak</a>
+            <nav id="hero-nav-menu" class="nav-menu" x-show="navOpen" x-cloak
+                 x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 -translate-y-2" x-transition:enter-end="opacity-100 translate-y-0"
+                 x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-2">
+
+                <a href="#home-section" class="nav-pill water-hover" @click="navOpen = false">Home</a>
+
+                <div class="nav-dropdown">
+                    <button type="button" class="nav-pill water-hover dropdown-toggle">
+                        Informasi <span class="dropdown-arrow">▾</span>
+                    </button>
+                    <div class="dropdown-menu">
+                        <a href="#data-investasi-section" class="dropdown-item" @click="navOpen = false">Potensi Investasi</a>
+                        <a href="#profil-kota-section" class="dropdown-item" @click="navOpen = false">Profil DPMPTSP</a>
+                        <a href="#QR-Kode" class="dropdown-item" @click="navOpen = false">QR Kode</a>
+                        <a href="#map-section" class="dropdown-item" @click="navOpen = false">Kawasan & Peta</a>
+                    </div>
+                </div>
+
+                <a href="#kontak-section" class="nav-pill water-hover" @click="navOpen = false">Kontak</a>
+            </nav>
+        </div>
     </header>
 
     <section class="hero" id="hero" data-page="home">

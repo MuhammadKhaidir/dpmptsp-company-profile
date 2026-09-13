@@ -235,6 +235,75 @@ html, body {
     background: rgba(255,255,255,0.3);
 }
 
+/* ---- hamburger toggle: nyimpen seluruh navbar di balik 1 tombol ---- */
+.nav-menu-wrap {
+    position: relative;
+}
+
+.nav-burger {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    width: 46px;
+    height: 46px;
+    padding: 0;
+    border-radius: 999px;
+    background: var(--hero-glass-bg);
+    border: 1px solid var(--hero-glass-border);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    box-shadow:
+        inset 0 1px 1px rgba(255,255,255,0.65),
+        inset 0 -6px 10px rgba(0,0,0,0.05),
+        0 6px 16px rgba(20,16,0,0.10);
+    cursor: pointer;
+    transition: transform .35s var(--hero-ease), background .35s ease, box-shadow .35s ease;
+}
+
+.nav-burger:hover {
+    transform: translateY(-2px);
+    background: rgba(255,255,255,0.3);
+}
+
+.nav-burger-line {
+    display: block;
+    width: 20px;
+    height: 2px;
+    border-radius: 2px;
+    background: var(--hero-glass-ink);
+    transition: transform .3s var(--hero-ease), opacity .3s var(--hero-ease);
+}
+
+/* garis tiga -> jadi silang (X) pas lagi kebuka */
+.nav-burger.is-open .nav-burger-line:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+.nav-burger.is-open .nav-burger-line:nth-child(2) { opacity: 0; }
+.nav-burger.is-open .nav-burger-line:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+.nav-menu {
+    position: absolute;
+    top: 50%;
+    right: calc(100% + 12px); /* nongol di KIRI si burger, bukan di bawahnya */
+    transform: translateY(-50%); /* biar sejajar tinggi sama garis tiga */
+    display: flex;
+    flex-direction: row; /* sejajar menyamping, bukan ditumpuk ke bawah */
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 10px;
+    border-radius: 20px;
+    background: var(--hero-glass-bg);
+    border: 1px solid var(--hero-glass-border);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    box-shadow:
+        inset 0 1px 1px rgba(255,255,255,0.65),
+        0 16px 40px rgba(20,16,0,0.2);
+    white-space: nowrap;
+}
+
+
 /* ---- gold emblem logo ---- */
 .hero-logo-parallax { position: absolute; z-index: 15; top: clamp(60px, 9vw, 96px); left: clamp(24px, 8vw, 130px); transition: transform .1s linear; will-change: transform; }
 .hero-logo-float { animation: heroFloatLogo 6.5s ease-in-out infinite; }
@@ -502,55 +571,37 @@ html, body {
 }
 
 @media (max-width: 640px) {
-    .hero {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 16px;
-        min-height: 100svh;
-        padding: 32px 20px 40px;
-        text-align: center;
+    .nav-menu {
+        position: fixed;
+        top: 78px;
+        left: 20px;
+        right: 20px;
+        width: auto;
+        min-width: 0;
+        max-width: none;
+        flex-direction: column;   /* balik tumpuk khusus HP, biar gak sesak */
+        align-items: stretch;
     }
+    .nav-menu .nav-pill,
+    .nav-menu .nav-dropdown { width: 100%; }
+    .nav-menu .dropdown-toggle { width: 100%; justify-content: space-between; }
 
-    .hero-nav {
+    .nav-menu .dropdown-menu {
         position: static;
-        width: 100%;
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: 8px;
+        display: none;
+        min-width: 0;
+        margin: 6px 0 0;
+        opacity: 1;
+        visibility: visible;
+        transform: none;
+        background: rgba(255,255,255,0.14);
+        box-shadow: none;
     }
-    .nav-pill { padding: 9px 16px; font-size: 11.5px; }
-
-    .hero-logo-parallax { position: static; transform: none; }
-    .hero-logo-badge {
-        width: clamp(96px, 34vw, 150px);
-        height: clamp(96px, 34vw, 150px);
-        margin-top: 0;
-    }
-
-    .hero-title-parallax { position: static; transform: none; max-width: 92vw; }
-    .hero-title { font-size: clamp(46px, 15vw, 80px); }
-    .hero-subtitle { font-size: clamp(14px, 4.4vw, 19px); letter-spacing: .16em; margin-left: 0; margin-top: 8px; }
-
-    .hero-device-parallax { position: static; transform: none; }
-    .hero-device { width: min(190px, 58vw); min-width: 0; }
-
-    .device-dpad { width: 42px; height: 42px; }
-    .device-dpad .v { width: 14px; margin-left: -7px; }
-    .device-dpad .h { height: 14px; margin-top: -7px; }
-    .device-buttons { width: 46px; height: 46px; }
-    .device-buttons b { width: 18px; height: 18px; }
-    .device-buttons b.b1 { top: 12px; }
-    .device-buttons b.b2 { right: 12px; }
-    .device-buttons b.b3 { right: 12px; top: 24px; }
-    .device-buttons b.b4 { right: 24px; top: 12px; }
-    .device-vents { height: 6px; gap: 3px; }
-    .device-badge { width: 12px; height: 12px; left: 7px; }
-    .device-label { font-size: 8px; }
+    .nav-menu .nav-dropdown.open .dropdown-menu { display: block; }
 }
 
 @media (prefers-reduced-motion: reduce) {
     .hero-logo-float, .hero-device-float { animation: none; }
     .hero [data-hero-in] { transition: opacity .3s ease; transform: none !important; filter: none !important; }
 }
+
