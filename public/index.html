@@ -34,10 +34,40 @@
     <link rel="stylesheet" href="css/Particles.css">
     <link rel="stylesheet" href="css/DataInvestasi.css">
     <link rel="stylesheet" href="css/PageRouter.css">
+    <link rel="stylesheet" href="css/BgSideAssets.css">
 </head>
 
 <body x-data="appData()">
 
+<!--
+    FIX: #site-bg dipanggil & di-transparent-in sama banyak CSS lain
+    (Hero.css, Dashboard.css, ScrubRevealAnimation.css, Arccarousel.css)
+    tapi elemennya sendiri gak pernah ditaruh di HTML, jadi background
+    globalnya emang gak akan pernah muncul. Ditaruh di sini karena ini
+    ada DI LUAR semua <div x-show="v==='...'">, jadi tetap kepasang di
+    semua halaman (landing, login, dashboard-*, detail), bukan cuma satu.
+-->
+<div id="site-bg" aria-hidden="true"></div>
+
+<!--
+    HIASAN BACKGROUND KANAN & KIRI (RightAsset.png / LeftAsset.png).
+    - Ditaruh di sini juga (di luar semua x-show) biar "netep" di
+      SELURUH halaman & keliatan di belakang SEMUA komponen, bukan cuma
+      section tertentu.
+    - position:fixed + z-index:-1 -> selalu nempel di viewport & selalu
+      di belakang konten (pola sama persis kayak #site-bg di atas).
+    - pointer-events:none -> gak pernah ngeblok klik/scroll ke konten.
+    - opacity diatur di BgSideAssets.css biar transparan/halus.
+    - File gambarnya BELUM ada -- taruh file aslinya di:
+        Assets/RightAsset.png
+        Assets/LeftAsset.png
+      (folder Assets/ di root project, sudah di-serve sebagai /assets/
+      lewat express.static di server.js).
+-->
+<div class="bg-side-assets" aria-hidden="true">
+    <img class="bg-side-asset bg-side-asset--left" src="/assets/LeftAsset.png" alt="">
+    <img class="bg-side-asset bg-side-asset--right" src="/assets/RightAsset.png" alt="">
+</div>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
     <defs>

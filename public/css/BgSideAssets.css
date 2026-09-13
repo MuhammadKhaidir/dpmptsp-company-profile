@@ -1,0 +1,75 @@
+/* ==========================================================================
+   BG SIDE ASSETS — hiasan gambar tetap (fixed) di tepi kanan & kiri
+   halaman: RightAsset.png & LeftAsset.png.
+
+   Markupnya (.bg-side-assets) ditaruh di index.html DI LUAR semua
+   <div x-show="v==='...'">, jadi wrapper ini cuma ada SATU KALI di DOM
+   dan otomatis ikut tampil di halaman apa pun yang lagi aktif (landing,
+   login, dashboard-masyarakat, dashboard-petugas, dashboard-admin,
+   detail) -- bukan elemen yang di-copy ke tiap section.
+
+   - position:fixed + inset:0 pada wrapper -> nempel ke viewport, ikut
+     "diam" pas discroll (bukan background yang ikut scroll).
+   - z-index:-1 -> selalu di BELAKANG semua komponen. Pola ini sama
+     persis kayak #site-bg (Hero.css) yang udah kepake & kebukti jalan
+     di codebase ini.
+   - pointer-events:none di wrapper -> gambar gak akan pernah nge-block
+     klik/tap/scroll ke elemen yang ada di atasnya.
+   - opacity < 1 pada masing-masing img -> hiasan yang transparan/halus,
+     bukan elemen yang menonjol/mengganggu isi.
+
+   CATATAN: file gambar aslinya belum ada. Taruh di root project:
+       Assets/RightAsset.png
+       Assets/LeftAsset.png
+   (folder Assets/ sudah di-serve sebagai /assets/... lewat
+   `app.use('/assets', express.static(...))` di server.js, jadi begitu
+   filenya ditaruh di situ, langsung kepakai tanpa ubah apa pun di sini).
+   ========================================================================== */
+
+.bg-side-assets {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+.bg-side-asset {
+    position: absolute;
+    top: 50%;
+    height: min(88vh, 900px);
+    width: auto;
+    max-width: 24vw;
+    object-fit: contain;
+    opacity: 0.22;
+    transform: translateY(-50%);
+}
+
+.bg-side-asset--left {
+    left: 0;
+    transform-origin: left center;
+}
+
+.bg-side-asset--right {
+    right: 0;
+    transform-origin: right center;
+}
+
+/* Layar sempit: dikecilin & ditipisin lagi (bukan disembunyiin total)
+   biar gak nutupin konten, tapi tetap "ada" di semua halaman sesuai
+   yang diminta. Ubah ke display:none di sini kalau maunya malah
+   dihilangin total di HP. */
+@media (max-width: 900px) {
+    .bg-side-asset {
+        max-width: 34vw;
+        opacity: 0.14;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .bg-side-asset {
+        transition: none;
+    }
+}
