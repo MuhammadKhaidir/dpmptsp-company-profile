@@ -1,9 +1,11 @@
 /**
  * DataInvestasiPage
  * PDF data investasi ditampilkan UTUH langsung di halaman pake PDF.js.
- * Upload/ganti/hapus dokumen cuma bisa ADMIN yang lagi login (dicek
- * lewat /api/auth/check-session) -- pola sama persis kayak
- * Arccarousel.js: otorisasi dari sesi admin, bukan password per-aksi.
+ * BISA LEBIH DARI SATU TAB/HALAMAN -- tiap tab nyimpen satu PDF aktifnya
+ * sendiri. Tambah tab baru, ganti nama tab, hapus tab, dan upload/ganti/
+ * hapus PDF di tiap tab, cuma bisa ADMIN yang lagi login (dicek lewat
+ * /api/auth/check-session) -- pola sama persis kayak Arccarousel.js:
+ * otorisasi dari sesi admin, bukan password per-aksi.
  */
 
 const PDFJS_VERSION = '4.0.379';
@@ -22,9 +24,11 @@ class DataInvestasiPage {
         this.pdfjsLib = null;
         this.pdfDoc = null;
         this.isAdmin = false;
-        this.meta = null;
+        this.pages = [];
+        this.activeIndex = 0;
         this.modalOverlay = null;
-        this.modalMode = null;
+        this.modalMode = null; // 'upload' | 'delete' | 'deleteTab'
+        this.modalTargetIndex = null;
     }
 
     async init() {
@@ -58,64 +62,217 @@ class DataInvestasiPage {
             });
     }
 
-    async getMeta() {
+    async fetchPages() {
         try {
             const res = await fetch('/api/data-investasi');
             if (!res.ok) throw new Error('Response gak OK: ' + res.status);
             const data = await res.json();
-            return { pdfUrl: data.pdfUrl || null, originalName: data.originalName || 'Data Investasi.pdf' };
+            return Array.isArray(data.pages) ? data.pages : [];
         } catch (err) {
             console.error('Gagal ambil data dokumen:', err);
             return null;
         }
     }
 
-    async refresh() {
-        this.meta = await this.getMeta();
-        if (this.meta && this.meta.pdfUrl) {
-            await this.renderPDF(this.meta);
-        } else {
-            this.renderEmpty();
+    // keepIndex: index tab yang mau tetap aktif setelah refresh (misal
+    // abis upload/rename di tab yang sama, atau abis nambah tab baru).
+    // Kalau gak dikasih / udah gak valid lagi, jatuh balik ke tab
+    // terakhir yang valid.
+    async refresh(keepIndex) {
+        const pages = await this.fetchPages();
+        if (pages === null) {
+            this.showState('<p class="di-error">Gagal memuat dokumen PDF.</p>');
+            return;
         }
+
+        this.pages = pages;
+        if (typeof keepIndex === 'number' && keepIndex >= 0 && keepIndex < pages.length) {
+            this.activeIndex = keepIndex;
+        } else if (this.activeIndex >= pages.length) {
+            this.activeIndex = Math.max(0, pages.length - 1);
+        }
+
+        await this.render();
     }
 
-    renderEmpty() {
-        const container = document.getElementById(this.containerId);
-        if (!container) return;
-
-        container.innerHTML = '';
-        const msg = el('p', 'di-loading');
-        msg.textContent = 'Belum ada dokumen Data Investasi yang di-upload.';
-        container.appendChild(msg);
-
-        if (this.isAdmin) {
-            const uploadBtn = el('button', 'di-admin-btn');
-            uploadBtn.type = 'button';
-            uploadBtn.style.marginTop = '12px';
-            uploadBtn.textContent = '+ Upload PDF';
-            uploadBtn.addEventListener('click', () => this.openUploadModal());
-            container.appendChild(uploadBtn);
-        }
-    }
-
-    // FIX: container-nya SENDIRI udah punya class .di-scene di index.html,
-    // jadi di sini langsung isi toolbar+pages-nya, gak usah bikin .di-scene
-    // baru di dalemnya (sebelumnya nested/dobel).
-    async renderPDF({ pdfUrl, originalName }) {
+    async render() {
         const container = document.getElementById(this.containerId);
         if (!container) {
             console.error('Container #' + this.containerId + ' gak ketemu di halaman.');
             return;
         }
 
-        this.showState('<p class="di-loading">Memuat dokumen...</p>');
+        container.innerHTML = '';
+        container.appendChild(this.buildTabBar());
+
+        const body = el('div', 'di-tab-body');
+        container.appendChild(body);
+
+        const activePage = this.pages[this.activeIndex];
+        if (!activePage) {
+            body.innerHTML = '<p class="di-loading">Belum ada halaman.</p>';
+            return;
+        }
+
+        if (activePage.pdfUrl) {
+            await this.renderPDF(activePage, body);
+        } else {
+            this.renderEmpty(body);
+        }
+    }
+
+    buildTabBar() {
+        const bar = el('div', 'di-tabbar');
+
+        this.pages.forEach((page, index) => {
+            const tab = el('div', 'di-tab' + (index === this.activeIndex ? ' di-tab--active' : ''));
+
+            const label = el('span', 'di-tab__label');
+            label.textContent = page.label || ('Halaman ' + (index + 1));
+            label.title = page.label || '';
+            label.addEventListener('click', () => this.switchTab(index));
+            tab.appendChild(label);
+
+            if (this.isAdmin) {
+                const renameBtn = el('button', 'di-tab__rename');
+                renameBtn.type = 'button';
+                renameBtn.title = 'Ganti nama halaman';
+                renameBtn.textContent = '\u270e';
+                renameBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.startRename(tab, label, index);
+                });
+                tab.appendChild(renameBtn);
+
+                if (this.pages.length > 1) {
+                    const closeBtn = el('button', 'di-tab__close');
+                    closeBtn.type = 'button';
+                    closeBtn.title = 'Hapus halaman ini';
+                    closeBtn.textContent = '\u00d7';
+                    closeBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.openDeleteTabModal(index);
+                    });
+                    tab.appendChild(closeBtn);
+                }
+            }
+
+            bar.appendChild(tab);
+        });
+
+        if (this.isAdmin) {
+            const addBtn = el('button', 'di-tab-add');
+            addBtn.type = 'button';
+            addBtn.title = 'Tambah halaman baru';
+            addBtn.textContent = '+ Halaman';
+            addBtn.addEventListener('click', () => this.addTab());
+            bar.appendChild(addBtn);
+        }
+
+        return bar;
+    }
+
+    switchTab(index) {
+        if (index === this.activeIndex) return;
+        this.activeIndex = index;
+        this.render();
+    }
+
+    startRename(tabEl, labelEl, index) {
+        const currentValue = this.pages[index].label || '';
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.className = 'di-tab__rename-input';
+        input.value = currentValue;
+        input.maxLength = 60;
+
+        tabEl.replaceChild(input, labelEl);
+        input.focus();
+        input.select();
+
+        let settled = false;
+        const commit = () => {
+            if (settled) return;
+            settled = true;
+            const newLabel = input.value.trim();
+            if (newLabel && newLabel !== currentValue) {
+                this.submitRename(index, newLabel);
+            } else {
+                this.render();
+            }
+        };
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); commit(); }
+            if (e.key === 'Escape') { e.preventDefault(); settled = true; this.render(); }
+        });
+        input.addEventListener('blur', commit);
+    }
+
+    async submitRename(index, label) {
+        try {
+            const fd = new FormData();
+            fd.append('pageIndex', index);
+            fd.append('label', label);
+            const res = await fetch('/api/data-investasi/page/rename', {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (!data.success) {
+                console.error('[DataInvestasi] Gagal ganti nama:', data.message);
+            }
+        } catch (err) {
+            console.error('[DataInvestasi] Gagal ganti nama:', err);
+        }
+        await this.refresh(index);
+    }
+
+    async addTab() {
+        try {
+            const res = await fetch('/api/data-investasi/page/add', {
+                method: 'POST',
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (!data.success) {
+                console.error('[DataInvestasi] Gagal tambah halaman:', data.message);
+                return;
+            }
+            // Langsung pindah ke tab baru (selalu ditambahkan di paling akhir).
+            await this.refresh(data.pages.length - 1);
+        } catch (err) {
+            console.error('[DataInvestasi] Gagal tambah halaman:', err);
+        }
+    }
+
+    renderEmpty(body) {
+        body.innerHTML = '';
+        const msg = el('p', 'di-loading');
+        msg.textContent = 'Belum ada dokumen di halaman ini.';
+        body.appendChild(msg);
+
+        if (this.isAdmin) {
+            const uploadBtn = el('button', 'di-admin-btn');
+            uploadBtn.type = 'button';
+            uploadBtn.style.marginTop = '12px';
+            uploadBtn.textContent = '+ Upload PDF';
+            uploadBtn.addEventListener('click', () => this.openUploadModal(this.activeIndex));
+            body.appendChild(uploadBtn);
+        }
+    }
+
+    async renderPDF(page, body) {
+        const { pdfUrl, originalName } = page;
+        body.innerHTML = '<p class="di-loading">Memuat dokumen...</p>';
 
         try {
             this.pdfDoc = await this.pdfjsLib.getDocument(pdfUrl).promise;
 
-            container.innerHTML = `
+            body.innerHTML = `
                 <div class="di-toolbar">
-                    <span class="di-toolbar__name">${this.escapeHtml(originalName)}</span>
+                    <span class="di-toolbar__name">${this.escapeHtml(originalName || '')}</span>
                     <div class="di-toolbar__actions">
                         <a class="di-toolbar__download" href="${pdfUrl}" target="_blank" rel="noopener">Unduh PDF</a>
                     </div>
@@ -124,28 +281,28 @@ class DataInvestasiPage {
             `;
 
             if (this.isAdmin) {
-                const actions = container.querySelector('.di-toolbar__actions');
+                const actions = body.querySelector('.di-toolbar__actions');
 
                 const changeBtn = el('button', 'di-admin-btn');
                 changeBtn.type = 'button';
                 changeBtn.textContent = 'Ganti PDF';
-                changeBtn.addEventListener('click', () => this.openUploadModal());
+                changeBtn.addEventListener('click', () => this.openUploadModal(this.activeIndex));
                 actions.appendChild(changeBtn);
 
                 const deleteBtn = el('button', 'di-admin-btn di-admin-btn--danger');
                 deleteBtn.type = 'button';
                 deleteBtn.textContent = 'Hapus';
-                deleteBtn.addEventListener('click', () => this.openDeleteModal());
+                deleteBtn.addEventListener('click', () => this.openDeleteModal(this.activeIndex));
                 actions.appendChild(deleteBtn);
             }
 
-            const pagesEl = container.querySelector('.di-pages');
+            const pagesEl = body.querySelector('.di-pages');
             for (let pageNum = 1; pageNum <= this.pdfDoc.numPages; pageNum++) {
                 await this.renderPage(pageNum, pagesEl);
             }
         } catch (err) {
             console.error('Gagal render PDF:', err);
-            this.showState('<p class="di-error">Gagal memuat dokumen PDF.</p>');
+            body.innerHTML = '<p class="di-error">Gagal memuat dokumen PDF.</p>';
         }
     }
 
@@ -180,7 +337,7 @@ class DataInvestasiPage {
         });
     }
 
-    /* ---------------- Modal admin: upload/ganti & hapus ---------------- */
+    /* ---------------- Modal admin: upload/hapus PDF & hapus tab ---------------- */
 
     buildModal() {
         if (this.modalOverlay) return;
@@ -237,10 +394,12 @@ class DataInvestasiPage {
         submitBtn.addEventListener('click', () => this.submitModal());
     }
 
-    openUploadModal() {
+    openUploadModal(pageIndex) {
+        const page = this.pages[pageIndex];
         this.modalMode = 'upload';
-        this.modalTitleEl.textContent = this.meta && this.meta.pdfUrl ? 'Ganti Dokumen PDF' : 'Upload Dokumen PDF';
-        this.modalSubEl.textContent = 'Pilih berkas PDF (maks. 4MB). Dokumen lama otomatis diganti.';
+        this.modalTargetIndex = pageIndex;
+        this.modalTitleEl.textContent = page && page.pdfUrl ? 'Ganti Dokumen PDF' : 'Upload Dokumen PDF';
+        this.modalSubEl.textContent = 'Pilih berkas PDF (maks. 4MB) untuk halaman "' + (page ? page.label : '') + '". Dokumen lama di halaman ini otomatis diganti.';
         this.modalSubmitBtn.textContent = 'Upload';
 
         this.modalFieldsWrap.innerHTML = '';
@@ -254,11 +413,28 @@ class DataInvestasiPage {
         this.modalOverlay.hidden = false;
     }
 
-    openDeleteModal() {
+    openDeleteModal(pageIndex) {
+        const page = this.pages[pageIndex];
         this.modalMode = 'delete';
+        this.modalTargetIndex = pageIndex;
         this.modalTitleEl.textContent = 'Hapus Dokumen PDF';
-        this.modalSubEl.textContent = 'Yakin mau hapus dokumen "' + (this.meta ? this.meta.originalName : '') + '"? Tindakan ini tidak bisa dibatalkan.';
+        this.modalSubEl.textContent = 'Yakin mau hapus dokumen "' + (page ? page.originalName : '') + '" di halaman "' + (page ? page.label : '') + '"? Tindakan ini tidak bisa dibatalkan.';
         this.modalSubmitBtn.textContent = 'Hapus';
+
+        this.modalFieldsWrap.innerHTML = '';
+        this.modalFileInput = null;
+
+        this.modalErrorEl.hidden = true;
+        this.modalOverlay.hidden = false;
+    }
+
+    openDeleteTabModal(pageIndex) {
+        const page = this.pages[pageIndex];
+        this.modalMode = 'deleteTab';
+        this.modalTargetIndex = pageIndex;
+        this.modalTitleEl.textContent = 'Hapus Halaman';
+        this.modalSubEl.textContent = 'Yakin mau hapus halaman "' + (page ? page.label : '') + '" beserta dokumen di dalamnya? Tindakan ini tidak bisa dibatalkan.';
+        this.modalSubmitBtn.textContent = 'Hapus Halaman';
 
         this.modalFieldsWrap.innerHTML = '';
         this.modalFileInput = null;
@@ -270,6 +446,7 @@ class DataInvestasiPage {
     closeModal() {
         this.modalOverlay.hidden = true;
         this.modalMode = null;
+        this.modalTargetIndex = null;
     }
 
     showModalError(msg) {
@@ -283,8 +460,10 @@ class DataInvestasiPage {
         try {
             if (this.modalMode === 'upload') {
                 await this.submitUpload();
-            } else {
+            } else if (this.modalMode === 'delete') {
                 await this.submitDelete();
+            } else if (this.modalMode === 'deleteTab') {
+                await this.submitDeleteTab();
             }
         } finally {
             this.modalSubmitBtn.disabled = false;
@@ -304,6 +483,7 @@ class DataInvestasiPage {
 
         const fd = new FormData();
         fd.append('pdf', file);
+        fd.append('pageIndex', this.modalTargetIndex);
 
         try {
             const res = await fetch('/api/data-investasi/upload', {
@@ -316,8 +496,9 @@ class DataInvestasiPage {
                 this.showModalError(data.message || 'Gagal mengunggah dokumen.');
                 return;
             }
+            const targetIndex = this.modalTargetIndex;
             this.closeModal();
-            await this.refresh();
+            await this.refresh(targetIndex);
         } catch (err) {
             console.error('[DataInvestasi] Gagal upload:', err);
             this.showModalError('Gagal terhubung ke server. Coba lagi.');
@@ -326,8 +507,11 @@ class DataInvestasiPage {
 
     async submitDelete() {
         try {
+            const fd = new FormData();
+            fd.append('pageIndex', this.modalTargetIndex);
             const res = await fetch('/api/data-investasi/delete', {
                 method: 'POST',
+                body: fd,
                 credentials: 'same-origin'
             });
             const data = await res.json();
@@ -335,10 +519,37 @@ class DataInvestasiPage {
                 this.showModalError(data.message || 'Gagal menghapus dokumen.');
                 return;
             }
+            const targetIndex = this.modalTargetIndex;
             this.closeModal();
-            await this.refresh();
+            await this.refresh(targetIndex);
         } catch (err) {
             console.error('[DataInvestasi] Gagal hapus:', err);
+            this.showModalError('Gagal terhubung ke server. Coba lagi.');
+        }
+    }
+
+    async submitDeleteTab() {
+        try {
+            const fd = new FormData();
+            fd.append('pageIndex', this.modalTargetIndex);
+            const res = await fetch('/api/data-investasi/page/delete', {
+                method: 'POST',
+                body: fd,
+                credentials: 'same-origin'
+            });
+            const data = await res.json();
+            if (!data.success) {
+                this.showModalError(data.message || 'Gagal menghapus halaman.');
+                return;
+            }
+            const deletedIndex = this.modalTargetIndex;
+            this.closeModal();
+            // Abis satu tab dihapus, jatuh ke tab sebelah kiri kalau ada,
+            // atau tetap di tab pertama kalau yang dihapus tab paling awal.
+            const nextIndex = Math.max(0, deletedIndex - 1);
+            await this.refresh(nextIndex);
+        } catch (err) {
+            console.error('[DataInvestasi] Gagal hapus halaman:', err);
             this.showModalError('Gagal terhubung ke server. Coba lagi.');
         }
     }
@@ -363,7 +574,7 @@ class DataInvestasiPage {
     }
 }
 
-// BARU: bootstrap sendiri -- sebelumnya gak ada satupun kode yang manggil
+// bootstrap sendiri -- sebelumnya gak ada satupun kode yang manggil
 // new DataInvestasiPage().init(), jadi class ini gak pernah jalan walau
 // sudah ke-load. Pola sama kayak init() di Arccarousel.js.
 (function () {

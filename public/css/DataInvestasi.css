@@ -154,3 +154,75 @@
 }
 .di-modal-cancel { background: #fff; border: 1px solid #D6DBE0; color: #5A6B7B; }
 .di-modal-submit { background: #0F2A43; border: 1px solid #0F2A43; color: #fff; }
+
+/* TAMBAHAN -- tab bar multi-halaman Data Investasi */
+.di-tabbar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.di-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #FFFFFF;
+    border: 1px solid #D6DBE0;
+    border-radius: 6px;
+    padding: 8px 10px;
+    cursor: pointer;
+    color: #5A6B7B;
+    font-size: 13px;
+    user-select: none;
+}
+
+.di-tab--active {
+    border-color: #0F2A43;
+    color: #0F2A43;
+    font-weight: 600;
+    background: #F3F6F9;
+}
+
+.di-tab__label {
+    max-width: 160px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.di-tab__rename-input {
+    max-width: 160px;
+    font-size: 13px;
+    border: 1px solid #0F2A43;
+    border-radius: 3px;
+    padding: 2px 4px;
+    font-family: inherit;
+}
+
+.di-tab__rename,
+.di-tab__close {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    color: #5A6B7B;
+    font-size: 13px;
+    line-height: 1;
+    padding: 2px;
+}
+
+.di-tab__rename:hover { color: #0F2A43; }
+.di-tab__close:hover { color: #8A3B2B; }
+
+.di-tab-add {
+    background: #fff;
+    border: 1px dashed #A9B6C2;
+    border-radius: 6px;
+    padding: 8px 12px;
+    color: #0F2A43;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+}
+.di-tab-add:hover { background: #0F2A43; color: #fff; border-style: solid; }
