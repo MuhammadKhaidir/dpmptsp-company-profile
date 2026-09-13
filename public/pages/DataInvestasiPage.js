@@ -4,11 +4,6 @@
  * Upload/ganti/hapus dokumen cuma bisa ADMIN yang lagi login (dicek
  * lewat /api/auth/check-session) -- pola sama persis kayak
  * Arccarousel.js: otorisasi dari sesi admin, bukan password per-aksi.
- *
- * PERLU DI index.html:
- *   <link rel="stylesheet" href="/css/DataInvestasi.css">
- *   <div id="data-investasi-content"></div>
- *   <script src="/pages/DataInvestasiPage.js"></script>
  */
 
 const PDFJS_VERSION = '4.0.379';
@@ -22,8 +17,8 @@ function el(tag, className) {
 
 class DataInvestasiPage {
     constructor() {
-        this.pageName = 'Potensi Investasi';
-        this.containerId = 'data-investasi-content';
+        this.pageName = 'Data Investasi';
+        this.containerId = 'data-investasi-container'; // FIX: samain sama ID asli di index.html
         this.pdfjsLib = null;
         this.pdfDoc = null;
         this.isAdmin = false;
@@ -103,6 +98,9 @@ class DataInvestasiPage {
         }
     }
 
+    // FIX: container-nya SENDIRI udah punya class .di-scene di index.html,
+    // jadi di sini langsung isi toolbar+pages-nya, gak usah bikin .di-scene
+    // baru di dalemnya (sebelumnya nested/dobel).
     async renderPDF({ pdfUrl, originalName }) {
         const container = document.getElementById(this.containerId);
         if (!container) {
@@ -116,15 +114,13 @@ class DataInvestasiPage {
             this.pdfDoc = await this.pdfjsLib.getDocument(pdfUrl).promise;
 
             container.innerHTML = `
-                <div class="di-scene">
-                    <div class="di-toolbar">
-                        <span class="di-toolbar__name">${this.escapeHtml(originalName)}</span>
-                        <div class="di-toolbar__actions">
-                            <a class="di-toolbar__download" href="${pdfUrl}" target="_blank" rel="noopener">Unduh PDF</a>
-                        </div>
+                <div class="di-toolbar">
+                    <span class="di-toolbar__name">${this.escapeHtml(originalName)}</span>
+                    <div class="di-toolbar__actions">
+                        <a class="di-toolbar__download" href="${pdfUrl}" target="_blank" rel="noopener">Unduh PDF</a>
                     </div>
-                    <div class="di-pages"></div>
                 </div>
+                <div class="di-pages"></div>
             `;
 
             if (this.isAdmin) {
@@ -366,3 +362,20 @@ class DataInvestasiPage {
         this.pdfDoc = null;
     }
 }
+
+// BARU: bootstrap sendiri -- sebelumnya gak ada satupun kode yang manggil
+// new DataInvestasiPage().init(), jadi class ini gak pernah jalan walau
+// sudah ke-load. Pola sama kayak init() di Arccarousel.js.
+(function () {
+    function boot() {
+        if (window.__dataInvestasiPageInstance) return;
+        var page = new DataInvestasiPage();
+        window.__dataInvestasiPageInstance = page;
+        page.init();
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', boot);
+    } else {
+        boot();
+    }
+})();
