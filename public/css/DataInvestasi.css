@@ -1,0 +1,78 @@
+/* css/DataInvestasi.css
+   Gaya untuk widget penampil PDF di section #data-investasi-section.
+   Sengaja tidak menyentuh .info-section / .info-section-head — itu
+   sudah didefinisikan di stylesheet lain milik proyek ini.
+*/
+
+.di-scene {
+    display: block;
+    max-width: 820px;
+    margin: 0 auto;
+}
+
+.di-loading,
+.di-error {
+    background: #FFFFFF;
+    border: 1px solid #D6DBE0;
+    border-radius: 6px;
+    padding: 32px 20px;
+    text-align: center;
+    color: #5A6B7B;
+    font-size: 14px;
+}
+
+.di-error {
+    color: #8A3B2B;
+    border-color: #E3C4BA;
+    background: #FDF3F1;
+}
+
+.di-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #FFFFFF;
+    border: 1px solid #D6DBE0;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    padding: 10px 16px;
+    font-size: 13px;
+    color: #5A6B7B;
+}
+
+.di-toolbar__download {
+    color: #0F2A43;
+    font-weight: 600;
+    text-decoration: none;
+    border: 1px solid #0F2A43;
+    padding: 6px 12px;
+    border-radius: 4px;
+}
+
+.di-toolbar__download:hover {
+    background: #0F2A43;
+    color: #fff;
+}
+
+.di-pages {
+    background: #FFFFFF;
+    border: 1px solid #D6DBE0;
+    border-radius: 0 0 6px 6px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 18px;
+}
+
+.di-page-wrap {
+    max-width: 100%;
+}
+
+.di-page {
+    display: block;
+    max-width: 100%;
+    height: auto;
+    box-shadow: 0 1px 3px rgba(15, 42, 67, 0.18);
+    border: 1px solid #D6DBE0;
+}

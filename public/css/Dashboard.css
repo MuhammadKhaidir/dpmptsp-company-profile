@@ -1,56 +1,81 @@
 /* ==========================================================================
    DASHBOARD & AUTH — login/register, sidebar, tables, buttons, modal
    Dipakai bareng: js/App.js, js/AdminChart.js
+
+   UPDATE: .inner & .d-main dulu punya background gradient gelap sendiri
+   (#0a0a0a) -- sekarang transparan, ngikutin #site-bg global (Hero.css),
+   sama kayak section lain. Semua kartu (auth-card, d-aside, panel, s-card,
+   m-box) diganti jadi gaya "kaca hangat" yang sama kayak .nav-pill (pakai
+   token --hero-glass-* yang udah didefinisikan di Hero.css :root), dan
+   semua warna teks dibalik dari putih ke ink gelap (skala opacity-nya
+   dipertahanin sama persis, cuma base warnanya yang beda). Kartu login
+   & modal dikasih animasi masuk, dan konten dashboard dikasih max-width
+   biar gak ngambang lebar di layar gede.
    ========================================================================== */
 
 .inner {
     min-height: 100vh;
-    background: linear-gradient(160deg, #0a0a0a 0%, #161616 45%, #232323 100%);
+    background: transparent;
+    color: var(--hero-glass-ink); /* default teks buat semua elemen di dalem .inner yang gak punya warna sendiri */
 }
 
 .auth-card {
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.18);
+    background: var(--hero-glass-bg);
+    border: 1px solid var(--hero-glass-border);
     border-radius: 22px; padding: 38px;
     width: 100%; max-width: 440px;
-    backdrop-filter: blur(20px);
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    backdrop-filter: blur(20px) saturate(140%);
+    -webkit-backdrop-filter: blur(20px) saturate(140%);
+    box-shadow:
+        inset 0 1px 1px rgba(255,255,255,0.65),
+        inset 0 -6px 10px rgba(0,0,0,0.05),
+        0 20px 50px rgba(20,16,0,0.16);
+    animation: authCardIn .6s var(--hero-ease) both;
 }
+
+@keyframes authCardIn {
+    from { opacity: 0; transform: translateY(18px) scale(.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 .a-input {
     width: 100%; padding: 13px 16px;
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.18);
-    border-radius: 12px; color: #fff;
+    background: rgba(255,255,255,0.5);
+    border: 1px solid rgba(28,26,21,0.16);
+    border-radius: 12px; color: var(--hero-glass-ink);
     font-size: 14px; font-family: 'Inter', sans-serif;
-    outline: none; transition: border-color .3s var(--ease), box-shadow .3s var(--ease);
+    outline: none; transition: border-color .3s var(--hero-ease), box-shadow .3s var(--hero-ease);
 }
-.a-input::placeholder { color: rgba(255,255,255,0.28); }
-.a-input:focus { border-color: rgba(255,255,255,0.48); box-shadow: 0 0 0 3px rgba(255,255,255,0.09); }
-.a-input option { background: #161616; }
+.a-input::placeholder { color: rgba(28,26,21,0.36); }
+.a-input:focus { border-color: rgba(203,164,84,0.65); box-shadow: 0 0 0 3px rgba(203,164,84,0.14); }
+.a-input option { background: #faf9f5; color: var(--hero-glass-ink); }
 .a-label {
     display: block; font-size: 11px; font-weight: 700;
     letter-spacing: .1em; text-transform: uppercase;
-    color: rgba(255,255,255,0.48); margin-bottom: 7px;
+    color: rgba(28,26,21,0.48); margin-bottom: 7px;
 }
 .a-btn {
     width: 100%; padding: 14px;
-    background: rgba(255,255,255,0.18);
-    border: 1px solid rgba(255,255,255,0.28);
-    border-radius: 12px; color: #fff;
+    background: linear-gradient(135deg, #2b2b2b, #000000);
+    border: 1px solid rgba(0,0,0,0.4);
+    border-radius: 12px; color: #fbf8f1;
     font-size: 14px; font-weight: 700; cursor: pointer;
-    font-family: 'Inter', sans-serif; transition: all .3s var(--ease);
+    font-family: 'Inter', sans-serif; transition: all .3s var(--hero-ease);
+    box-shadow: 0 10px 24px rgba(20,16,10,0.22);
 }
-.a-btn:hover { background: rgba(255,255,255,0.28); transform: translateY(-1px); }
+.a-btn:hover { transform: translateY(-2px); box-shadow: 0 14px 30px rgba(20,16,10,0.3); }
 
 .d-aside {
     width: 228px; flex-shrink: 0;
-    background: rgba(0,0,0,0.22);
-    border-right: 1px solid rgba(255,255,255,0.08);
+    background: var(--hero-glass-bg);
+    border-right: 1px solid var(--hero-glass-border);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
     display: flex; flex-direction: column;
 }
 .d-aside-head {
     padding: 19px 16px;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    border-bottom: 1px solid rgba(28,26,21,0.1);
     display: flex; align-items: center; gap: 10px;
 }
 .d-icon {
@@ -62,69 +87,98 @@
     width: 100%; display: flex; align-items: center; gap: 11px;
     padding: 11px 14px; border-radius: 11px;
     font-size: 13px; font-weight: 600; cursor: pointer;
-    color: rgba(255,255,255,0.42); background: transparent; border: none;
-    text-align: left; transition: all .3s var(--ease); font-family: 'Inter', sans-serif;
+    color: rgba(28,26,21,0.5); background: transparent; border: none;
+    text-align: left; transition: all .3s var(--hero-ease); font-family: 'Inter', sans-serif;
 }
-.d-btn:hover { background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.82); }
-.d-btn.on { background: rgba(255,255,255,0.13); color: #fff; border: 1px solid rgba(255,255,255,0.14); }
-.d-btn.out { color: rgba(255,255,255,0.5); border-top: 1px solid rgba(255,255,255,0.08); margin-top: 4px; padding-top: 15px; }
-.d-btn.out:hover { background: rgba(255,255,255,0.1); color: #fff; }
+.d-btn:hover { background: rgba(28,26,21,0.07); color: rgba(28,26,21,0.9); }
+.d-btn.on { background: rgba(255,255,255,0.55); color: var(--hero-glass-ink); border: 1px solid var(--hero-glass-border); }
+.d-btn.out { color: rgba(28,26,21,0.5); border-top: 1px solid rgba(28,26,21,0.1); margin-top: 4px; padding-top: 15px; }
+.d-btn.out:hover { background: rgba(28,26,21,0.08); color: var(--hero-glass-ink); }
 
-.d-main { flex: 1; background: linear-gradient(160deg, #0a0a0a 0%, #1e1e1e 100%); overflow-y: auto; }
+.d-main {
+    flex: 1;
+    background: transparent;
+    overflow-y: auto;
+}
+/* Konten dashboard ditengahin & dibatasin lebarnya, biar gak ngambang
+   penuh di layar gede -- .d-main sendiri tetep full width buat sidebar-nya */
+.d-main > * {
+    max-width: 1100px;
+    margin-left: auto;
+    margin-right: auto;
+}
 
 .s-card {
-    background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.11);
+    background: var(--hero-glass-bg); border: 1px solid var(--hero-glass-border);
     border-radius: 16px; padding: 20px;
     display: flex; align-items: center; justify-content: space-between;
-    backdrop-filter: blur(6px);
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
 }
 .s-card-icon {
     width: 44px; height: 44px; border-radius: 12px;
     display: flex; align-items: center; justify-content: center;
-    font-size: 18px; background: rgba(255,255,255,0.12);
+    font-size: 18px; background: rgba(255,255,255,0.5);
 }
 
 .panel {
-    background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 18px; overflow: hidden; backdrop-filter: blur(6px);
+    background: var(--hero-glass-bg); border: 1px solid var(--hero-glass-border);
+    border-radius: 18px; overflow: hidden;
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
 }
 .p-head {
-    padding: 15px 20px; border-bottom: 1px solid rgba(255,255,255,0.08);
+    padding: 15px 20px; border-bottom: 1px solid rgba(28,26,21,0.08);
     display: flex; justify-content: space-between; align-items: center;
 }
 
 .dtable { width: 100%; border-collapse: collapse; }
-.dtable th { padding: 12px 18px; font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,0.3); background: rgba(0,0,0,0.1); border-bottom: 1px solid rgba(255,255,255,0.07); text-align: left; }
-.dtable td { padding: 13px 18px; font-size: 13px; font-weight: 500; border-bottom: 1px solid rgba(255,255,255,0.05); color: rgba(255,255,255,0.8); }
+.dtable th { padding: 12px 18px; font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgba(28,26,21,0.42); background: rgba(28,26,21,0.04); border-bottom: 1px solid rgba(28,26,21,0.08); text-align: left; }
+.dtable td { padding: 13px 18px; font-size: 13px; font-weight: 500; border-bottom: 1px solid rgba(28,26,21,0.06); color: rgba(28,26,21,0.82); }
 .dtable tr:last-child td { border-bottom: none; }
-.dtable tr:hover td { background: rgba(255,255,255,0.04); }
+.dtable tr:hover td { background: rgba(28,26,21,0.03); }
 
 .bs { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; }
-.bs-p { background: rgba(255,255,255,.06); color: rgba(255,255,255,.78); border: 1px dashed rgba(255,255,255,.32); }
-.bs-d { background: #ffffff; color: #000000; border: 1px solid #ffffff; }
-.bs-r { background: transparent; color: rgba(255,255,255,.4); border: 1px solid rgba(255,255,255,.18); text-decoration: line-through; }
+.bs-p { background: rgba(28,26,21,.05); color: rgba(28,26,21,.7); border: 1px dashed rgba(28,26,21,.28); }
+.bs-d { background: linear-gradient(135deg, #fff6d8, #cba454 60%, #8a6a22); color: #14100a; border: 1px solid rgba(138,106,34,0.5); }
+.bs-r { background: transparent; color: rgba(28,26,21,.38); border: 1px solid rgba(28,26,21,.18); text-decoration: line-through; }
 
-.btn-sm { padding: 7px 13px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all .3s var(--ease); font-family: 'Inter', sans-serif; }
-.btn-a { background: #ffffff; color: #000000; border: 1px solid #ffffff; }
-.btn-a:hover { background: rgba(255,255,255,.85); }
-.btn-rj { background: transparent; color: rgba(255,255,255,.72); border: 1px solid rgba(255,255,255,.3); }
-.btn-rj:hover { border-color: rgba(255,255,255,.55); color: #fff; }
-.btn-g { background: rgba(255,255,255,.1); color: rgba(255,255,255,.8); border: 1px solid rgba(255,255,255,.16); }
-.btn-g:hover { background: rgba(255,255,255,.18); color: #fff; }
+.btn-sm { padding: 7px 13px; border-radius: 10px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all .3s var(--hero-ease); font-family: 'Inter', sans-serif; }
+.btn-a { background: #14100a; color: #fbf8f1; border: 1px solid #14100a; }
+.btn-a:hover { background: #2b2b2b; }
+.btn-rj { background: transparent; color: rgba(28,26,21,.7); border: 1px solid rgba(28,26,21,.28); }
+.btn-rj:hover { border-color: rgba(28,26,21,.5); color: #14100a; }
+.btn-g { background: rgba(28,26,21,.06); color: rgba(28,26,21,.75); border: 1px solid rgba(28,26,21,.14); }
+.btn-g:hover { background: rgba(28,26,21,.12); color: #14100a; }
 
+/* Backdrop modal SENGAJA dibiarin gelap (dim overlay) -- ini konvensi UX
+   standar buat modal, independen dari tema global-nya terang/gelap */
 .m-bg {
     position: fixed; inset: 0; z-index: 50;
-    background: rgba(0,0,0,.75); backdrop-filter: blur(10px);
+    background: rgba(15,12,8,.55); backdrop-filter: blur(10px);
     display: flex; align-items: center; justify-content: center; padding: 16px;
+    animation: mBgFadeIn .25s ease;
 }
+@keyframes mBgFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
 .m-box {
-    background: rgba(18,18,18,.9); border: 1px solid rgba(255,255,255,.2);
+    background: #faf9f5; border: 1px solid rgba(28,26,21,.1);
+    color: var(--hero-glass-ink);
     border-radius: 22px; padding: 30px; width: 100%; max-width: 505px;
-    backdrop-filter: blur(20px); box-shadow: 0 30px 80px rgba(0,0,0,.5);
+    box-shadow: 0 30px 80px rgba(20,16,10,.32);
+    animation: mBoxPopIn .3s cubic-bezier(.34,1.1,.64,1);
+}
+@keyframes mBoxPopIn {
+    from { opacity: 0; transform: translateY(14px) scale(.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.tl-track { border-left: 2px solid rgba(255,255,255,.14); padding-left: 18px; position: relative; }
-.tl-dot { position: absolute; left: -7px; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: #ffffff; border: 2px solid rgba(12,12,12,.92); box-shadow: 0 0 8px rgba(255,255,255,.45); }
+.tl-track { border-left: 2px solid rgba(28,26,21,.14); padding-left: 18px; position: relative; }
+.tl-dot { position: absolute; left: -7px; top: 4px; width: 12px; height: 12px; border-radius: 50%; background: linear-gradient(135deg, #fff6d8, #cba454 60%, #8a6a22); border: 2px solid #faf9f5; box-shadow: 0 0 8px rgba(203,164,84,.45); }
 
 textarea.a-input { resize: vertical; }
 select.a-input { appearance: none; }
+
+@media (prefers-reduced-motion: reduce) {
+    .auth-card, .m-bg, .m-box { animation: none; }
+}

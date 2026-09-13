@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-
+app.use('/api/data-investasi', require('./routes/dataInvestasi.route'));
 app.use('/assets', express.static(path.join(__dirname, 'Assets')));
 
 // FIX: sebelumnya gak ada `store` di sini -- express-session otomatis

@@ -436,7 +436,7 @@ class FlipBookScroll {
   constructor(container, config) {
     this.container = container;
     this.books = config.books && config.books.length ? config.books : DEFAULT_BOOKS;
-    this.segmentVh = config.segmentVh || 220;
+    this.segmentVh = config.segmentVh || 220; // FITUR: udah gak dipakai buat tinggi container lagi (lihat build()), dibiarin di config biar gak break kalau ada caller lama yang masih ngirim nilai ini
 
     this.inView = true;
     this.activeIndex = -1;
@@ -461,20 +461,22 @@ class FlipBookScroll {
     this.addEvents();
 
     this.recomputeBounds();
-    if (isMobileViewport()) {
-      this.progress = clamp01(ENTER_END / this.books.length); // buku 0, tertutup, langsung tampak
-    } else {
-      this.checkReentry();
-    }
+    // FITUR: PC sekarang disamain kayak HP -- buku pertama (tertutup)
+    // langsung nampil di posisi awal begitu section ini kebentuk, gak
+    // perlu discroll dulu buat "masuk" ke area render. checkReentry()
+    // (scroll-jack) udah dimatiin total, lihat komentar di fungsi itu.
+    this.progress = clamp01(ENTER_END / this.books.length);
     this.render();
   }
 
   build() {
     this.container.classList.add('flipbook-scroll-wrap');
     this.container.style.position = 'relative';
-    this.container.style.height = isMobileViewport()
-      ? '100svh'
-      : `${this.books.length * this.segmentVh}vh`;
+    // FITUR: dulu PC dikasih tinggi `books.length * segmentVh` biar ada
+    // "jalur scroll panjang" yang di-lock (scroll-jack). Sekarang PC
+    // disamain kayak HP: section-nya cuma setinggi 1 layar (100svh),
+    // pindah buku/halaman lewat tombol panah & dots, bukan scroll.
+    this.container.style.height = '100svh';
 
     this.sticky = el('div', 'flipbook-scroll-sticky');
     this.container.appendChild(this.sticky);
@@ -489,6 +491,9 @@ this.stage = el('div', 'fb-stage');
     this.books.forEach(() => this.dotsWrap.appendChild(el('span', 'fb-dot')));
     this.sticky.appendChild(this.dotsWrap);
 
+    // FITUR: tombol ini dulu namanya "fb-mobile-nav" karena cuma dipakai
+    // di HP. Sekarang dipakai di semua ukuran layar (lihat CSS), tapi
+    // nama class-nya dibiarin sama biar gak perlu ganti-ganti selector.
     this.mobileNav = el('div', 'fb-mobile-nav');
     this.prevBtn = el('button', 'fb-mobile-nav-btn fb-mobile-prev');
     this.prevBtn.type = 'button';
@@ -907,9 +912,9 @@ this.stage = el('div', 'fb-stage');
     });
 
     this.books = newBooksData;
-    this.container.style.height = isMobileViewport()
-      ? '100svh'
-      : `${this.books.length * this.segmentVh}vh`;
+    // FITUR: sama kayak build()/onResize(), tinggi container sekarang
+    // selalu 1 layar, terlepas dari device-nya.
+    this.container.style.height = '100svh';
 
     this.dotsWrap.innerHTML = '';
     this.books.forEach(() => this.dotsWrap.appendChild(el('span', 'fb-dot')));
@@ -976,6 +981,11 @@ this.stage = el('div', 'fb-stage');
     this.totalDistance = Math.max(1, this.pinEnd - this.pinStart);
   }
 
+  // FITUR: engageLock/releaseLock/lockBodyScroll/unlockBodyScroll di
+  // bawah ini sekarang gak pernah dipanggil lagi dari mana pun (dulu
+  // dipanggil dari checkReentry(), yang sekarang di-nonaktifin total --
+  // lihat komentar di checkReentry()). Dibiarin di sini (dormant, gak
+  // dihapus) kalau suatu saat mode scroll-jack ini mau diaktifin lagi.
   engageLock(initialProgress, atY) {
     this.progress = clamp01(initialProgress);
     this.locked = true;
@@ -1044,8 +1054,17 @@ this.stage = el('div', 'fb-stage');
   }
 
 checkReentry() {
+    // FITUR: scroll-jack (auto-lock scroll pas masuk/keluar area buku)
+    // dimatiin TOTAL sekarang, di semua ukuran layar. Dulu baris di sini
+    // cuma `if (isMobileViewport()) return;` -- yang berarti scroll-jack
+    // itu CUMA jalan di PC. Sekarang PC & HP dua-duanya perlakuannya
+    // sama: scroll section ini normal aja (gak ke-lock), pindah
+    // buku/halaman lewat tombol panah (fb-mobile-nav) & dots.
+    // Kode lama di bawah ini sengaja dibiarin (jadi dead code) sebagai
+    // referensi kalau nanti perilaku ini mau diaktifin lagi.
+    return;
+
     if (this.locked) return;
-    if (isMobileViewport()) return; // HP: gak pake scroll-jack, biar scroll normal aja
     const y = window.scrollY;
 
     // Jika posisi scroll di luar rentang container buku, hiraukan
@@ -1154,9 +1173,8 @@ checkReentry() {
 
 onResize() {
     this.flipBooks.forEach(fb => fb.measure());
-    this.container.style.height = isMobileViewport()
-      ? '100svh'
-      : `${this.books.length * this.segmentVh}vh`;
+    // FITUR: selalu 1 layar, gak lagi dibedain PC/HP.
+    this.container.style.height = '100svh';
     this.recomputeBounds();
     if (this.locked) this.lockBodyScroll(this.savedScrollY);
     this.scheduleRender();
@@ -1180,29 +1198,74 @@ onResize() {
   }
 
   stepPage(direction) {
-    if (this.editModalOpen || !this.flipBooks.length) return;
-    const nBooks = this.books.length;
-    const bookIndex = Math.min(nBooks - 1, Math.max(0, Math.floor(this.progress * nBooks + 1e-6)));
-    const book = this.flipBooks[bookIndex];
-    const n = book ? book.pageCount : 1;
-    const stepSize = (EXIT_START - ENTER_END) / n / nBooks;
-    const target = this.snapProgress(clamp01(this.progress + direction * stepSize));
+  if (this.editModalOpen || !this.flipBooks.length) return;
 
-    const reduceMotion = window.matchMedia &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (reduceMotion) { this.progress = target; this.render(); return; }
+  const nBooks = this.books.length;
+  const globalFloat = this.progress * nBooks;
+  let bookIndex = Math.min(nBooks - 1, Math.max(0, Math.floor(globalFloat + 1e-6)));
+  const local = clamp01(globalFloat - bookIndex);
+  let book = this.flipBooks[bookIndex];
+  let n = book ? book.pageCount : 1;
 
-    const from = this.progress;
-    const duration = 450;
-    const start = performance.now();
-    const tick = (now) => {
-      const t = clamp01((now - start) / duration);
-      this.progress = lerp(from, target, easeOutCubic(t));
-      this.render();
-      if (t < 1) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
+  // Cari halaman (k) yang lagi ditampilkan sekarang, dalam rentang 0..n
+  let k;
+  if (local <= ENTER_END) {
+    k = 0; // masih di cover
+  } else if (local >= EXIT_START) {
+    k = n; // udah kebaca abis, siap keluar
+  } else {
+    const openLocal = (local - ENTER_END) / (EXIT_START - ENTER_END);
+    k = Math.round(openLocal * n);
   }
+
+  // Geser 1 halaman. Kalau udah di ujung buku ini, lompat eksplisit
+  // ke buku sebelah (bukan ngandelin stepSize kecil buat "nyebrang").
+  if (direction > 0) {
+    if (k < n) {
+      k += 1;
+    } else if (bookIndex < nBooks - 1) {
+      bookIndex += 1;
+      book = this.flipBooks[bookIndex];
+      n = book ? book.pageCount : 1;
+      k = 0;
+    } else {
+      return; // udah di halaman terakhir, buku terakhir
+    }
+  } else {
+    if (k > 0) {
+      k -= 1;
+    } else if (bookIndex > 0) {
+      bookIndex -= 1;
+      book = this.flipBooks[bookIndex];
+      n = book ? book.pageCount : 1;
+      k = n; // langsung ke halaman TERAKHIR buku sebelumnya
+    } else {
+      return; // udah di cover, buku pertama
+    }
+  }
+
+  // (bookIndex, k) -> progress
+  let newLocal;
+  if (k <= 0) newLocal = ENTER_END;
+  else if (k >= n) newLocal = EXIT_START;
+  else newLocal = ENTER_END + (k / n) * (EXIT_START - ENTER_END);
+  const target = clamp01((bookIndex + newLocal) / nBooks);
+
+  const reduceMotion = window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (reduceMotion) { this.progress = target; this.render(); return; }
+
+  const from = this.progress;
+  const duration = 450;
+  const start = performance.now();
+  const tick = (now) => {
+    const t = clamp01((now - start) / duration);
+    this.progress = lerp(from, target, easeOutCubic(t));
+    this.render();
+    if (t < 1) requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+}
 
   scheduleRender() {
     if (this.renderTicking) return;
@@ -1277,49 +1340,32 @@ onResize() {
       : ENTER_END + openLocal * (EXIT_START - ENTER_END);
     const targetProgress = clamp01((i + targetLocal) / this.books.length);
 
-    const settle = () => {
-      this.progress = targetProgress;
+    // FITUR: dulu fungsi ini nunggu (poll sampai 2 detik) buat "lock" scroll
+    // sebelum animasi jalan, karena dulu ada mode di mana scroll-jack
+    // beneran aktif (nge-lock body). Sekarang scroll-jack dimatiin total
+    // (lihat checkReentry()) jadi gak ada lagi "lock" buat ditunggu --
+    // di sini kita cukup scroll ke section-nya terus animasiin progress
+    // langsung, tanpa nunggu apa pun.
+    window.scrollTo({ top: this.pinStart, behavior: reduceMotion ? 'auto' : 'smooth' });
+
+    const from = this.progress;
+    const to = targetProgress;
+
+    if (reduceMotion) {
+      this.progress = to;
       this.render();
-    };
-
-    const beginTween = () => {
-      if (reduceMotion) { settle(); return; }
-      const from = this.progress;
-      const to = targetProgress;
-      const duration = 900;
-      const start = performance.now();
-
-      const step = (now) => {
-        const t = clamp01((now - start) / duration);
-        this.progress = lerp(from, to, easeOutCubic(t));
-        this.render();
-        if (t < 1) {
-          requestAnimationFrame(step);
-        } else {
-          settle();
-        }
-      };
-      requestAnimationFrame(step);
-    };
-
-    if (this.locked) {
-      beginTween();
       return pageInfo;
     }
 
-    window.scrollTo({ top: this.pinStart, behavior: reduceMotion ? 'auto' : 'smooth' });
-
-    const pollStart = performance.now();
-    const poll = () => {
-      if (this.locked) { beginTween(); return; }
-      if (performance.now() - pollStart > 2000) {
-        this.engageLock(0, this.pinStart);
-        beginTween();
-        return;
-      }
-      requestAnimationFrame(poll);
+    const duration = 900;
+    const start = performance.now();
+    const step = (now) => {
+      const t = clamp01((now - start) / duration);
+      this.progress = lerp(from, to, easeOutCubic(t));
+      this.render();
+      if (t < 1) requestAnimationFrame(step);
     };
-    requestAnimationFrame(poll);
+    requestAnimationFrame(step);
 
     return pageInfo;
   }

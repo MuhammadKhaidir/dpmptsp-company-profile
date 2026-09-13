@@ -1,0 +1,449 @@
+/* =========================================================================
+   KONTAK PAGE — konten "kotak-kotak tengah" (header, info kontak, form)
+   Navbar TIDAK termasuk di sini — itu sudah ada di luar section ini.
+
+   Semua warna di bawah diambil dengan sampling piksel langsung dari
+   gambar referensi (bukan tebakan), supaya hasilnya presisi:
+     - Judul besar "Hubungi Kami"   -> olive lembut, BUKAN hitam pekat
+     - Label "Alamat/Telepon/dll"   -> coklat gelap, lebih gelap dari judul besar
+     - Ikon di list info            -> gold-coklat pekat, cukup jenuh
+     - Ikon di dalam form field     -> abu-coklat pudar, lebih redup dari ikon list
+     - Card form                    -> krem, sedikit lebih terang dari bg halaman
+
+   Ganti dua variabel font di bawah kalau situs sudah punya font sendiri
+   yang mau dipakai (biar konsisten satu situs).
+   ========================================================================= */
+
+#kontak-section-placeholder.kontak-section {
+  /* --- font --- */
+  --kontak-font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --kontak-font-sans: 'Poppins', 'Segoe UI', system-ui, -apple-system, sans-serif;
+
+  /* --- warna teks --- */
+  --kontak-ink: #423c2c;          /* judul: Alamat, Telepon, Kirim Pesan */
+  --kontak-ink-soft: #7c7561;     /* paragraf/body text */
+  --kontak-hero-title: #7d7250;   /* judul besar "Hubungi Kami" */
+  --kontak-gold: #8c7530;         /* eyebrow "KONTAK" */
+
+  /* --- info list (kiri) --- */
+  --kontak-icon-fg: #6f560f;
+  --kontak-icon-bg: #e0d7c1;
+  --kontak-divider: #e3dac2;
+
+  /* --- form card (kanan) --- */
+  --kontak-card-bg: #efe8d8;
+  --kontak-card-border: #e6dcc2;
+  --kontak-field-bg: #f2ebda;
+  --kontak-field-border: #d8cdb0;
+  --kontak-field-border-focus: #b9a877;
+  --kontak-field-icon: #8d7f5e;
+  --kontak-placeholder: #978c74;
+  --kontak-btn-bg: #8f7f52;
+  --kontak-btn-bg-hover: #786a43;
+  --kontak-btn-fg: #f4eedf;
+
+  /* --- feedback pesan terkirim --- */
+  --kontak-success-bg: #e6ecd9;
+  --kontak-success-border: #c7d3ac;
+  --kontak-success-fg: #47542e;
+  --kontak-error-bg: #f3e0da;
+  --kontak-error-border: #e0bcaf;
+  --kontak-error-fg: #7a3b28;
+
+  display: block;
+  max-width: 1160px;
+  margin: 0 auto;
+  padding: 96px 24px 120px;
+  box-sizing: border-box;
+}
+
+#kontak-section-placeholder.kontak-section *,
+#kontak-section-placeholder.kontak-section *::before,
+#kontak-section-placeholder.kontak-section *::after {
+  box-sizing: border-box;
+}
+
+/* ---------- Header: eyebrow + judul + subjudul ---------- */
+
+.kontak-head {
+  text-align: center;
+  max-width: 640px;
+  margin: 0 auto 64px;
+}
+
+.kontak-eyebrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 0 0 18px;
+  font-family: var(--kontak-font-sans);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--kontak-gold);
+}
+
+.kontak-eyebrow-arrow {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.kontak-title {
+  margin: 0 0 18px;
+  font-family: var(--kontak-font-serif);
+  font-size: 44px;
+  line-height: 1.15;
+  font-weight: 700;
+  color: var(--kontak-hero-title);
+}
+
+.kontak-subtitle {
+  margin: 0;
+  font-family: var(--kontak-font-sans);
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--kontak-ink-soft);
+}
+
+/* ---------- Grid dua kolom: info list | form card ---------- */
+
+.kontak-grid {
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  gap: 60px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .kontak-grid {
+    grid-template-columns: 1fr;
+    gap: 48px;
+  }
+}
+
+/* ---------- Kolom kiri: daftar info kontak ---------- */
+
+.kontak-info-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.kontak-info-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 24px 0;
+}
+
+.kontak-info-item:first-child {
+  padding-top: 0;
+}
+
+.kontak-info-icon {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--kontak-icon-bg);
+  color: var(--kontak-icon-fg);
+}
+
+.kontak-info-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.kontak-info-text {
+  padding-top: 6px;
+}
+
+.kontak-info-text h3 {
+  margin: 0 0 8px;
+  font-family: var(--kontak-font-serif);
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--kontak-ink);
+}
+
+.kontak-info-text p {
+  margin: 0;
+  font-family: var(--kontak-font-sans);
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--kontak-ink-soft);
+}
+
+.kontak-info-divider {
+  height: 1px;
+  background: var(--kontak-divider);
+  margin-left: 84px;
+}
+
+/* ---------- Kolom kanan: kartu form "Kirim Pesan" ---------- */
+
+.kontak-form-card {
+  background: var(--kontak-card-bg);
+  border: 1px solid var(--kontak-card-border);
+  border-radius: 20px;
+  padding: 40px;
+  box-shadow: 0 24px 48px -30px rgba(66, 60, 44, 0.35);
+}
+
+.kontak-form-title {
+  margin: 0 0 12px;
+  font-family: var(--kontak-font-serif);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--kontak-ink);
+}
+
+.kontak-form-desc {
+  margin: 0 0 28px;
+  font-family: var(--kontak-font-sans);
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--kontak-ink-soft);
+}
+
+.kontak-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.kontak-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+@media (max-width: 560px) {
+  .kontak-form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- Field form (input / select / textarea) ---------- */
+
+.kontak-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 54px;
+  padding: 0 16px;
+  border: 1px solid var(--kontak-field-border);
+  border-radius: 10px;
+  background: var(--kontak-field-bg);
+  cursor: text;
+  transition: border-color 0.15s ease;
+}
+
+.kontak-field:focus-within {
+  border-color: var(--kontak-field-border-focus);
+}
+
+.kontak-field-icon {
+  flex: none;
+  display: flex;
+  align-items: center;
+  color: var(--kontak-field-icon);
+}
+
+.kontak-field-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.kontak-field input,
+.kontak-field select {
+  width: 100%;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: var(--kontak-font-sans);
+  font-size: 14.5px;
+  color: var(--kontak-ink);
+}
+
+.kontak-field input::placeholder {
+  color: var(--kontak-placeholder);
+}
+
+.kontak-field select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  color: var(--kontak-ink);
+  cursor: pointer;
+}
+
+.kontak-field select:invalid {
+  color: var(--kontak-placeholder);
+}
+
+.kontak-field-select {
+  padding-right: 44px;
+}
+
+.kontak-field-chevron {
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  color: var(--kontak-field-icon);
+  pointer-events: none;
+}
+
+.kontak-field-chevron svg {
+  width: 15px;
+  height: 15px;
+}
+
+.kontak-field-textarea {
+  height: auto;
+  align-items: flex-start;
+  padding: 16px;
+  cursor: text;
+}
+
+.kontak-field-textarea .kontak-field-icon {
+  margin-top: 2px;
+}
+
+.kontak-field-textarea textarea {
+  width: 100%;
+  min-height: 96px;
+  border: none;
+  outline: none;
+  resize: vertical;
+  background: transparent;
+  font-family: var(--kontak-font-sans);
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--kontak-ink);
+}
+
+.kontak-field-textarea textarea::placeholder {
+  color: var(--kontak-placeholder);
+}
+
+/* ---------- Feedback setelah submit ---------- */
+
+.kontak-form-feedback {
+  display: none;
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-family: var(--kontak-font-sans);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.kontak-form-feedback.is-visible {
+  display: block;
+}
+
+.kontak-form-feedback.success {
+  background: var(--kontak-success-bg);
+  border: 1px solid var(--kontak-success-border);
+  color: var(--kontak-success-fg);
+}
+
+.kontak-form-feedback.error {
+  background: var(--kontak-error-bg);
+  border: 1px solid var(--kontak-error-border);
+  color: var(--kontak-error-fg);
+}
+
+/* ---------- Tombol kirim ---------- */
+
+.kontak-submit-btn {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 15px 28px;
+  border: none;
+  border-radius: 10px;
+  background: var(--kontak-btn-bg);
+  color: var(--kontak-btn-fg);
+  font-family: var(--kontak-font-sans);
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.kontak-submit-btn:hover {
+  background: var(--kontak-btn-bg-hover);
+}
+
+.kontak-submit-btn:active {
+  transform: translateY(1px);
+}
+
+.kontak-submit-btn:focus-visible {
+  outline: 2px solid var(--kontak-btn-bg);
+  outline-offset: 3px;
+}
+
+.kontak-submit-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+.kontak-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ---------- Aksesibilitas: fokus keyboard di field & disable animasi ---------- */
+
+.kontak-field:has(input:focus-visible),
+.kontak-field:has(select:focus-visible),
+.kontak-field:has(textarea:focus-visible) {
+  border-color: var(--kontak-field-border-focus);
+  box-shadow: 0 0 0 3px rgba(143, 127, 82, 0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kontak-submit-btn {
+    transition: none;
+  }
+}
+
+/* ---------- Responsif: mobile ---------- */
+
+@media (max-width: 600px) {
+  #kontak-section-placeholder.kontak-section {
+    padding: 64px 20px 80px;
+  }
+
+  .kontak-title {
+    font-size: 34px;
+  }
+
+  .kontak-subtitle {
+    font-size: 15px;
+  }
+
+  .kontak-form-card {
+    padding: 28px 22px;
+  }
+
+  .kontak-info-divider {
+    margin-left: 0;
+  }
+
+  .kontak-submit-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

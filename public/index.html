@@ -10,12 +10,16 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="js/NavDropdown.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700;9..144,800;9..144,900&display=swap" rel="stylesheet">
+<script src="pages/DataInvestasi.js"></script>
 
     <!-- CSS dipecah per komponen/fungsi -->
     <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/KontakPage.css">
+    <link rel="stylesheet" href="/css/pdf-viewer.css">
     <link rel="stylesheet" href="css/Hero.css">
     <link rel="stylesheet" href="css/AiChat.css">
     <link rel="stylesheet" href="css/Dashboard.css">
@@ -28,6 +32,8 @@
     <link rel="stylesheet" href="css/FlipBookProfile.css">
     <link rel="stylesheet" href="css/FlipBookScroll.css">
     <link rel="stylesheet" href="css/Particles.css">
+    <link rel="stylesheet" href="css/DataInvestasi.css">
+    <link rel="stylesheet" href="css/PageRouter.css">
 </head>
 
 <body x-data="appData()">
@@ -51,21 +57,40 @@
 
 <div x-show="v==='landing'" x-cloak>
 
-    <section class="hero" id="hero">
+    <!--
+        FIX: header ini dulu ada DI DALAM <section data-page="home">.
+        PageRouter nge-display:none-in total section yang lagi gak aktif,
+        jadi begitu pindah halaman, navbar ikut hilang karena dianggap
+        bagian dari section "home". Sekarang dipindah keluar jadi elemen
+        permanen, dan dikasih position:fixed biar tetap nempel di atas
+        section mana pun yang lagi aktif (independen dari .hero).
+    -->
+    <header class="hero-nav" data-hero-in="nav" style="position:fixed;top:0;left:0;right:0;z-index:1000;">
+        <a href="#home-section" class="nav-pill water-hover">Home</a>
+
+        <div class="nav-dropdown">
+            <button type="button" class="nav-pill water-hover dropdown-toggle">
+                Informasi <span class="dropdown-arrow">▾</span>
+            </button>
+            <div class="dropdown-menu">
+                <a href="#data-investasi-section" class="dropdown-item">Potensi Investasi</a>
+                <a href="#profil-kota-section" class="dropdown-item">Profil DPMPTSP</a>
+                <a href="#QR-Kode" class="dropdown-item">QR Kode</a>
+                <a href="#map-section" class="dropdown-item">Kawasan & Peta</a>
+            </div>
+        </div>
+
+        <a href="#kontak-section" class="nav-pill water-hover">Kontak</a>
+    </header>
+
+    <section class="hero" id="hero" data-page="home">
         <div id="hero-particles" class="particles-container" aria-hidden="true"></div>
 
         <canvas class="reveal-layer" id="revealCanvas"></canvas>
 
         <div class="hero-bg-parallax" id="heroBgParallax" data-hero-in="brush" aria-hidden="true"></div>
 
-        <header class="hero-nav" data-hero-in="nav">
-            <a href="#layanan-section" class="nav-pill water-hover">Dashboard</a>
-            <a href="#qr-section" class="nav-pill water-hover">QR Kode</a>
-            <a href="#flipbook-section" class="nav-pill water-hover">Dokumen</a>
-            <a href="#map-section" class="nav-pill water-hover">Maps</a>
-        </header>
-
-        <div class="hero-logo-parallax" id="heroLogoParallax" data-hero-in="logo">
+        <div class="hero-logo-parallax" id="heroLogoParallax" data-hero-in="logo" data-fade-target>
             <div class="hero-logo-float">
                 <div class="hero-logo-wrap" id="heroLogoWobble">
                     <img class="hero-logo-badge" src="Assets/Video/LogoPTSPKotPal.png" alt="Logo DPMPTSP Kota Palembang">
@@ -74,12 +99,12 @@
             </div>
         </div>
 
-        <div class="hero-title-parallax" id="heroTitleParallax" data-hero-in="title">
+        <div class="hero-title-parallax" id="heroTitleParallax" data-hero-in="title" data-fade-target>
             <h1 class="hero-title">DPMPTSP</h1>
             <p class="hero-subtitle">KOTA PALEMBANG</p>
         </div>
 
-        <div class="hero-device-parallax" id="heroDeviceParallax" data-hero-in="device">
+        <div class="hero-device-parallax" id="heroDeviceParallax" data-hero-in="device" data-fade-target>
             <div class="hero-device-float">
                 <div class="hero-device">
                     <div class="device-shell">
@@ -163,7 +188,7 @@
         </div>
     </div>
 
-<section class="scrub-wrap" id="profil-section">
+<section class="scrub-wrap" id="profil-section" data-page="profil-dpmptsp">
 <div class="scrub-sticky">
         <canvas class="scrub-bg-3d" id="scrubBg3D"></canvas>
 
@@ -175,7 +200,7 @@
             <span class="scrub-word">Palembang</span>
         </div>
 
-        <div class="scrub-content" id="profilVisiMisiContent">
+        <div class="scrub-content" id="profilVisiMisiContent" data-fade-target>
             <div class="info-section-head">
                 <p class="info-eyebrow"></p>
                 <h2 class="info-title"> </h2>
@@ -218,13 +243,13 @@
     </div>
 </section>
 
-<section class="info-section" id="qr-section">
-    <div class="info-section-head" data-reveal>
+<section class="info-section" id="QR-Kode" data-page="potensi-investasi">
+    <div class="info-section-head" data-reveal data-fade-target>
         <p class="info-eyebrow">TRY NOW</p>
         <h2 class="info-title">SCAN ME!</h2>
     </div>
 
-    <div class="qr-scene" id="qr-scene">
+    <div class="qr-scene" id="qr-scene" data-fade-target>
         <div class="qr-panel" id="qr-panel">
             <div class="qr-panel-inner qr-panel-left">
                 <div class="qr-visual">
@@ -284,7 +309,7 @@
     </div>
 </section>
 
-<section class="info-section" id="flipbook-section">
+<section class="info-section" id="flipbook-section" data-page="profil-kota">
     <div class="info-wipe-layer">
         <div class="info-wipe-box"></div>
         <div class="info-wipe-box"></div>
@@ -298,22 +323,33 @@
         <div class="info-wipe-box"></div>
     </div>
 
-    <div class="info-section-head" data-reveal>
+    <div class="info-section-head" data-reveal data-fade-target>
         <p class="info-eyebrow">Profil Interaktif</p>
         <h2 class="info-title">Company Profile</h2>
     </div>
-    <div class="fb-reveal" id="fbReveal">
+    <div class="fb-reveal" id="fbReveal" data-fade-target>
         <div id="flipbookContainer"></div>
     </div>
 </section>
 
-<section class="info-section" id="map-section">
-    <div class="info-section-head" data-reveal>
+<section class="info-section" id="data-investasi-section" data-page="data-investasi">
+    <div class="info-section-head" data-reveal data-fade-target>
+        <p class="info-eyebrow">Data Investasi</p>
+        <h2 class="info-title">Data Investasi Kota Palembang</h2>
+    </div>
+
+    <div class="di-scene" id="data-investasi-container" data-fade-target>
+        <div class="di-loading">Memuat data investasi&hellip;</div>
+    </div>
+</section>
+
+<section class="info-section" id="map-section" data-page="kawasan-peta">
+    <div class="info-section-head" data-reveal data-fade-target>
         <p class="info-eyebrow">Peta Investasi</p>
         <h2 class="info-title">Lokasi Peluang Investasi</h2>
     </div>
 
-    <div class="map-scene" id="map-scene">
+    <div class="map-scene" id="map-scene" data-fade-target>
         <div id="investment-map" class="investment-map"></div>
 
         <button type="button" class="map-manage-btn" id="map-manage-btn">
@@ -324,6 +360,14 @@
             <span><i class="fa-solid fa-crosshairs"></i> Klik pada peta untuk menandai lokasi</span>
             <button type="button" id="map-pick-cancel">Batal</button>
         </div>
+    </div>
+</section>
+
+<section class="info-section" id="kontak-section-placeholder" data-page="kontak">
+    <div class="info-section-head" data-fade-target>
+        <p class="info-eyebrow">Kontak</p>
+        <h2 class="info-title">Segera Hadir</h2>
+        <p class="page-placeholder-note">Konten halaman ini masih dalam proses pengerjaan.</p>
     </div>
 </section>
 
@@ -573,6 +617,7 @@
     </div>
 </div>
 <script src="js/App.js"></script>
+<script src="js/PageRouter.js"></script>
 <script src="js/AdminChart.js"></script>
 <script src="js/AiChat.js"></script>
 <script src="js/SectionRevealAnimation.js"></script>
@@ -590,10 +635,7 @@
 </script>
 <script type="module" src="js/ScrubRevealAnimation.js"></script>
 
-<script src="js/QRCodeRevealAnimation.js"></script>
-<script src="js/MusicPlayer.js"></script>
-<script src="js/MapSection.js"></script>
-<script src="js/VideoRevealEffect.js"></script>
+
 <script>
   window.FlipBookScrollConfig = {
     // Tinggi scroll per buku (dalam vh). Makin besar, makin "lambat" buku
@@ -634,6 +676,10 @@
   };
 </script>
 <script type="module" src="js/FlipBookScroll.js"></script>
+<script type="module" src="js/QRCodeRevealAnimation.js"></script>
+<script type="module" src="js/MapSection.js"></script>
+<script type="module" src="js/MusicPlayer.js"></script>
+<script type="module" src="js/KontakPage.js"></script>
 <script src="js/SplashCursor.js"></script>
 <script type="module" src="js/Particles.js" defer></script>
 

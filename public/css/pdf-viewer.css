@@ -1,0 +1,54 @@
+/* Wajib buat DataInvestasiPage.js — nge-align text layer PDF.js di atas canvas */
+
+/* PENTING: cegah section collapse jadi pendek pas PDF masih loading,
+   biar anchor scroll (#data-investasi-section) gak landing di posisi salah */
+#data-investasi-content {
+    min-height: 80vh;
+}
+
+.pdf-page-wrapper {
+    position: relative;
+    margin: 0 auto 16px auto;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+}
+
+.pdf-page-canvas {
+    display: block;
+}
+
+.pdf-text-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow: hidden;
+    line-height: 1;
+    opacity: 1;
+}
+
+.pdf-text-layer span,
+.pdf-text-layer br {
+    color: transparent;
+    position: absolute;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0% 0%;
+}
+
+.pdf-text-layer ::selection {
+    background: rgba(0, 100, 255, 0.3);
+}
+
+.pdf-loading,
+.pdf-error,
+.pdf-empty {
+    text-align: center;
+    padding: 40px 20px;
+    font-size: 1rem;
+    color: #666;
+}
+
+.pdf-error {
+    color: #c0392b;
+}

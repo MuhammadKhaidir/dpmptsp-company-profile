@@ -1,0 +1,36 @@
+/**
+ * PageRouter.css
+ * Cuma satu "halaman" (section bertanda [data-page]) yang keliatan
+ * dalam satu waktu. display diatur di section pembungkusnya sendiri;
+ * animasi opacity cuma kena elemen yang ditandai [data-fade-target]
+ * di dalemnya (jadi background/parallax/canvas di section itu gak ikut fade).
+ *
+ * FIX: sebelumnya section aktif dipaksa `display: revert`, yang balikin
+ * ke display DEFAULT BROWSER buat tag itu (contoh: <section> -> block
+ * polos) — bukan ke display asli yang didefinisikan .hero / .info-section
+ * di file CSS lain (yang sering-nya flex/grid). Itu bisa bikin layout
+ * section jadi collapse/berantakan pas ditampilin ulang, ikutan bikin
+ * konten keliatan aneh/"blur" secara visual. Sekarang section aktif
+ * gak disentuh display-nya sama sekali dari file ini — cuma section
+ * yang lagi TIDAK aktif yang di-display:none-in.
+ */
+
+[data-page]:not(.is-page-active) {
+    display: none;
+}
+
+[data-fade-target] {
+    opacity: 0;
+    transition: opacity 0.45s ease;
+}
+
+[data-page].is-page-visible [data-fade-target] {
+    opacity: 1;
+}
+
+/* teks placeholder buat halaman yang kontennya belum diisi */
+.page-placeholder-note {
+    margin-top: 12px;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 14px;
+}
