@@ -82,6 +82,7 @@ html, body {
     overflow: hidden;
     isolation: isolate;
     background: transparent; /* biar #site-bg di belakangnya nembus, gak ketutup */
+    height: fit-content;
 }
 
 .hero-grain {

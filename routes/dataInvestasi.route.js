@@ -18,7 +18,7 @@ const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 // TODO: ganti ini pake middleware admin-auth (session) yang udah lo bikin
-const requireAdmin = require('../iddleware/requireAdmin.js');
+const requireAdmin = require('../middleware/requireAdmin.js');
 
 // GET: ambil URL PDF Data Investasi yang lagi aktif — dipanggil sama DataInvestasiPage.js
 router.get('/', async (req, res) => {

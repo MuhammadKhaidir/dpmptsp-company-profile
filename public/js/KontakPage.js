@@ -260,3 +260,9 @@ class KontakPage {
     console.log('[' + this.pageName + '] destroyed');
   }
 }
+
+
+document.addEventListener('DOMContentLoaded', function () {
+  const kontakPage = new KontakPage();
+  kontakPage.init();
+});
