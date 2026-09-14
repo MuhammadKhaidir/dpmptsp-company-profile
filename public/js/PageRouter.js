@@ -44,7 +44,7 @@
 
     // key = fragment href nav (tanpa #), value = key data-page di section target
     var NAV_TARGETS = {
-        'home-section': 'home',
+        'hero': 'home',
         'profil-dpmptsp-section': 'profil-dpmptsp',
         'profil-kota-section': 'profil-kota',
         'berita-section': 'berita',
@@ -52,7 +52,7 @@
         'sektor-unggulan-section': 'sektor-unggulan',
         'data-investasi-section': 'data-investasi',
         'map-section': 'kawasan-peta',
-        'kontak-section': 'kontak',
+        'kontak-section-placeholder': 'kontak',
     };
 
     // Paksa body keluar dari state "scroll-locked" ala FlipBookScroll,
