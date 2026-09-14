@@ -51,7 +51,7 @@ function loadAdminStatus() {
     });
 }
 
-const QUICK_CHIPS_DEFAULT = ["Ke Buku Sejarah & Latar Belakang", "Scan Katalog Investasi", "Masuk ke Sistem", "Lihat Company Profile"];
+const QUICK_CHIPS_DEFAULT = ["Lihat Data Investasi", "Scan Katalog Investasi", "Ke Peta Investasi", "Lihat Company Profile"];
 
 /* ==========================================================================
    BARU: SISTEM NAVIGASI LOKAL (client-side), TANPA PERLU LEWAT AI BACKEND
@@ -82,14 +82,20 @@ const CAROUSEL_TITLES = ['Pelayanan Terpadu', 'Transparan & Akuntabel', 'Respons
 const SECTION_IDS = {
   hero: 'hero',
   profil: 'profil-section',
-  qr: 'qr-section',
-  flipbook: 'flipbook-section'
+  qr: 'QR-Kode',                       // FIX: sebelumnya 'qr-section' -- id itu gak pernah ada di HTML (id aslinya 'QR-Kode'), jadi perintah "buka QR" gagal diam-diam.
+  flipbook: 'flipbook-section',
+  dataInvestasi: 'data-investasi-section', // BARU: sebelumnya gak dikenal sama sekali oleh navigasi lokal.
+  map: 'map-section',                      // BARU
+  kontak: 'kontak-section-placeholder'     // BARU: ikutin id asli section (lihat FIX di index.html buat href-nya).
 };
 const SECTION_LABELS = {
   hero: 'Beranda',
   profil: 'Profil, Visi & Misi',
-  qr: 'Scan QR / Katalog Investasi',
-  flipbook: 'Company Profile (Flipbook)'
+  qr: 'Scan QR / Potensi Investasi',
+  flipbook: 'Company Profile (Flipbook)',
+  dataInvestasi: 'Data Investasi',
+  map: 'Peta / Kawasan Investasi',
+  kontak: 'Kontak'
 };
 
 function matchPageNumber(t) {
@@ -196,8 +202,11 @@ function detectAndExecuteLocalAction(rawText) {
     return runCarouselAction(cardIndex);
   }
 
-  if (/\bqr\b|scan|pindai/.test(t)) return runSectionAction('qr');
-  if (/flipbook|company profile|\bdokumen\b/.test(t)) return runSectionAction('flipbook');
+  if (/\bqr\b|scan|pindai|potensi investasi/.test(t)) return runSectionAction('qr');
+  if (/flipbook|company profile|\bdokumen\b|profil kota/.test(t)) return runSectionAction('flipbook');
+  if (/data investasi/.test(t)) return runSectionAction('dataInvestasi'); // BARU
+  if (/\bpeta\b|kawasan/.test(t)) return runSectionAction('map');          // BARU
+  if (/\bkontak\b|hubungi|\bcontact\b/.test(t)) return runSectionAction('kontak'); // BARU
   if (/\bprofil\b/.test(t)) return runSectionAction('profil');
   if (/beranda|awal|\bhero\b/.test(t)) return runSectionAction('hero');
 
