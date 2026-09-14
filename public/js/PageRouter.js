@@ -119,6 +119,14 @@
             return;
         }
 
+        // FIX: dulu scroll position gak pernah direset pas pindah halaman --
+        // kalau lagi discroll ke bawah (misal ngeliatin dokumen di Data
+        // Investasi) terus pindah ke halaman lain (Home/Kontak/dll), scroll-nya
+        // ikut kebawa, jadi halaman baru itu kepotong/keliatan kosong sampai
+        // discroll manual ke atas. Sekarang tiap ganti halaman langsung
+        // snap ke atas duluan.
+        window.scrollTo(0, 0);
+
         var current = currentKey
             ? document.querySelector('[data-page="' + currentKey + '"]')
             : null;
