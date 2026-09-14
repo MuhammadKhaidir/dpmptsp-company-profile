@@ -469,6 +469,18 @@ class FlipBookScroll {
     this.render();
   }
 
+  // FITUR: dipanggil PageRouter.js pas halaman "profil-kota" di-enter
+  // (termasuk pas balik lagi ke halaman ini). Progress di-reset ke posisi
+  // yang SAMA PERSIS kayak constructor -- "buku pertama, cover udah
+  // kebuka penuh, siap dibaca" -- BUKAN ke 0. progress=0 artinya buku
+  // masih di state "belum masuk" (invisible/mengecil), baru kelihatan
+  // penuh setelah stepPage() (tombol panah) mendorongnya ke zona ENTER_END.
+  resetToStart() {
+    this.activeIndex = -1;
+    this.progress = clamp01(ENTER_END / this.books.length);
+    this.render();
+  }
+
   build() {
     this.container.classList.add('flipbook-scroll-wrap');
     this.container.style.position = 'relative';

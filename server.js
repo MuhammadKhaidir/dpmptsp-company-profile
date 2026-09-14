@@ -63,6 +63,7 @@ const arcCarouselRouter = require('./routes/arcCarouselContent');
 
    app.use('/api/qr-doc', require('./routes/qrDoc'));
    app.use('/api/data-investasi', require('./routes/dataInvestasi.route'));
+   app.use('/api/kontak', require('./routes/kontak.route'));
 
 
 // Semua route non-API jatuh ke index.html — routing halaman (login/dashboard/dll)

@@ -171,8 +171,13 @@ body {
     letter-spacing: 0em;
 }
 
-/* Turunin "Profil Interaktif" & "Company Profile" — khusus flipbook-section,
-   section lain yang pake .info-section-head gak ikut kegeser */
+/* Kasih jarak di atas "Profil Interaktif" & "Company Profile" -- khusus
+   flipbook-section, section lain yang pake .info-section-head gak ikut
+   kegeser. FIX: sebelumnya 400px -- jauh lebih gede dari yang dibutuhin
+   cuma buat ngasih jarak dari navbar (.hero-nav, fixed di atas), bikin
+   seluruh section (judul + buku) nembus jauh di bawah 1 layar pas
+   halaman ini pertama dibuka. Dikecilin ke 96px, cukup buat ngasih
+   jarak dari navbar tanpa mendorong bukunya keluar dari viewport awal. */
 #flipbook-section .info-section-head {
-    margin-top: 400px;
+    margin-top: 96px;
 }

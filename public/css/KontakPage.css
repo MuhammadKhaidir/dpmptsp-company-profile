@@ -183,6 +183,84 @@
   margin-left: 84px;
 }
 
+/* ---------- BARU: edit info kontak (admin) ---------- */
+
+.kontak-info-edit-btn {
+  flex: none;
+  align-self: flex-start;
+  margin-left: auto;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--kontak-divider);
+  background: transparent;
+  color: var(--kontak-ink-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background .2s ease, color .2s ease, border-color .2s ease;
+}
+.kontak-info-edit-btn svg { width: 15px; height: 15px; }
+.kontak-info-edit-btn:hover {
+  background: var(--kontak-icon-bg);
+  color: var(--kontak-icon-fg);
+  border-color: var(--kontak-icon-fg);
+}
+
+.kontak-info-item--editing {
+  align-items: stretch;
+}
+
+.kontak-info-edit-textarea {
+  width: 100%;
+  font-family: var(--kontak-font-sans);
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--kontak-ink);
+  background: var(--kontak-field-bg);
+  border: 1px solid var(--kontak-field-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+.kontak-info-edit-textarea:focus {
+  outline: none;
+  border-color: var(--kontak-field-border-focus);
+}
+
+.kontak-info-edit-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.kontak-info-edit-cancel,
+.kontak-info-edit-save {
+  font-family: var(--kontak-font-sans);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.kontak-info-edit-cancel {
+  background: transparent;
+  border-color: var(--kontak-divider);
+  color: var(--kontak-ink-soft);
+}
+.kontak-info-edit-cancel:hover { background: var(--kontak-icon-bg); }
+
+.kontak-info-edit-save {
+  background: var(--kontak-icon-fg);
+  border-color: var(--kontak-icon-fg);
+  color: #fff;
+}
+.kontak-info-edit-save:hover { opacity: .9; }
+.kontak-info-edit-save:disabled { opacity: .6; cursor: default; }
+
 /* ---------- Kolom kanan: kartu form "Kirim Pesan" ---------- */
 
 .kontak-form-card {

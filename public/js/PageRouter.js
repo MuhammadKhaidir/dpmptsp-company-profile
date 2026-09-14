@@ -76,10 +76,17 @@
                     forceUnlockBody();
                 }
                 fb.lastScrollY = null;
-                fb.progress = 0;
                 window.scrollTo(0, 0);
                 fb.recomputeBounds();
-                fb.render();
+                // FIX: dulu di sini progress dipaksa manual ke 0 -- padahal
+                // progress=0 itu artinya buku pertama masih di state
+                // "belum masuk" (invisible/mengecil), BUKAN posisi "cover
+                // udah kebuka, siap dibaca". Makanya bukunya kayak "gak
+                // muncul" sampai user neken tombol panah kanan/kiri dulu
+                // (stepPage() yang sebenarnya mendorong progress ke zona
+                // yang kebaca). resetToStart() nyamain persis sama state
+                // awal yang dipakai constructor.
+                fb.resetToStart();
             },
             onExit: function () {
                 var fb = window.__flipBookScrollInstance;

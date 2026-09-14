@@ -10,6 +10,14 @@
  *
  * Navbar di luar section ini TIDAK disentuh sama sekali.
  *
+ * BARU: daftar info kontak (Alamat/Telepon/Email/Jam Pelayanan) SEKARANG
+ * DIAMBIL DARI SERVER (/api/kontak) alih-alih di-hardcode di file ini --
+ * ADMIN yang lagi login bisa klik ikon pensil di tiap item buat
+ * memperbarui isinya (lihat routes/kontak.route.js & data/kontakStore.js),
+ * jadi kalau alamat/nomor telepon/jam pelayanan berubah, gak perlu
+ * edit kode & deploy ulang lagi. Status admin dicek lewat
+ * /api/auth/check-session -- pola sama kayak DataInvestasiPage.js.
+ *
  * Pasang bareng kontak.css (link di <head>), lalu panggil:
  *
  *   const kontakPage = new KontakPage();
@@ -31,32 +39,19 @@ const KONTAK_ICONS = {
   document: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5h7.2L19 8.3V19a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 7 19V3.5Z"/><path d="M14 3.5V8h4.7"/><path d="M9.5 13h5M9.5 16.3h5"/></svg>`,
   chevronDown: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>`,
   chat: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 1 3.3 6.5L4 20l1.3-3.6A7.96 7.96 0 0 1 4 12Z"/></svg>`,
-  send: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3 3 10.5l7 2.7L15 21l6-18Z"/><path d="m10.5 13.2 4-5"/></svg>`
+  send: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3 3 10.5l7 2.7L15 21l6-18Z"/><path d="m10.5 13.2 4-5"/></svg>`,
+  pencil: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>`
 };
 
-// Isi daftar info kontak. Tinggal edit array ini kalau alamat/telepon/dll
-// berubah -- tidak perlu sentuh markup di bawah.
-const KONTAK_INFO_ITEMS = [
-  {
-    icon: 'pin',
-    title: 'Alamat',
-    lines: ['Jl. Merdeka No. 123, Ilir Timur I', 'Palembang, Sumatera Selatan 30111']
-  },
-  {
-    icon: 'phone',
-    title: 'Telepon',
-    lines: ['(0711) 123456']
-  },
-  {
-    icon: 'mail',
-    title: 'Email',
-    lines: ['dpmptsp@palembang.go.id']
-  },
-  {
-    icon: 'clock',
-    title: 'Jam Pelayanan',
-    lines: ['Senin – Jumat  |  08.00 – 16.00 WIB']
-  }
+// FALLBACK -- dipakai kalau /api/kontak gagal diakses (server down / belum
+// pernah setup Redis). Isinya sama kayak nilai default di
+// data/kontakStore.js, biar halaman tetap tampil normal walau data dari
+// server gak bisa diambil.
+const KONTAK_FALLBACK_ITEMS = [
+  { id: 'alamat', icon: 'pin', title: 'Alamat', lines: ['Jl. Merdeka No. 123, Ilir Timur I', 'Palembang, Sumatera Selatan 30111'] },
+  { id: 'telepon', icon: 'phone', title: 'Telepon', lines: ['(0711) 123456'] },
+  { id: 'email', icon: 'mail', title: 'Email', lines: ['dpmptsp@palembang.go.id'] },
+  { id: 'jam', icon: 'clock', title: 'Jam Pelayanan', lines: ['Senin – Jumat  |  08.00 – 16.00 WIB'] }
 ];
 
 const KONTAK_KATEGORI_OPTIONS = [
@@ -75,17 +70,53 @@ class KontakPage {
     this.feedbackEl = null;
     this.submitBtn = null;
 
+    this.isAdmin = false;
+    this.items = KONTAK_FALLBACK_ITEMS;
+    this.editingId = null; // id item yang lagi dalam mode edit, kalau ada
+
     this.handleSubmit = this.handleSubmit.bind(this);
   }
 
-  init() {
+  async init() {
     this.section = document.getElementById('kontak-section-placeholder');
     if (!this.section) {
       console.warn('[' + this.pageName + '] #kontak-section-placeholder tidak ditemukan di DOM');
       return;
     }
+
+    // Render dulu pakai fallback biar halaman langsung ada isinya (gak
+    // nunggu network), lalu update begitu data asli dari server datang.
     this.render();
+
+    await Promise.all([this.loadAdminStatus(), this.loadItems()]);
+    this.editingId = null;
+    this.renderInfoList();
+
     console.log('[' + this.pageName + '] initialized');
+  }
+
+  loadAdminStatus() {
+    return fetch('/api/auth/check-session')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        this.isAdmin = !!(data && data.logged_in && data.role === 'admin');
+      })
+      .catch(() => {
+        this.isAdmin = false;
+      });
+  }
+
+  loadItems() {
+    return fetch('/api/kontak')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data && Array.isArray(data.items) && data.items.length) {
+          this.items = data.items;
+        }
+      })
+      .catch((err) => {
+        console.warn('[' + this.pageName + '] Gagal memuat info kontak dari server, pakai data bawaan:', err);
+      });
   }
 
   render() {
@@ -97,10 +128,19 @@ class KontakPage {
     this.form = this.section.querySelector('#kontakForm');
     this.feedbackEl = this.section.querySelector('#kontakFormFeedback');
     this.submitBtn = this.section.querySelector('.kontak-submit-btn');
+    this.infoListEl = this.section.querySelector('.kontak-info-list');
 
     if (this.form) {
       this.form.addEventListener('submit', this.handleSubmit);
     }
+  }
+
+  // Cuma re-render daftar info kontak (kiri) -- form pesan (kanan) gak
+  // ikut disentuh, biar isian yang lagi diketik pengunjung gak ke-reset.
+  renderInfoList() {
+    if (!this.infoListEl) return;
+    this.infoListEl.innerHTML = this.buildInfoItemsMarkup();
+    this.bindInfoListEvents();
   }
 
   buildMarkup() {
@@ -174,21 +214,97 @@ class KontakPage {
   }
 
   buildInfoItemsMarkup() {
-    return KONTAK_INFO_ITEMS.map((item, i) => {
-      const isLast = i === KONTAK_INFO_ITEMS.length - 1;
+    return this.items.map((item, i) => {
+      const isLast = i === this.items.length - 1;
       const divider = isLast ? '' : '<div class="kontak-info-divider"></div>';
-      const lines = item.lines.map((line) => this.escapeHtml(line)).join('<br>');
+      const isEditing = this.editingId === item.id;
+
+      const body = isEditing
+        ? `<textarea class="kontak-info-edit-textarea" data-edit-id="${item.id}" rows="${Math.max(2, item.lines.length)}">${this.escapeHtml(item.lines.join('\n'))}</textarea>
+           <div class="kontak-info-edit-actions">
+             <button type="button" class="kontak-info-edit-cancel" data-cancel-id="${item.id}">Batal</button>
+             <button type="button" class="kontak-info-edit-save" data-save-id="${item.id}">Simpan</button>
+           </div>`
+        : `<p>${item.lines.map((line) => this.escapeHtml(line)).join('<br>')}</p>`;
+
+      const editBtn = this.isAdmin && !isEditing
+        ? `<button type="button" class="kontak-info-edit-btn" data-edit-btn-id="${item.id}" title="Edit ${this.escapeHtml(item.title)}" aria-label="Edit ${this.escapeHtml(item.title)}">${KONTAK_ICONS.pencil}</button>`
+        : '';
+
       return `
-        <div class="kontak-info-item">
-          <div class="kontak-info-icon">${KONTAK_ICONS[item.icon]}</div>
+        <div class="kontak-info-item${isEditing ? ' kontak-info-item--editing' : ''}">
+          <div class="kontak-info-icon">${KONTAK_ICONS[item.icon] || ''}</div>
           <div class="kontak-info-text">
             <h3>${this.escapeHtml(item.title)}</h3>
-            <p>${lines}</p>
+            ${body}
           </div>
+          ${editBtn}
         </div>
         ${divider}
       `;
     }).join('');
+  }
+
+  bindInfoListEvents() {
+    if (!this.infoListEl) return;
+
+    this.infoListEl.querySelectorAll('[data-edit-btn-id]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.editingId = btn.getAttribute('data-edit-btn-id');
+        this.renderInfoList();
+      });
+    });
+
+    this.infoListEl.querySelectorAll('[data-cancel-id]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        this.editingId = null;
+        this.renderInfoList();
+      });
+    });
+
+    this.infoListEl.querySelectorAll('[data-save-id]').forEach((btn) => {
+      btn.addEventListener('click', () => this.submitEdit(btn.getAttribute('data-save-id')));
+    });
+  }
+
+  async submitEdit(id) {
+    const textarea = this.infoListEl.querySelector('textarea[data-edit-id="' + id + '"]');
+    if (!textarea) return;
+
+    const lines = textarea.value.split('\n').map((l) => l.trim()).filter(Boolean);
+    if (!lines.length) {
+      textarea.focus();
+      return;
+    }
+
+    const saveBtn = this.infoListEl.querySelector('[data-save-id="' + id + '"]');
+    if (saveBtn) saveBtn.disabled = true;
+
+    try {
+      const fd = new FormData();
+      fd.append('id', id);
+      fd.append('lines', JSON.stringify(lines));
+
+      const res = await fetch('/api/kontak/update', {
+        method: 'POST',
+        body: fd,
+        credentials: 'same-origin'
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        console.error('[' + this.pageName + '] Gagal update info kontak:', data.message);
+        if (saveBtn) saveBtn.disabled = false;
+        return;
+      }
+
+      this.items = data.items;
+      this.editingId = null;
+      this.renderInfoList();
+    } catch (err) {
+      console.error('[' + this.pageName + '] Gagal update info kontak:', err);
+      if (saveBtn) saveBtn.disabled = false;
+    }
   }
 
   buildKategoriOptionsMarkup() {
@@ -257,6 +373,8 @@ class KontakPage {
     this.form = null;
     this.feedbackEl = null;
     this.submitBtn = null;
+    this.infoListEl = null;
+    this.editingId = null;
     console.log('[' + this.pageName + '] destroyed');
   }
 }
