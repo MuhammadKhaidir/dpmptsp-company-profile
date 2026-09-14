@@ -435,12 +435,12 @@
 
 </div>
 
-<div x-show="v==='login'" x-cloak class="inner" style="display:flex;align-items:center;justify-content:center;min-height:100svh;padding:40px 16px;">
-    <button type="button" @click="v='landing'" class="nav-pill water-hover" style="position:fixed;top:clamp(20px,4vw,44px);left:clamp(20px,4vw,54px);z-index:500;cursor:pointer;font-family:'Inter',sans-serif;">
-        <i class="fa-solid fa-arrow-left" style="margin-right:7px;"></i>Beranda
-    </button>
-
+<div x-show="v==='login'" x-cloak class="inner" style="display:flex;align-items:center;justify-content:center;min-height:100vh;width:100%;box-sizing:border-box;padding:40px 16px;">
     <div class="auth-card">
+        <button type="button" @click="v='landing'" style="display:inline-flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:rgba(28,26,21,.5);background:none;border:none;cursor:pointer;padding:0;margin-bottom:20px;font-family:'Inter',sans-serif;">
+            <i class="fa-solid fa-arrow-left"></i> Kembali ke Beranda
+        </button>
+
         <div style="text-align:center;margin-bottom:26px;">
             <div style="width:50px;height:50px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.26);border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;font-size:20px;">
                 <i class="fa-solid fa-lock"></i>
@@ -461,7 +461,6 @@
             .then(r => r.json())
             .then(data => {
                 loading = false;
-                // SESUDAH
                 if (data.success) {
                     sessionStorage.setItem('nama_lengkap', data.nama_lengkap);
                     sessionStorage.setItem('role', data.role);
