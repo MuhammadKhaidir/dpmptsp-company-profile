@@ -54,7 +54,7 @@
     transform: translate(-50%, -50%);
     margin-right: 10px;
 
-    font-family: "Fraunces",;
+    font-family: "Fraunces", serif;
     font-weight: 600;
 
     font-size: clamp(56px, 10vw, 170px);

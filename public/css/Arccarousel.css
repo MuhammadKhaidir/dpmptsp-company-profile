@@ -46,8 +46,6 @@
    tetep aman di-scope ke .arc-carousel seperti sebelumnya.
    ============================================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Newsreader:wght@300;400;500;600&display=swap');
-
 :root {
     --arc-paper: #ece7dc;
     --arc-paper-deep: #d9cfb4;
@@ -122,7 +120,7 @@
         rgba(43, 33, 24, 0) 100%
     );
 
-    font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif;
+    font-family: 'Fraunces', serif;
     font-size: clamp(12px, calc(var(--arc-card-w) * 0.09), 18px);
     font-weight: 400;
     line-height: 1.28;
@@ -260,7 +258,7 @@
     justify-content: center;
     gap: 6px;
     max-width: 100%;
-    font-family: 'Newsreader', Georgia, 'Times New Roman', serif;
+    font-family: 'Inter', sans-serif;
     font-size: clamp(10.5px, calc(var(--arc-card-w) * 0.0625), 12.5px);
     font-weight: 500;
     letter-spacing: 0.02em;
@@ -337,7 +335,7 @@
 .arc-empty {
     flex-basis: 100%;
     text-align: center;
-    font-family: 'Newsreader', Georgia, serif;
+    font-family: 'Inter', sans-serif;
     font-size: 13px;
     color: var(--arc-ink-faint);
     padding: 24px 12px;
@@ -422,7 +420,7 @@
     border: 1px solid rgba(154, 106, 62, 0.5);
     background: var(--arc-paper);
     color: var(--arc-ink);
-    font-family: 'Newsreader', Georgia, serif;
+    font-family: 'Inter', sans-serif;
     font-size: 13px;
     font-weight: 500;
     letter-spacing: 0.02em;
@@ -459,7 +457,7 @@
     border-radius: 14px;
     padding: 28px 24px 22px;
     box-shadow: 0 30px 80px rgba(0, 0, 0, 0.4);
-    font-family: 'Newsreader', Georgia, serif;
+    font-family: 'Inter', sans-serif;
 }
 
 .arc-modal-close {
@@ -475,7 +473,7 @@
 }
 
 .arc-modal-title {
-    font-family: 'Instrument Serif', Georgia, serif;
+    font-family: 'Fraunces', serif;
     font-size: 21px;
     font-weight: 400;
     color: var(--arc-ink);
@@ -507,7 +505,7 @@
 }
 
 .arc-modal-field-input {
-    font-family: 'Newsreader', Georgia, serif;
+    font-family: 'Inter', sans-serif;
     font-size: 14px;
     font-weight: 400;
     color: var(--arc-ink);
@@ -531,7 +529,7 @@
 
 .arc-modal-cancel,
 .arc-modal-submit {
-    font-family: 'Newsreader', Georgia, serif;
+    font-family: 'Inter', sans-serif;
     font-size: 13px;
     font-weight: 500;
     padding: 9px 18px;

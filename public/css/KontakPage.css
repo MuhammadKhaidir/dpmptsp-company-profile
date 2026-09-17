@@ -16,8 +16,8 @@
 
 #kontak-section-placeholder.kontak-section {
   /* --- font --- */
-  --kontak-font-serif: 'Playfair Display', Georgia, 'Times New Roman', serif;
-  --kontak-font-sans: 'Poppins', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --kontak-font-serif: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --kontak-font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
 
   /* --- warna teks --- */
   --kontak-ink: #423c2c;          /* judul: Alamat, Telepon, Kirim Pesan */
